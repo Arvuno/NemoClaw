@@ -384,7 +384,7 @@
   <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">About NemoClaw</span></p>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="../about/overview.html">Overview</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../about/how-it-works.html">How It Works</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../about/how-it-works.html">Architecture Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../about/ecosystem.html">Ecosystem</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../about/release-notes.html">Release Notes</a></li>
 </ul>
@@ -394,7 +394,8 @@
 <li class="toctree-l2"><a class="reference internal" href="../get-started/windows-preparation.html">Prepare Windows for NemoClaw</a></li>
 </ul>
 </details></li>
-<li class="toctree-l1"><a class="reference internal" href="../get-started/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../get-started/quickstart.html">Quickstart with OpenClaw</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../get-started/quickstart-hermes.html">Quickstart with Hermes</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Inference</span></p>
 <ul class="nav bd-sidenav">
@@ -1513,6 +1514,8 @@ Pass <code class="docutils literal notranslate"><span class="pre">--control-ui-p
 Every <code class="docutils literal notranslate"><span class="pre">nemohermes</span></code> command is equivalent to running <code class="docutils literal notranslate"><span class="pre">nemoclaw</span></code> with <code class="docutils literal notranslate"><span class="pre">--agent</span> <span class="pre">hermes</span></code> (for onboard) or <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_AGENT=hermes</span></code> (for all commands).</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemohermes<span class="w"> </span>onboard<span class="w">              </span><span class="c1"># equivalent to: nemoclaw onboard --agent hermes</span>
 <span class="gp">$ </span>nemohermes<span class="w"> </span>my-sandbox<span class="w"> </span>connect<span class="w">   </span><span class="c1"># same as: nemoclaw my-sandbox connect</span>
+<span class="gp">$ </span>nemohermes<span class="w"> </span>--help<span class="w">               </span><span class="c1"># show NemoHermes-branded help</span>
+<span class="gp">$ </span>nemohermes<span class="w"> </span>--version<span class="w">            </span><span class="c1"># show the installed NemoHermes CLI version</span>
 </pre></div>
 </div>
 <p>The alias is installed alongside <code class="docutils literal notranslate"><span class="pre">nemoclaw</span></code> via <code class="docutils literal notranslate"><span class="pre">npm</span> <span class="pre">link</span></code> or <code class="docutils literal notranslate"><span class="pre">npm</span> <span class="pre">install</span> <span class="pre">-g</span></code>.

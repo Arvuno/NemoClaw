@@ -9,7 +9,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Network Policies &#8212; NVIDIA NemoClaw Developer Guide</title>
+    <title>NemoClaw Quickstart with Hermes &#8212; NVIDIA NemoClaw Developer Guide</title>
   
   
   
@@ -52,7 +52,7 @@
     <script src="../_static/copybutton.js?v=6dbb43f8"></script>
     <script src="../_static/search-assets.bundle.js?v=099b119e"></script>
     <script src="../_static/design-tabs.js?v=f930bc37"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'reference/network-policies';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'get-started/quickstart-hermes';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = '../versions1.json';
@@ -61,12 +61,12 @@
             false;
         </script>
 
-    <link rel="canonical" href="https://docs.nvidia.com/nemoclaw/latest/reference/network-policies.html" />
+    <link rel="canonical" href="https://docs.nvidia.com/nemoclaw/latest/get-started/quickstart-hermes.html" />
     <link rel="icon" href="../_static/favicon.png"/>
 
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Troubleshooting" href="troubleshooting.html" />
-    <link rel="prev" title="Commands" href="commands.html" />
+    <link rel="next" title="Inference Options" href="../inference/inference-options.html" />
+    <link rel="prev" title="NemoClaw Quickstart with OpenClaw" href="quickstart.html" />
 
 
 
@@ -389,13 +389,13 @@
 <li class="toctree-l1"><a class="reference internal" href="../about/release-notes.html">Release Notes</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Get Started</span></p>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="../get-started/prerequisites.html">Prerequisites</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
-<li class="toctree-l2"><a class="reference internal" href="../get-started/windows-preparation.html">Prepare Windows for NemoClaw</a></li>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="prerequisites.html">Prerequisites</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="windows-preparation.html">Prepare Windows for NemoClaw</a></li>
 </ul>
 </details></li>
-<li class="toctree-l1"><a class="reference internal" href="../get-started/quickstart.html">Quickstart with OpenClaw</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../get-started/quickstart-hermes.html">Quickstart with Hermes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart with OpenClaw</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Quickstart with Hermes</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Inference</span></p>
 <ul class="nav bd-sidenav">
@@ -432,11 +432,11 @@
 <li class="toctree-l1"><a class="reference internal" href="../monitoring/monitor-sandbox-activity.html">Monitor Sandbox Activity</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Reference</span></p>
-<ul class="current nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
-<li class="toctree-l1"><a class="reference internal" href="commands.html">Commands</a></li>
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">Network Policies</a></li>
-<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../reference/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/commands.html">Commands</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/network-policies.html">Network Policies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Resources</span></p>
 <ul class="nav bd-sidenav">
@@ -478,7 +478,7 @@
         <i class="fa-solid fa-home"></i>
       </a>
     </li>
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Network Policies</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">NemoClaw Quickstart with Hermes</span></li>
   </ul>
 </nav>
 </div>
@@ -499,168 +499,135 @@
   SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
   SPDX-License-Identifier: Apache-2.0
 -->
-<section class="tex2jax_ignore mathjax_ignore" id="network-policies">
-<h1>Network Policies<a class="headerlink" href="#network-policies" title="Link to this heading">#</a></h1>
-<p>NemoClaw runs with a deny-by-default network policy.
-The sandbox can only reach endpoints that are explicitly allowed.
-Any request to an unlisted destination is intercepted by OpenShell, and the operator is prompted to approve or deny it in real time through the TUI.</p>
-<section id="baseline-policy">
-<h2>Baseline Policy<a class="headerlink" href="#baseline-policy" title="Link to this heading">#</a></h2>
-<p>The baseline policy is defined in <code class="docutils literal notranslate"><span class="pre">nemoclaw-blueprint/policies/openclaw-sandbox.yaml</span></code>.</p>
-<section id="filesystem">
-<h3>Filesystem<a class="headerlink" href="#filesystem" title="Link to this heading">#</a></h3>
-<div class="pst-scrollable-table-container"><table class="table">
-<thead>
-<tr class="row-odd"><th class="head"><p>Path</p></th>
-<th class="head"><p>Access</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">/sandbox</span></code>, <code class="docutils literal notranslate"><span class="pre">/tmp</span></code>, <code class="docutils literal notranslate"><span class="pre">/dev/null</span></code></p></td>
-<td><p>Read-write</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">/usr</span></code>, <code class="docutils literal notranslate"><span class="pre">/lib</span></code>, <code class="docutils literal notranslate"><span class="pre">/proc</span></code>, <code class="docutils literal notranslate"><span class="pre">/dev/urandom</span></code>, <code class="docutils literal notranslate"><span class="pre">/app</span></code>, <code class="docutils literal notranslate"><span class="pre">/etc</span></code>, <code class="docutils literal notranslate"><span class="pre">/var/log</span></code></p></td>
-<td><p>Read-only</p></td>
-</tr>
-</tbody>
-</table>
+<section class="tex2jax_ignore mathjax_ignore" id="nemoclaw-quickstart-with-hermes">
+<h1>NemoClaw Quickstart with Hermes<a class="headerlink" href="#nemoclaw-quickstart-with-hermes" title="Link to this heading">#</a></h1>
+<p>Use NemoHermes when you want NemoClaw to create an OpenShell sandbox that runs Hermes instead of the default OpenClaw agent.
+The <code class="docutils literal notranslate"><span class="pre">nemohermes</span></code> command is an alias for <code class="docutils literal notranslate"><span class="pre">nemoclaw</span></code> with the Hermes agent pre-selected.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The Hermes agent option is experimental.
+Interfaces, defaults, and supported features may change without notice, and it is not recommended for production use.</p>
 </div>
-<p>The sandbox process runs as a dedicated <code class="docutils literal notranslate"><span class="pre">sandbox</span></code> user and group.
-Landlock LSM enforcement applies on a best-effort basis.</p>
-</section>
-<section id="id1">
-<h3>Network Policies<a class="headerlink" href="#id1" title="Link to this heading">#</a></h3>
-<p>The following endpoint groups are allowed by default:</p>
-<div class="pst-scrollable-table-container"><table class="table">
-<colgroup>
-<col style="width: 20.0%" />
-<col style="width: 30.0%" />
-<col style="width: 20.0%" />
-<col style="width: 30.0%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>Policy</p></th>
-<th class="head"><p>Endpoints</p></th>
-<th class="head"><p>Binaries</p></th>
-<th class="head"><p>Rules</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">claude_code</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">api.anthropic.com:443</span></code>, <code class="docutils literal notranslate"><span class="pre">statsig.anthropic.com:443</span></code>, <code class="docutils literal notranslate"><span class="pre">sentry.io:443</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">/usr/local/bin/claude</span></code></p></td>
-<td><p>POST to inference paths on <code class="docutils literal notranslate"><span class="pre">api.anthropic.com</span></code>, POST on <code class="docutils literal notranslate"><span class="pre">statsig.anthropic.com</span></code>, GET only on <code class="docutils literal notranslate"><span class="pre">sentry.io</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nvidia</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">integrate.api.nvidia.com:443</span></code>, <code class="docutils literal notranslate"><span class="pre">inference-api.nvidia.com:443</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">/usr/local/bin/claude</span></code>, <code class="docutils literal notranslate"><span class="pre">/usr/local/bin/openclaw</span></code></p></td>
-<td><p>POST to inference and embedding paths, GET to model listings</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">clawhub</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">clawhub.ai:443</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">/usr/local/bin/openclaw</span></code>, <code class="docutils literal notranslate"><span class="pre">/usr/local/bin/node</span></code></p></td>
-<td><p>GET, POST</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">openclaw_api</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">openclaw.ai:443</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">/usr/local/bin/openclaw</span></code>, <code class="docutils literal notranslate"><span class="pre">/usr/local/bin/node</span></code></p></td>
-<td><p>GET, POST</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">openclaw_docs</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">docs.openclaw.ai:443</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">/usr/local/bin/openclaw</span></code></p></td>
-<td><p>GET only</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">npm_registry</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">registry.npmjs.org:443</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">/usr/local/bin/openclaw</span></code> only (openclaw plugins install)</p></td>
-<td><p>GET only</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>All endpoints use TLS termination and are enforced at port 443.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>GitHub access (<code class="docutils literal notranslate"><span class="pre">github.com</span></code>, <code class="docutils literal notranslate"><span class="pre">api.github.com</span></code>) is not included in the baseline policy.
-Apply the <code class="docutils literal notranslate"><span class="pre">github</span></code> preset during onboarding if your agent needs GitHub access.
-See <a class="reference internal" href="../network-policy/customize-network-policy.html"><span class="std std-doc">Customize the Network Policy</span></a>.</p>
+<p>Review the <a class="reference internal" href="prerequisites.html"><span class="std std-doc">Prerequisites</span></a> before starting.
+The first Hermes build can take several minutes because NemoClaw builds the Hermes sandbox base image if it is not already cached.</p>
 </div>
-</section>
-</section>
-<section id="policy-tiers">
-<span id="id2"></span><h2>Policy Tiers<a class="headerlink" href="#policy-tiers" title="Link to this heading">#</a></h2>
-<p>During onboarding, the wizard prompts for a policy tier that determines the default set of presets applied on top of the baseline policy.
-The baseline policy is always applied regardless of the selected tier.</p>
-<div class="pst-scrollable-table-container"><table class="table">
-<thead>
-<tr class="row-odd"><th class="head"><p>Tier</p></th>
-<th class="head"><p>Presets included</p></th>
-<th class="head"><p>Description</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>Restricted</p></td>
-<td><p>None</p></td>
-<td><p>Base sandbox only. No third-party network access beyond inference and core agent tooling.</p></td>
-</tr>
-<tr class="row-odd"><td><p>Balanced (default)</p></td>
-<td><p>npm, pypi, huggingface, brew, brave</p></td>
-<td><p>Full dev tooling and web search. No messaging platform access.</p></td>
-</tr>
-<tr class="row-even"><td><p>Open</p></td>
-<td><p>npm, pypi, huggingface, brew, brave, slack, discord, telegram, jira, outlook</p></td>
-<td><p>Broad access across third-party services including messaging and productivity.</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>After selecting a tier, a combined preset and access-mode screen lets you include or exclude individual presets and toggle each between read (GET only) and read-write (GET + POST/PUT/PATCH) access.
-Tier-default presets are pre-selected; additional presets can be added from the full list.</p>
-<p>Tier definitions are stored in <code class="docutils literal notranslate"><span class="pre">nemoclaw-blueprint/policies/tiers.yaml</span></code>.</p>
-<p>In non-interactive mode, set the tier with <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_POLICY_TIER</span></code>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nv">NEMOCLAW_POLICY_TIER</span><span class="o">=</span>open<span class="w"> </span>nemoclaw<span class="w"> </span>onboard<span class="w"> </span>--non-interactive<span class="w"> </span>--yes-i-accept-third-party-software
+<section id="install-and-onboard">
+<h2>Install and Onboard<a class="headerlink" href="#install-and-onboard" title="Link to this heading">#</a></h2>
+<p>Start the installer with <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_AGENT=hermes</span></code> set in your shell.
+The installer installs the CLI, selects the <code class="docutils literal notranslate"><span class="pre">nemohermes</span></code> alias, and runs the guided onboarding flow.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">NEMOCLAW_AGENT</span><span class="o">=</span>hermes
+<span class="gp">$ </span>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://www.nvidia.com/nemoclaw.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>bash
 </pre></div>
 </div>
-<p>If the value does not match a known tier, onboarding exits with an error listing the valid options.</p>
-<section id="inference">
-<h3>Inference<a class="headerlink" href="#inference" title="Link to this heading">#</a></h3>
-<p>The baseline policy allows only the <code class="docutils literal notranslate"><span class="pre">local</span></code> inference route. External inference
-providers are reached through the OpenShell gateway, not by direct sandbox egress.</p>
+<p>If NemoClaw is already installed, start Hermes onboarding directly.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemohermes<span class="w"> </span>onboard
+</pre></div>
+</div>
 </section>
+<section id="respond-to-the-wizard">
+<h2>Respond to the Wizard<a class="headerlink" href="#respond-to-the-wizard" title="Link to this heading">#</a></h2>
+<p>The onboard wizard asks for a sandbox name, inference provider, model, credentials, and network policy preset.
+At any prompt, press Enter to accept the default shown in <code class="docutils literal notranslate"><span class="pre">[brackets]</span></code>, type <code class="docutils literal notranslate"><span class="pre">back</span></code> to return to the previous prompt, or type <code class="docutils literal notranslate"><span class="pre">exit</span></code> to quit.</p>
+<p>Use a distinct sandbox name, such as <code class="docutils literal notranslate"><span class="pre">my-hermes</span></code>, so you can run Hermes and OpenClaw sandboxes side by side.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Sandbox name [my-assistant]: my-hermes
+</pre></div>
+</div>
+<p>Choose the inference provider that matches where you want Hermes model traffic to go.
+The provider options and credential environment variables are the same as the standard NemoClaw quickstart.
+For provider-specific prompts, refer to the <a class="reference internal" href="quickstart.html#respond-to-the-onboard-wizard"><span class="std std-ref">Respond to the Onboard Wizard</span></a> section and the <a class="reference internal" href="../inference/inference-options.html"><span class="std std-doc">Inference Options</span></a> page.</p>
+<p>After provider and policy selection, review the summary and confirm the build.
+NemoClaw writes Hermes configuration into <code class="docutils literal notranslate"><span class="pre">/sandbox/.hermes</span></code>, routes model traffic through <code class="docutils literal notranslate"><span class="pre">inference.local</span></code>, and starts the Hermes gateway inside the sandbox.</p>
 </section>
-<section id="operator-approval-flow">
-<h2>Operator Approval Flow<a class="headerlink" href="#operator-approval-flow" title="Link to this heading">#</a></h2>
-<p>When the agent attempts to reach an endpoint not listed in the policy, OpenShell intercepts the request and presents it in the TUI for operator review:</p>
-<ol class="arabic simple">
-<li><p>The agent makes a network request to an unlisted host.</p></li>
-<li><p>OpenShell blocks the connection and logs the attempt.</p></li>
-<li><p>The TUI command <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">term</span></code> displays the blocked request with host, port, and requesting binary.</p></li>
-<li><p>The operator approves or denies the request.</p></li>
-<li><p>If approved, the endpoint is added to the running policy for the session.</p></li>
+<section id="use-non-interactive-setup">
+<h2>Use Non-Interactive Setup<a class="headerlink" href="#use-non-interactive-setup" title="Link to this heading">#</a></h2>
+<p>For CI or scripted installs, set the required environment variables before running the installer.
+The example below uses NVIDIA Endpoints and creates a sandbox named <code class="docutils literal notranslate"><span class="pre">my-hermes</span></code>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">NEMOCLAW_AGENT</span><span class="o">=</span>hermes
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">NEMOCLAW_NON_INTERACTIVE</span><span class="o">=</span><span class="m">1</span>
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE</span><span class="o">=</span><span class="m">1</span>
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">NEMOCLAW_SANDBOX_NAME</span><span class="o">=</span>my-hermes
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">NVIDIA_API_KEY</span><span class="o">=</span>&lt;your-key&gt;
+<span class="gp">$ </span>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://www.nvidia.com/nemoclaw.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>bash
+</pre></div>
+</div>
+<p>Use the provider variables from <a class="reference internal" href="../inference/inference-options.html"><span class="std std-doc">Inference Options</span></a> when you choose a different provider.</p>
+</section>
+<section id="connect-to-hermes">
+<h2>Connect to Hermes<a class="headerlink" href="#connect-to-hermes" title="Link to this heading">#</a></h2>
+<p>When onboarding completes, NemoClaw prints the sandbox name, model, lifecycle commands, and Hermes API endpoint.
+Hermes exposes an OpenAI-compatible API on port <code class="docutils literal notranslate"><span class="pre">8642</span></code>, not a browser dashboard.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>──────────────────────────────────────────────────
+Sandbox      my-hermes (Landlock + seccomp + netns)
+Model        nvidia/nemotron-3-super-120b-a12b (NVIDIA Endpoints)
+──────────────────────────────────────────────────
+Run:         nemohermes my-hermes connect
+Status:      nemohermes my-hermes status
+Logs:        nemohermes my-hermes logs --follow
+
+Hermes Agent OpenAI-compatible API
+Port 8642 must be forwarded before connecting.
+http://127.0.0.1:8642/v1
+──────────────────────────────────────────────────
+</pre></div>
+</div>
+<p>To chat with the agent from a terminal, follow these steps:</p>
+<ol class="arabic">
+<li><p>Connect to the sandbox and start the Hermes CLI.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemohermes<span class="w"> </span>my-hermes<span class="w"> </span>connect
+</pre></div>
+</div>
+</li>
+<li><p>Inside the sandbox, run the Hermes CLI.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>hermes
+</pre></div>
+</div>
+</li>
 </ol>
-<p>To try this, run the walkthrough:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>./scripts/walkthrough.sh
+</section>
+<section id="check-the-api-endpoint">
+<h2>Check the API Endpoint<a class="headerlink" href="#check-the-api-endpoint" title="Link to this heading">#</a></h2>
+<p>The onboard flow starts the port forward automatically.
+Check the health endpoint from the host to confirm that the Hermes API is reachable.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-sf<span class="w"> </span>http://127.0.0.1:8642/health
 </pre></div>
 </div>
-<p>This opens a split tmux session with the TUI on the left and the agent on the right.</p>
+<p>If the command cannot connect after a reboot or terminal restart, start the forward again.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>forward<span class="w"> </span>start<span class="w"> </span>--background<span class="w"> </span><span class="m">8642</span><span class="w"> </span>my-hermes
+</pre></div>
+</div>
+<p>Configure an OpenAI-compatible client with the base URL <code class="docutils literal notranslate"><span class="pre">http://127.0.0.1:8642/v1</span></code>.
+Hermes uses API header authentication for client requests.
+Do not append an OpenClaw <code class="docutils literal notranslate"><span class="pre">#token=</span></code> URL fragment to the Hermes endpoint.</p>
 </section>
-<section id="modifying-the-policy">
-<h2>Modifying the Policy<a class="headerlink" href="#modifying-the-policy" title="Link to this heading">#</a></h2>
-<section id="static-changes">
-<h3>Static Changes<a class="headerlink" href="#static-changes" title="Link to this heading">#</a></h3>
-<p>Edit <code class="docutils literal notranslate"><span class="pre">nemoclaw-blueprint/policies/openclaw-sandbox.yaml</span></code> and re-run the onboard wizard:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>onboard
+<section id="manage-the-sandbox">
+<h2>Manage the Sandbox<a class="headerlink" href="#manage-the-sandbox" title="Link to this heading">#</a></h2>
+<p>Use the same lifecycle commands as a standard NemoClaw sandbox.
+The <code class="docutils literal notranslate"><span class="pre">nemohermes</span></code> alias keeps help text and recovery messages aligned with Hermes, while targeting the same registered sandbox.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemohermes<span class="w"> </span>my-hermes<span class="w"> </span>status
+<span class="gp">$ </span>nemohermes<span class="w"> </span>my-hermes<span class="w"> </span>logs<span class="w"> </span>--follow
+<span class="gp">$ </span>nemohermes<span class="w"> </span>my-hermes<span class="w"> </span>snapshot<span class="w"> </span>create<span class="w"> </span>--name<span class="w"> </span>before-change
+<span class="gp">$ </span>nemohermes<span class="w"> </span>my-hermes<span class="w"> </span>rebuild
+</pre></div>
+</div>
+<p>To change the active model or provider without rebuilding the sandbox, use the OpenShell inference route.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>inference<span class="w"> </span><span class="nb">set</span><span class="w"> </span>-g<span class="w"> </span>nemoclaw<span class="w"> </span>--model<span class="w"> </span>&lt;model&gt;<span class="w"> </span>--provider<span class="w"> </span>&lt;provider&gt;
+</pre></div>
+</div>
+<p>To remove the sandbox when you are done, destroy it explicitly.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemohermes<span class="w"> </span>my-hermes<span class="w"> </span>destroy
 </pre></div>
 </div>
 </section>
-<section id="dynamic-changes">
-<h3>Dynamic Changes<a class="headerlink" href="#dynamic-changes" title="Link to this heading">#</a></h3>
-<p>Apply policy updates to a running sandbox without restarting:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>policy<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--policy<span class="w"> </span>&lt;policy-file&gt;<span class="w"> </span>&lt;sandbox-name&gt;
-</pre></div>
-</div>
-</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../inference/inference-options.html"><span class="std std-doc">Inference Options</span></a> to choose a provider and model.</p></li>
+<li><p><a class="reference internal" href="../reference/commands.html"><span class="std std-doc">Commands</span></a> to see the full <code class="docutils literal notranslate"><span class="pre">nemohermes</span></code> alias behavior.</p></li>
+<li><p><a class="reference internal" href="../workspace/backup-restore.html"><span class="std std-doc">Backup and Restore</span></a> to preserve sandbox state before destructive operations.</p></li>
+<li><p><a class="reference internal" href="../monitoring/monitor-sandbox-activity.html"><span class="std std-doc">Monitor Sandbox Activity</span></a> to inspect OpenShell events and sandbox logs.</p></li>
+</ul>
 </section>
 </section>
 
@@ -675,20 +642,20 @@ providers are reached through the OpenShell gateway, not by direct sandbox egres
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="commands.html"
+       href="quickstart.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Commands</p>
+        <p class="prev-next-title">NemoClaw Quickstart with OpenClaw</p>
       </div>
     </a>
     <a class="right-next"
-       href="troubleshooting.html"
+       href="../inference/inference-options.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Troubleshooting</p>
+        <p class="prev-next-title">Inference Options</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -713,21 +680,13 @@ providers are reached through the OpenShell gateway, not by direct sandbox egres
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#baseline-policy">Baseline Policy</a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#filesystem">Filesystem</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id1">Network Policies</a></li>
-</ul>
-</li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#policy-tiers">Policy Tiers</a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inference">Inference</a></li>
-</ul>
-</li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#operator-approval-flow">Operator Approval Flow</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#modifying-the-policy">Modifying the Policy</a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#static-changes">Static Changes</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#dynamic-changes">Dynamic Changes</a></li>
-</ul>
-</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#install-and-onboard">Install and Onboard</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#respond-to-the-wizard">Respond to the Wizard</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#use-non-interactive-setup">Use Non-Interactive Setup</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#connect-to-hermes">Connect to Hermes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#check-the-api-endpoint">Check the API Endpoint</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#manage-the-sandbox">Manage the Sandbox</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#next-steps">Next Steps</a></li>
 </ul>
   </nav></div>
 
