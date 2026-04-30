@@ -1,4 +1,3 @@
-// @ts-nocheck
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -15,8 +14,17 @@ import { describe, expect, it } from "vitest";
  * file, sets up a sandbox registry, and spawns the real CLI entrypoint.
  */
 
+type SandboxEntryFixture = {
+  name: string;
+  model?: string | null;
+  provider?: string | null;
+  nimContainer?: string | null;
+  gpuEnabled?: boolean;
+  policies?: string[];
+};
+
 function setupFixture(
-  sandboxEntry: Record<string, unknown>,
+  sandboxEntry: SandboxEntryFixture,
   liveInferenceProvider: string | null,
   liveInferenceModel: string | null,
 ) {
@@ -74,7 +82,7 @@ if (args[0] === "sandbox" && args[1] === "get" && args[2] === ${JSON.stringify(s
 }
 
 if (args[0] === "sandbox" && args[1] === "list") {
-  process.stdout.write("${sandboxName}\\n");
+  process.stdout.write("${sandboxName}   Ready   2m ago\\n");
   process.exit(0);
 }
 
@@ -125,7 +133,7 @@ function runConnect(tmpDir: string, sandboxName: string) {
         PATH: "/usr/bin:/bin",
         NEMOCLAW_NO_CONNECT_HINT: "1",
       },
-      timeout: 15_000,
+      timeout: Number(process.env.NEMOCLAW_EXEC_TIMEOUT || 15_000),
     },
   );
 }
@@ -133,7 +141,7 @@ function runConnect(tmpDir: string, sandboxName: string) {
 describe("sandbox connect inference route swap (#1248)", () => {
   it(
     "swaps inference route when live route does not match sandbox provider",
-    { timeout: 20_000 },
+    { timeout: Number(process.env.NEMOCLAW_TEST_TIMEOUT || 20_000) },
     () => {
       const { tmpDir, stateFile, sandboxName } = setupFixture(
         {
@@ -162,13 +170,15 @@ describe("sandbox connect inference route swap (#1248)", () => {
 
       // Verify the notice was printed
       const combined = (result.stdout || "") + (result.stderr || "");
-      expect(combined).toContain("Switching inference route to anthropic-prod/claude-sonnet-4-20250514");
+      expect(combined).toContain(
+        "Switching inference route to anthropic-prod/claude-sonnet-4-20250514",
+      );
     },
   );
 
   it(
     "does not swap inference route for legacy sandbox without provider",
-    { timeout: 20_000 },
+    { timeout: Number(process.env.NEMOCLAW_TEST_TIMEOUT || 20_000) },
     () => {
       const { tmpDir, stateFile, sandboxName } = setupFixture(
         {
@@ -191,7 +201,7 @@ describe("sandbox connect inference route swap (#1248)", () => {
 
   it(
     "does not swap when live route already matches sandbox provider",
-    { timeout: 20_000 },
+    { timeout: Number(process.env.NEMOCLAW_TEST_TIMEOUT || 20_000) },
     () => {
       const { tmpDir, stateFile, sandboxName } = setupFixture(
         {
