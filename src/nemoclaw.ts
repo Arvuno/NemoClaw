@@ -578,6 +578,9 @@ async function recoverRegistryEntries({
 
 exports.captureOpenshell = captureOpenshell;
 exports.recoverRegistryEntries = recoverRegistryEntries;
+exports.ensureLiveSandboxOrExit = ensureLiveSandboxOrExit;
+exports.G = G;
+exports.R = R;
 
 function hasNamedGateway(output = ""): boolean {
   return stripAnsi(output).includes("Gateway: nemoclaw");
@@ -1521,12 +1524,16 @@ function showStatus() {
   });
 }
 
-async function listSandboxes(args: string[] = []): Promise<void> {
-  await runRegisteredOclifCommand("list", args, {
+async function runOclif(commandId: string, args: string[] = []): Promise<void> {
+  await runRegisteredOclifCommand(commandId, args, {
     rootDir: ROOT,
     error: console.error,
     exit: (code: number) => process.exit(code),
   });
+}
+
+async function listSandboxes(args: string[] = []): Promise<void> {
+  await runOclif("list", args);
 }
 
 // ── Sandbox-scoped actions ───────────────────────────────────────
@@ -2931,6 +2938,13 @@ function cleanupSandboxServices(
     const { stopAll } = require("./lib/services");
     stopAll({ sandboxName });
   }
+
+  const sb = registry.getSandbox(sandboxName);
+  if (sb?.provider?.includes("ollama")) {
+    const { unloadOllamaModels } = require("./lib/onboard-ollama-proxy");
+    unloadOllamaModels();
+  }
+
   try {
     fs.rmSync(`/tmp/nemoclaw-services-${sandboxName}`, { recursive: true, force: true });
   } catch {
@@ -3010,6 +3024,12 @@ async function sandboxDestroy(sandboxName: string, args: string[] = []): Promise
     // be recorded in the registry (e.g. older sandboxes).  Suppress output
     // so the user doesn't see "No such container" noise when no NIM exists.
     nim.stopNimContainer(sandboxName, { silent: true });
+  }
+
+  if (sb?.provider?.includes("ollama")) {
+    const { unloadOllamaModels, killStaleProxy } = require("./lib/onboard-ollama-proxy");
+    unloadOllamaModels();
+    killStaleProxy();
   }
 
   console.log(`  Deleting sandbox '${sandboxName}'...`);
@@ -4428,6 +4448,13 @@ const [cmd, ...args] = process.argv.slice(2);
       case "snapshot":
         await sandboxSnapshot(cmd, actionArgs);
         break;
+      case "share":
+        await runRegisteredOclifCommand("share", [cmd, ...actionArgs], {
+          rootDir: ROOT,
+          error: console.error,
+          exit: (code: number) => process.exit(code),
+        });
+        break;
       case "shields": {
         const shieldsSub = actionArgs[0];
         const shieldsFlags = actionArgs.slice(1);
@@ -4572,7 +4599,7 @@ const [cmd, ...args] = process.argv.slice(2);
       default:
         console.error(`  Unknown action: ${action}`);
         console.error(
-          `  Valid actions: connect, status, logs, policy-add, policy-remove, policy-list, skill, snapshot, rebuild, shields, config, channels, gateway-token, destroy`,
+          `  Valid actions: connect, status, logs, policy-add, policy-remove, policy-list, skill, snapshot, share, rebuild, shields, config, channels, gateway-token, destroy`,
         );
         process.exit(1);
     }
