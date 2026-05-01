@@ -26,6 +26,7 @@ status: published
 
 Use this guide after you finish the [OpenClaw quickstart](../get-started/quickstart.md).
 It covers day-two sandbox operations such as listing sandboxes, checking health, managing ports, rebuilding safely, upgrading, and uninstalling.
+When a workflow uses the lower-level OpenShell CLI, see [CLI Selection Guide](../reference/cli-selection-guide.md) for the boundary between `nemoclaw` and `openshell`.
 
 ## List Sandboxes
 
