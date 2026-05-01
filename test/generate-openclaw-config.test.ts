@@ -307,7 +307,11 @@ describe("generate-openclaw-config.py: numeric env var validation", () => {
       env,
       timeout: 10_000,
     });
-    expect(result.status).toBe(0);
+    if (result.status !== 0) {
+      throw new Error(
+        `Script failed (exit ${result.status}):\nstdout: ${result.stdout}\nstderr: ${result.stderr}`,
+      );
+    }
     const configPath = path.join(tmpDir, ".openclaw", "openclaw.json");
     return {
       config: JSON.parse(fs.readFileSync(configPath, "utf-8")),
