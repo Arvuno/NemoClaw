@@ -329,6 +329,7 @@ Do not log it, share it, or commit it to version control.
 
 Stop the NIM container, remove the host-side Docker image built during onboard, and delete the sandbox.
 This removes the sandbox from the registry.
+For Ollama-backed sandboxes, `destroy` also asks Ollama to unload currently loaded models and clears stale auth proxy state on a best-effort basis.
 
 :::{warning}
 This command permanently deletes the sandbox **and its persistent volume**.
