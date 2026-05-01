@@ -5,7 +5,7 @@
 
 import { Command } from "@oclif/core";
 
-import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
+import { runOnboardAction, runSetupAction, runSetupSparkAction } from "./global-cli-actions";
 
 export class OnboardCliCommand extends Command {
   static id = "onboard";
@@ -16,7 +16,7 @@ export class OnboardCliCommand extends Command {
 
   public async run(): Promise<void> {
     this.parsed = true;
-    await getNemoClawRuntimeBridge().onboard(this.argv);
+    await runOnboardAction(this.argv);
   }
 }
 
@@ -29,7 +29,7 @@ export class SetupCliCommand extends Command {
 
   public async run(): Promise<void> {
     this.parsed = true;
-    await getNemoClawRuntimeBridge().setup(this.argv);
+    await runSetupAction(this.argv);
   }
 }
 
@@ -42,6 +42,6 @@ export class SetupSparkCliCommand extends Command {
 
   public async run(): Promise<void> {
     this.parsed = true;
-    await getNemoClawRuntimeBridge().setupSpark(this.argv);
+    await runSetupSparkAction(this.argv);
   }
 }

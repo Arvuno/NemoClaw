@@ -5,7 +5,7 @@
 
 import { Args, Command, Flags } from "@oclif/core";
 
-import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
+import { runDeployAction } from "./global-cli-actions";
 
 export default class DeployCliCommand extends Command {
   static id = "deploy";
@@ -26,6 +26,6 @@ export default class DeployCliCommand extends Command {
 
   public async run(): Promise<void> {
     const { args } = await this.parse(DeployCliCommand);
-    await getNemoClawRuntimeBridge().deploy(args.instanceName);
+    await runDeployAction(args.instanceName);
   }
 }

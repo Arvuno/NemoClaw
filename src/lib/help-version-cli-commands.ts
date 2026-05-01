@@ -5,7 +5,7 @@
 
 import { Command } from "@oclif/core";
 
-import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
+import { showRootHelp, showVersion } from "./global-cli-actions";
 
 export class RootHelpCommand extends Command {
   static id = "root:help";
@@ -15,7 +15,7 @@ export class RootHelpCommand extends Command {
 
   public async run(): Promise<void> {
     this.parsed = true;
-    getNemoClawRuntimeBridge().help();
+    showRootHelp();
   }
 }
 
@@ -27,6 +27,6 @@ export class VersionCommand extends Command {
 
   public async run(): Promise<void> {
     this.parsed = true;
-    getNemoClawRuntimeBridge().version();
+    showVersion();
   }
 }
