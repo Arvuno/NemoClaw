@@ -240,8 +240,17 @@ cd ~/NemoClaw && git pull
 bash scripts/install.sh
 ```
 
-If you ran `huggingface-cli login` once during the one-time setup the token is picked
-up automatically. Otherwise prefix the command with `HUGGING_FACE_HUB_TOKEN=hf_...`.
+> **Note:** You no longer need to prefix the command with
+> `HUGGING_FACE_HUB_TOKEN="${HUGGING_FACE_HUB_TOKEN}"`. If you ran `huggingface-cli
+> login` once during the one-time setup, the installer auto-discovers the token from
+> `~/.cache/huggingface/token` and logs the source it used:
+>
+> ```text
+> [INFO]  HuggingFace token: using ~/.cache/huggingface/token (huggingface-cli login) — gated models and faster downloads enabled
+> ```
+>
+> Prefix with `HUGGING_FACE_HUB_TOKEN=hf_...` only if you have not logged in with the
+> HuggingFace CLI and prefer the per-shell env-var approach.
 
 ### Choose a model
 
