@@ -22,6 +22,7 @@ import {
   UpgradeSandboxesCommand,
 } from "./maintenance-cli-commands";
 import { PolicyAddCommand, PolicyRemoveCommand } from "./policy-mutate-cli-commands";
+import RebuildCliCommand from "./rebuild-cli-command";
 import {
   SandboxChannelsListCommand,
   SandboxConfigGetCommand,
@@ -67,6 +68,7 @@ export default {
   "sandbox:policy-add": PolicyAddCommand,
   "sandbox:policy-list": SandboxPolicyListCommand,
   "sandbox:policy-remove": PolicyRemoveCommand,
+  "sandbox:rebuild": RebuildCliCommand,
   "sandbox:shields:down": ShieldsDownCommand,
   "sandbox:shields:status": ShieldsStatusCommand,
   "sandbox:shields:up": ShieldsUpCommand,

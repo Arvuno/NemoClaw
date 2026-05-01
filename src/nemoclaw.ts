@@ -584,6 +584,7 @@ exports.sandboxLogs = sandboxLogs;
 exports.sandboxPolicyAdd = sandboxPolicyAdd;
 exports.sandboxPolicyList = sandboxPolicyList;
 exports.sandboxPolicyRemove = sandboxPolicyRemove;
+exports.sandboxRebuild = sandboxRebuild;
 exports.sandboxSkillInstall = sandboxSkillInstall;
 exports.sandboxSnapshot = sandboxSnapshot;
 exports.sandboxStatus = sandboxStatus;
@@ -4144,7 +4145,11 @@ const mainPromise = (async () => {
         break;
       }
       case "rebuild":
-        await sandboxRebuild(cmd, actionArgs);
+        if (hasHelpFlag(actionArgs)) {
+          printSandboxActionUsage("rebuild [--yes|--force] [--verbose|-v]");
+          break;
+        }
+        await runOclif("sandbox:rebuild", [cmd, ...actionArgs]);
         break;
       case "snapshot": {
         const snapshotSub = actionArgs[0];

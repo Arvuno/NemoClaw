@@ -723,6 +723,11 @@ describe("CLI dispatch", () => {
     expect(destroy.out).toContain("<name> destroy [--yes|--force]");
     expect(destroy.out).not.toContain("sandbox:destroy");
 
+    const rebuild = runWithEnv("alpha rebuild --help", { HOME: home });
+    expect(rebuild.code).toBe(0);
+    expect(rebuild.out).toContain("<name> rebuild [--yes|--force] [--verbose|-v]");
+    expect(rebuild.out).not.toContain("sandbox:rebuild");
+
     for (const action of ["policy-add", "policy-remove", "policy-list"]) {
       const policy = runWithEnv(`alpha ${action} --help`, { HOME: home });
       expect(policy.code).toBe(0);
