@@ -255,7 +255,7 @@ export function runChatCompletionsStreamingProbe(
         curlStatus,
         body,
         stderr: String(result.stderr || ""),
-        message: "HTTP 200: chat completions stream returned SSE data",
+        message: `HTTP ${status}: chat completions stream returned SSE data`,
       };
     }
 
