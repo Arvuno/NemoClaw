@@ -572,6 +572,7 @@ exports.captureOpenshell = captureOpenshell;
 exports.backupAll = backupAll;
 exports.deploy = deploy;
 exports.garbageCollectImages = garbageCollectImages;
+exports.help = help;
 exports.onboard = onboard;
 exports.recoverNamedGatewayRuntime = recoverNamedGatewayRuntime;
 exports.recoverRegistryEntries = recoverRegistryEntries;
@@ -594,6 +595,7 @@ exports.sandboxStatus = sandboxStatus;
 exports.setup = setup;
 exports.setupSpark = setupSpark;
 exports.upgradeSandboxes = upgradeSandboxes;
+exports.version = version;
 
 function hasNamedGateway(output = ""): boolean {
   return stripAnsi(output).includes("Gateway: nemoclaw");
@@ -3883,6 +3885,10 @@ async function garbageCollectImages(args: string[] = []): Promise<void> {
 
 // ── Help ─────────────────────────────────────────────────────────
 
+function version(): void {
+  console.log(`${CLI_NAME} v${getVersion()}`);
+}
+
 /** Print CLI usage with all commands, flags, and reconfiguration guidance. */
 function help() {
   const PAD = 38; // column width for usage strings before description
@@ -3962,7 +3968,7 @@ const [cmd, ...args] = process.argv.slice(2);
 const mainPromise = (async () => {
   // No command → help
   if (!cmd || cmd === "help" || cmd === "--help" || cmd === "-h") {
-    help();
+    await runOclif("root:help", []);
     return;
   }
 
@@ -4021,10 +4027,9 @@ const mainPromise = (async () => {
         await runOclif("gc", args);
         break;
       case "--version":
-      case "-v": {
-        console.log(`${CLI_NAME} v${getVersion()}`);
+      case "-v":
+        await runOclif("root:version", []);
         break;
-      }
       default:
         help();
         break;
