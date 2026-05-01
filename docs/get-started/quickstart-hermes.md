@@ -58,7 +58,7 @@ At any prompt, press Enter to accept the default shown in `[brackets]`, type `ba
 
 The default Hermes sandbox name is `my-hermes`.
 Use a distinct sandbox name so you can run Hermes and OpenClaw sandboxes side by side.
-NemoClaw prevents same-name reuse when the existing sandbox was created for a different agent.
+NemoClaw prevents same-name reuse when an existing sandbox uses a different agent.
 
 ```text
 Sandbox name [my-hermes]: my-hermes
@@ -72,7 +72,7 @@ The Hermes wizard does not ask for Brave Web Search because Hermes does not use 
 After provider and policy selection, review the summary and confirm the build.
 NemoClaw writes Hermes configuration into `/sandbox/.hermes`, routes model traffic through `inference.local`, and starts the Hermes gateway inside the sandbox.
 The Hermes image includes runtime dependencies for the supported NemoClaw messaging integrations, API service, and health endpoint.
-Unsupported Hermes integrations are not prebaked into the base image.
+The base image does not include unsupported Hermes integrations.
 
 ## Use Non-Interactive Setup
 

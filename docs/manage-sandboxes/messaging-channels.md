@@ -52,8 +52,8 @@ Telegram uses a bot token from [BotFather](https://t.me/BotFather).
 Open Telegram, send `/newbot` to [@BotFather](https://t.me/BotFather), follow the prompts, and copy the token.
 `TELEGRAM_ALLOWED_IDS` is a comma-separated list of Telegram user IDs for DM access.
 Group chats stay open by default so rebuilt sandboxes do not silently drop Telegram group messages because of an empty group allowlist.
-Set `TELEGRAM_REQUIRE_MENTION=1` to make the bot reply in Telegram groups only when mentioned.
-Direct messages are unaffected by this setting and remain subject to pairing and `TELEGRAM_ALLOWED_IDS`.
+Set `TELEGRAM_REQUIRE_MENTION=1` to make the bot reply in Telegram groups only when users mention it.
+Pairing and `TELEGRAM_ALLOWED_IDS` still govern direct messages.
 
 Discord uses a bot token from the Discord Developer Portal.
 For server channels, enable Developer Mode in Discord, right-click the server, and copy the Server ID into `DISCORD_SERVER_ID`.
@@ -159,7 +159,7 @@ If you enable a messaging channel and another sandbox already uses the same toke
 
 Use `channels stop` when you want to pause one bridge and keep the sandbox running.
 Use `nemoclaw tunnel stop` or its deprecated alias `nemoclaw stop` when you want to stop host auxiliary services and also ask NemoClaw to stop the OpenClaw gateway inside the selected sandbox.
-Stopping the in-sandbox gateway stops Telegram, Discord, and Slack polling for that sandbox until the sandbox or gateway is started again.
+Stopping the in-sandbox gateway stops Telegram, Discord, and Slack polling for that sandbox until you restart the sandbox or gateway.
 
 ## Confirm Delivery
 
@@ -169,7 +169,7 @@ Use the matching policy preset (`telegram`, `discord`, or `slack`) or review [Cu
 
 ## Tunnel Command
 
-`nemoclaw tunnel start` starts cloudflared when it is installed, which can expose the dashboard with a public URL.
+When the host has `cloudflared`, `nemoclaw tunnel start` starts a cloudflared tunnel that can expose the dashboard with a public URL.
 `nemoclaw tunnel stop` stops the tunnel and asks NemoClaw to stop the in-sandbox gateway for the selected or default sandbox.
 The older `nemoclaw start` still works as a deprecated alias.
 
