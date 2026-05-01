@@ -247,20 +247,38 @@ describe("CLI dispatch", () => {
     expect(r.out).toContain("Did you mean: nemoclaw list?");
   });
 
-  it("attempts sandbox recovery before typo suggestion exits", () => {
-    const source = fs.readFileSync(
-      path.join(import.meta.dirname, "..", "src", "nemoclaw.ts"),
-      "utf-8",
+  it("recovers a live sandbox before suggesting a bare command typo", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-recover-typo-"));
+    const localBin = path.join(home, "bin");
+    fs.mkdirSync(localBin, { recursive: true });
+    fs.writeFileSync(
+      path.join(localBin, "openshell"),
+      [
+        "#!/usr/bin/env bash",
+        'printf "%s\\n" "$*" >> "$HOME/openshell-calls.log"',
+        'case "$*" in',
+        '  "status") printf "Status: Connected\\nGateway: nemoclaw\\n"; exit 0 ;;',
+        '  "gateway info -g nemoclaw") printf "Gateway: nemoclaw\\n"; exit 0 ;;',
+        '  "sandbox list") echo "liost Ready"; exit 0 ;;',
+        '  "sandbox get liost") printf "Name: liost\\nPhase: Ready\\nPolicy:\\n"; exit 0 ;;',
+        '  "policy get --full liost") exit 1 ;;',
+        '  "inference get") exit 1 ;;',
+        '  "sandbox connect liost") echo "CONNECTED_LIOST"; exit 0 ;;',
+        "  *) exit 0 ;;",
+        "esac",
+      ].join("\n"),
+      { mode: 0o755 },
     );
-    const scopedRecovery = source.indexOf(
-      "if (!registry.getSandbox(cmd) && sandboxActions.includes(requestedSandboxAction))",
-    );
-    const suggestion = source.indexOf(
-      "const suggestion = suggestGlobalCommand(cmd)",
-      scopedRecovery,
-    );
-    expect(scopedRecovery).toBeGreaterThan(-1);
-    expect(suggestion).toBeGreaterThan(scopedRecovery);
+
+    const r = runWithEnv("liost", {
+      HOME: home,
+      PATH: `${localBin}:${process.env.PATH || ""}`,
+      NEMOCLAW_CONNECT_TIMEOUT: "1",
+      NEMOCLAW_NO_CONNECT_HINT: "1",
+    });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("CONNECTED_LIOST");
+    expect(r.out).not.toContain("Unknown command: liost");
   });
 
   it("explains sandbox connect command order when the sandbox name is last", () => {

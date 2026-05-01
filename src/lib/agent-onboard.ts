@@ -120,28 +120,70 @@ function agentExecutableName(agent: AgentDefinition): string {
   return path.basename(configuredPath || agent.name);
 }
 
+type AgentBinaryAvailability =
+  | { available: true }
+  | {
+      available: false;
+      reason: "not_found" | "not_executable" | "path_mismatch";
+      binaryPath?: string;
+      resolvedPath?: string;
+    };
+
 function verifyAgentBinaryAvailable(
   sandboxName: string,
   agent: AgentDefinition,
   runCaptureOpenshell: OnboardContext["runCaptureOpenshell"],
-): boolean {
+): AgentBinaryAvailability {
   const executable = agentExecutableName(agent);
   const binaryPath = typeof agent.binary_path === "string" ? agent.binary_path.trim() : "";
   const script = binaryPath
     ? [
         `resolved="$(command -v ${shellQuote(executable)} 2>/dev/null || true)"`,
-        `[ "$resolved" = ${shellQuote(binaryPath)} ]`,
-        `[ -x ${shellQuote(binaryPath)} ]`,
+        `[ -n "$resolved" ] || { echo not_found; exit 1; }`,
+        `[ -x ${shellQuote(binaryPath)} ] || { echo not_executable; exit 1; }`,
+        `[ "$resolved" = ${shellQuote(binaryPath)} ] || { printf 'path_mismatch:%s\\n' "$resolved"; exit 1; }`,
         "echo ok",
       ].join(" && ")
-    : `command -v ${shellQuote(executable)} >/dev/null 2>&1 && echo ok`;
+    : `command -v ${shellQuote(executable)} >/dev/null 2>&1 && echo ok || echo not_found`;
   const result = runCaptureOpenshell(
     ["sandbox", "exec", "-n", sandboxName, "--", "sh", "-lc", script],
     {
       ignoreError: true,
     },
   );
-  return Boolean(result && result.includes("ok"));
+  if (result && result.includes("ok")) {
+    return { available: true };
+  }
+  if (binaryPath && result) {
+    const mismatch = result.match(/path_mismatch:([^\n]+)/);
+    if (mismatch) {
+      return {
+        available: false,
+        reason: "path_mismatch",
+        binaryPath,
+        resolvedPath: mismatch[1].trim(),
+      };
+    }
+    if (result.includes("not_executable")) {
+      return { available: false, reason: "not_executable", binaryPath };
+    }
+  }
+  return { available: false, reason: "not_found", binaryPath: binaryPath || undefined };
+}
+
+function describeAgentBinaryFailure(
+  sandboxName: string,
+  agent: AgentDefinition,
+  result: Exclude<AgentBinaryAvailability, { available: true }>,
+): string {
+  const executable = agentExecutableName(agent);
+  if (result.reason === "path_mismatch") {
+    return `${agent.displayName} binary '${executable}' resolves to '${result.resolvedPath}', expected '${result.binaryPath}' inside sandbox '${sandboxName}'`;
+  }
+  if (result.reason === "not_executable") {
+    return `${agent.displayName} configured binary '${result.binaryPath}' is not executable inside sandbox '${sandboxName}'`;
+  }
+  return `${agent.displayName} binary '${executable}' is missing inside sandbox '${sandboxName}'`;
 }
 
 function failAgentSetup(sandboxName: string, agent: AgentDefinition, message: string): never {
@@ -195,11 +237,12 @@ export async function handleAgentSetup(
   startRecordedStep("agent_setup", { sandboxName, provider, model });
   step(7, 8, `Setting up ${agent.displayName} inside sandbox`);
 
-  if (!verifyAgentBinaryAvailable(sandboxName, agent, runCaptureOpenshell)) {
+  const binaryAvailability = verifyAgentBinaryAvailable(sandboxName, agent, runCaptureOpenshell);
+  if (!binaryAvailability.available) {
     failAgentSetup(
       sandboxName,
       agent,
-      `${agent.displayName} binary '${agentExecutableName(agent)}' is missing inside sandbox '${sandboxName}'`,
+      describeAgentBinaryFailure(sandboxName, agent, binaryAvailability),
     );
   }
 

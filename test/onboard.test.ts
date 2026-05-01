@@ -121,6 +121,10 @@ function isOnboardTestInternals(
     value !== null &&
     typeof value.buildProviderArgs === "function" &&
     typeof value.classifySandboxCreateFailure === "function" &&
+    typeof value.getDefaultSandboxNameForAgent === "function" &&
+    typeof value.getSandboxPromptDefault === "function" &&
+    typeof value.getRequestedSandboxAgentName === "function" &&
+    typeof value.normalizeSandboxAgentName === "function" &&
     typeof value.agentSupportsWebSearch === "function" &&
     typeof value.configureWebSearch === "function" &&
     typeof value.writeSandboxConfigSyncFile === "function"
@@ -2679,10 +2683,7 @@ const { setupInference } = require(${onboardPath});
       "utf-8",
     );
     const setupPos = source.indexOf("await agentOnboard.handleAgentSetup");
-    const forwardPos = source.indexOf(
-      "ensureAgentDashboardForward(sandboxName, agent)",
-      setupPos,
-    );
+    const forwardPos = source.indexOf("ensureAgentDashboardForward(sandboxName, agent)", setupPos);
 
     assert.ok(setupPos !== -1, "agent setup call not found");
     assert.ok(
@@ -2993,6 +2994,9 @@ const childProcess = require("node:child_process");
 const { EventEmitter } = require("node:events");
 
 const commands = [];
+const registerCalls = [];
+const updateCalls = [];
+const defaultCalls = [];
 runner.run = (command, opts = {}) => {
   commands.push({ command: _n(command), env: opts.env || null });
   return { status: 0 };
@@ -3004,9 +3008,18 @@ runner.runCapture = (command) => {
   if (_n(command).includes("forward list")) return "my-assistant 127.0.0.1 18789 12345 running";
   return "";
 };
-registry.registerSandbox = () => true;
-registry.updateSandbox = () => true;
-registry.setDefault = () => true;
+registry.registerSandbox = (entry) => {
+  registerCalls.push(entry);
+  return true;
+};
+registry.updateSandbox = (name, updates) => {
+  updateCalls.push({ name, updates });
+  return true;
+};
+registry.setDefault = (name) => {
+  defaultCalls.push(name);
+  return true;
+};
 registry.removeSandbox = () => true;
 preflight.checkPortAvailable = async () => ({ ok: true });
 credentials.prompt = async () => "";
@@ -3028,7 +3041,7 @@ const { createSandbox } = require(${onboardPath});
 (async () => {
   process.env.OPENSHELL_GATEWAY = "nemoclaw";
   const sandboxName = await createSandbox(null, "gpt-5.4");
-  console.log(JSON.stringify({ sandboxName, commands }));
+  console.log(JSON.stringify({ sandboxName, commands, registerCalls, updateCalls, defaultCalls }));
 })().catch((error) => {
   console.error(error);
   process.exit(1);
@@ -3057,6 +3070,23 @@ const { createSandbox } = require(${onboardPath});
       assert.ok(payloadLine, `expected JSON payload in stdout:\n${result.stdout}`);
       const payload = JSON.parse(payloadLine);
       assert.equal(payload.sandboxName, "my-assistant");
+      assert.deepEqual(payload.defaultCalls, ["my-assistant"]);
+      assert.ok(
+        payload.registerCalls.some(
+          (entry: Record<string, unknown>) =>
+            entry.name === "my-assistant" &&
+            entry.model === "gpt-5.4" &&
+            Object.prototype.hasOwnProperty.call(entry, "agentVersion"),
+        ),
+        "expected registry metadata for created sandbox",
+      );
+      assert.ok(
+        payload.updateCalls.every(
+          (call: { name: string; updates: Record<string, unknown> }) =>
+            call.name === "my-assistant" && call.updates,
+        ),
+        "expected any registry metadata updates to target the created sandbox",
+      );
       const createCommand = payload.commands.find((entry: CommandEntry) =>
         entry.command.includes("sandbox create"),
       );
@@ -6324,7 +6354,7 @@ const { createSandbox } = require(${onboardPath});
     assert.match(source, /getSandboxAgentRegistryFields\(agent, agentVersionKnown\)/);
     assert.match(
       source,
-      /updateReusedSandboxMetadata\([\s\S]*?reusedPort[\s\S]*?!fromDockerfile[\s\S]*?\)/,
+      /const existingEntry = registry\.getSandbox\(sandboxName\)[\s\S]*?existingEntry\?\.agentVersion !== null/,
     );
     assert.match(source, /registry\.setDefault\(sandboxName\)/);
   });

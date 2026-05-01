@@ -4412,22 +4412,19 @@ const [cmd, ...args] = process.argv.slice(2);
   // command, attempt recovery — the sandbox may still be live with a stale registry.
   // Derived from command registry — single source of truth
   const sandboxActions = sandboxActionTokens();
-  const requestedSandboxAction = args[0] || "";
-  // Bare command typos should stay cheap: do not start gateway recovery just
-  // to tell a user that `liost` probably meant `list`. Explicit sandbox
-  // actions still run recovery before the later typo-suggestion exit.
-  if (!registry.getSandbox(cmd) && args.length === 0) {
-    const suggestion = suggestGlobalCommand(cmd);
-    if (suggestion) {
-      console.error(`  Unknown command: ${cmd}`);
-      console.error(`  Did you mean: ${CLI_NAME} ${suggestion}?`);
-      process.exit(1);
-    }
-  }
+  const requestedSandboxAction = args[0] || "connect";
   if (!registry.getSandbox(cmd) && sandboxActions.includes(requestedSandboxAction)) {
     validateName(cmd, "sandbox name");
     await recoverRegistryEntries({ requestedSandboxName: cmd });
     if (!registry.getSandbox(cmd)) {
+      if (args.length === 0) {
+        const suggestion = suggestGlobalCommand(cmd);
+        if (suggestion) {
+          console.error(`  Unknown command: ${cmd}`);
+          console.error(`  Did you mean: ${CLI_NAME} ${suggestion}?`);
+          process.exit(1);
+        }
+      }
       console.error(`  Sandbox '${cmd}' does not exist.`);
       const allNames = registry.listSandboxes().sandboxes.map((s: { name: string }) => s.name);
       if (allNames.length > 0) {

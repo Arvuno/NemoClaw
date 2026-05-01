@@ -2832,7 +2832,7 @@ async function preflight(): Promise<ReturnType<typeof nim.detectGpu>> {
         console.log(
           `  Gateway image ${imageDrift.currentVersion} does not match openshell ${imageDrift.expectedVersion}. Recreating...`,
         );
-        runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
+        stopAllDashboardForwards();
         destroyGateway();
         registry.clearAll();
         gatewayReuseState = "missing";
@@ -3479,8 +3479,9 @@ function updateReusedSandboxMetadata(
   model: string,
   provider: string,
   dashboardPort: number,
-  agentVersionKnown = true,
 ): void {
+  const existingEntry = registry.getSandbox(sandboxName);
+  const agentVersionKnown = existingEntry?.agentVersion !== null;
   registry.updateSandbox(sandboxName, {
     model,
     provider,
@@ -3856,14 +3857,7 @@ async function createSandbox(
             }
             const reusedPort = ensureDashboardForward(sandboxName, chatUiUrl);
             process.env.CHAT_UI_URL = `http://127.0.0.1:${reusedPort}`;
-            updateReusedSandboxMetadata(
-              sandboxName,
-              agent,
-              model,
-              provider,
-              reusedPort,
-              !fromDockerfile,
-            );
+            updateReusedSandboxMetadata(sandboxName, agent, model, provider, reusedPort);
             return sandboxName;
           }
         } else {
@@ -3892,14 +3886,7 @@ async function createSandbox(
             upsertMessagingProviders(messagingTokenDefs);
             const reusedPort2 = ensureDashboardForward(sandboxName, chatUiUrl);
             process.env.CHAT_UI_URL = `http://127.0.0.1:${reusedPort2}`;
-            updateReusedSandboxMetadata(
-              sandboxName,
-              agent,
-              model,
-              provider,
-              reusedPort2,
-              !fromDockerfile,
-            );
+            updateReusedSandboxMetadata(sandboxName, agent, model, provider, reusedPort2);
             return sandboxName;
           }
         }
@@ -3939,14 +3926,7 @@ async function createSandbox(
           }
           const reusedPort3 = ensureDashboardForward(sandboxName, chatUiUrl);
           process.env.CHAT_UI_URL = `http://127.0.0.1:${reusedPort3}`;
-          updateReusedSandboxMetadata(
-            sandboxName,
-            agent,
-            model,
-            provider,
-            reusedPort3,
-            !fromDockerfile,
-          );
+          updateReusedSandboxMetadata(sandboxName, agent, model, provider, reusedPort3);
           return sandboxName;
         }
       } catch (err) {
@@ -3964,14 +3944,7 @@ async function createSandbox(
         }
         const reusedPort4 = ensureDashboardForward(sandboxName, chatUiUrl);
         process.env.CHAT_UI_URL = `http://127.0.0.1:${reusedPort4}`;
-        updateReusedSandboxMetadata(
-          sandboxName,
-          agent,
-          model,
-          provider,
-          reusedPort4,
-          !fromDockerfile,
-        );
+        updateReusedSandboxMetadata(sandboxName, agent, model, provider, reusedPort4);
         return sandboxName;
       }
     }
@@ -7067,6 +7040,28 @@ function findForwardEntry(
   return null;
 }
 
+function getRunningForwardPorts(forwardListOutput: string | null | undefined): string[] {
+  const ports = new Set<string>();
+  if (!forwardListOutput) return [];
+  for (const line of forwardListOutput.split("\n")) {
+    if (/^\s*SANDBOX\s/i.test(line)) continue;
+    const parts = line.trim().split(/\s+/);
+    if (parts.length < 5 || !/^\d+$/.test(parts[2])) continue;
+    const status = (parts[4] || "").toLowerCase();
+    if (status === "running" || status === "active") {
+      ports.add(parts[2]);
+    }
+  }
+  return [...ports];
+}
+
+function stopAllDashboardForwards(): void {
+  const forwardList = runCaptureOpenshell(["forward", "list"], { ignoreError: true });
+  for (const port of getRunningForwardPorts(forwardList)) {
+    runOpenshell(["forward", "stop", port], { ignoreError: true });
+  }
+}
+
 /**
  * Parse `openshell forward list` output into a Map<port, sandboxName>.
  * Only includes running forwards — stopped/stale entries are ignored so
@@ -7253,12 +7248,10 @@ function ensureAgentDashboardForward(
   sandboxName: string,
   agent: { forwardPort?: number | null },
 ): number {
-  const agentDashboardPort = agent.forwardPort || CONTROL_UI_PORT;
-  const agentDashboardUrl = process.env.CHAT_UI_URL || `http://127.0.0.1:${agentDashboardPort}`;
+  const agentDashboardPort = agent.forwardPort ?? CONTROL_UI_PORT;
+  const agentDashboardUrl = `http://127.0.0.1:${agentDashboardPort}`;
   const actualAgentDashboardPort = ensureDashboardForward(sandboxName, agentDashboardUrl);
-  if (actualAgentDashboardPort !== Number(getDashboardForwardPort(agentDashboardUrl))) {
-    process.env.CHAT_UI_URL = `http://127.0.0.1:${actualAgentDashboardPort}`;
-  }
+  process.env.CHAT_UI_URL = `http://127.0.0.1:${actualAgentDashboardPort}`;
   return actualAgentDashboardPort;
 }
 
@@ -7980,7 +7973,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
           console.log(
             `  Gateway image ${imageDrift.currentVersion} does not match openshell ${imageDrift.expectedVersion}. Recreating...`,
           );
-          runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
+          stopAllDashboardForwards();
           destroyGateway();
           registry.clearAll();
           gatewayReuseState = "missing";
