@@ -231,7 +231,7 @@ describe("CLI dispatch", () => {
     // Longer timeout: when openshell is installed but the gateway is down,
     // the CLI probes the gateway before reporting "not found" and the
     // default 10s is not enough for the connection to time out.
-    const r = runWithEnv("boguscmd", {}, 30000);
+    const r = runWithEnv("boguscmd", {}, execTimeout(30_000));
     expect(r.code).toBe(1);
     expect(r.out.includes("Sandbox 'boguscmd' does not exist")).toBeTruthy();
   });
@@ -852,7 +852,8 @@ describe("CLI dispatch", () => {
 
     try {
       let calls: string[] = [];
-      const deadline = Date.now() + 10000;
+      const pollTimeoutMs = Math.min(testTimeout(10_000), Math.max(1_000, testTimeout() - 5_000));
+      const deadline = Date.now() + pollTimeoutMs;
       while (Date.now() < deadline) {
         calls = readCalls();
         if (
@@ -863,6 +864,8 @@ describe("CLI dispatch", () => {
         }
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
+      expect(calls).toContain("logs alpha -n 200 --source all --tail");
+      expect(calls).toContain("sandbox exec -n alpha -- tail -n 200 -f /tmp/gateway.log");
       child.kill("SIGTERM");
       const exitedEarly = await Promise.race([
         exitPromise.then(() => true),
@@ -1504,7 +1507,7 @@ describe("CLI dispatch", () => {
         HOME: home,
         PATH: `${localBin}:${process.env.PATH || ""}`,
       },
-      30000,
+      execTimeout(30_000),
     );
 
     expect(r.code).toBe(0);
