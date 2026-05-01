@@ -67,29 +67,19 @@ dump_hermes_sandbox_logs() {
     return
   }
 
-  diag "Hermes sandbox runtime logs:"
+  local diag_script
+  diag_script='set +e'
+  diag_script+='; echo "== identity =="; id 2>&1 || true'
+  diag_script+='; echo "== listening sockets =="; ss -tlnp 2>&1 || ss -tln 2>&1 || true'
+  diag_script+='; echo "== log and state paths =="; ls -ld /tmp /sandbox/.hermes /sandbox/.hermes/logs 2>&1 || true; ls -l /tmp/nemoclaw-start.log /tmp/gateway.log 2>&1 || true'
+  diag_script+='; echo "== hermes-related processes =="'
   # shellcheck disable=SC2016  # script is intentionally evaluated inside the sandbox
-  openshell sandbox exec -n "$SANDBOX_NAME" -- sh -lc '
-set +e
-echo "== identity =="
-id 2>&1 || true
-echo "== listening sockets =="
-ss -tlnp 2>&1 || ss -tln 2>&1 || true
-echo "== log and state paths =="
-ls -ld /tmp /sandbox/.hermes /sandbox/.hermes/logs 2>&1 || true
-ls -l /tmp/nemoclaw-start.log /tmp/gateway.log 2>&1 || true
-echo "== hermes-related processes =="
-for p in /proc/[0-9]*; do
-  cmd=$(tr "\000" " " < "$p/cmdline" 2>/dev/null || true)
-  case "$cmd" in
-    *hermes*|*socat*|*nemoclaw-decode-proxy*) echo "$(basename "$p") $cmd" ;;
-  esac
-done
-echo "== /tmp/nemoclaw-start.log tail =="
-tail -n 80 /tmp/nemoclaw-start.log 2>&1 || true
-echo "== /tmp/gateway.log tail =="
-tail -n 120 /tmp/gateway.log 2>&1 || true
-' 2>&1 | sed 's/^/[DIAG]   /'
+  diag_script+='; for p in /proc/[0-9]*; do cmd=$(tr "\000" " " < "$p/cmdline" 2>/dev/null || true); case "$cmd" in *hermes*|*socat*|*nemoclaw-decode-proxy*) echo "$(basename "$p") $cmd" ;; esac; done'
+  diag_script+='; echo "== /tmp/nemoclaw-start.log tail =="; tail -n 80 /tmp/nemoclaw-start.log 2>&1 || true'
+  diag_script+='; echo "== /tmp/gateway.log tail =="; tail -n 120 /tmp/gateway.log 2>&1 || true'
+
+  diag "Hermes sandbox runtime logs:"
+  openshell sandbox exec -n "$SANDBOX_NAME" -- sh -lc "$diag_script" 2>&1 | sed 's/^/[DIAG]   /'
 }
 
 export NEMOCLAW_REBUILD_VERBOSE=1
