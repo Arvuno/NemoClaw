@@ -859,6 +859,7 @@ install_telegram_diagnostics() {
     process.__nemoclawTelegramDiagnosticsInstalled = true;
   }
 
+  var providerStarted = false;
   var readyLogged = false;
   var inferenceLogged = false;
   var inDiagnosticWrite = false;
@@ -868,7 +869,10 @@ install_telegram_diagnostics() {
     text = text.replace(/\/bot[^/\s"']+/g, '/bot<redacted>');
     text = text.replace(/\/file\/bot[^/\s"']+/g, '/file/bot<redacted>');
     text = text.replace(/Bearer\s+[A-Za-z0-9._~+\/=-]+/g, 'Bearer <redacted>');
-    text = text.replace(/(api[_-]?key|token|authorization)["'=:\s]+[A-Za-z0-9._~+\/=-]+/gi, '$1=<redacted>');
+    text = text.replace(
+      /\b(api[_-]?key|token|authorization)\b(["']?\s*[:=]\s*["']?)[^"'\s,)]+/gi,
+      '$1$2<redacted>'
+    );
     return text;
   }
 
@@ -917,6 +921,7 @@ install_telegram_diagnostics() {
     if (!info || info.hostname !== 'api.telegram.org') return;
     if (!/\/(?:getUpdates|getMe|getWebhookInfo)(?:\?|$)/.test(info.path)) return;
     if (Number(statusCode) < 200 || Number(statusCode) >= 300) return;
+    providerStarted = true;
     readyLogged = true;
     emit('[telegram] [default] provider ready (Bot API reachable; agent replies use inference.local)');
   }
@@ -940,7 +945,10 @@ install_telegram_diagnostics() {
     var ret = originalStderrWrite.apply(process.stderr, arguments);
     if (!inDiagnosticWrite && !inferenceLogged) {
       var text = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk || '');
-      if (/Embedded agent failed before reply|LLM request failed|FailoverError/i.test(text)) {
+      if (!providerStarted && /\[telegram\] \[default\] starting provider\b/i.test(text)) {
+        providerStarted = true;
+      }
+      if (providerStarted && /Embedded agent failed before reply|LLM request failed|FailoverError/i.test(text)) {
         inferenceLogged = true;
         var line = text.split(/\r?\n/).find(function (entry) {
           return /Embedded agent failed before reply|LLM request failed|FailoverError/i.test(entry);

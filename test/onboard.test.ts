@@ -127,6 +127,9 @@ function isOnboardTestInternals(
   return (
     value !== null &&
     typeof value.buildProviderArgs === "function" &&
+    typeof value.buildCompatibleEndpointSandboxSmokeCommand === "function" &&
+    typeof value.buildCompatibleEndpointSandboxSmokeScript === "function" &&
+    typeof value.buildSandboxConfigSyncScript === "function" &&
     typeof value.classifySandboxCreateFailure === "function" &&
     typeof value.getDefaultSandboxNameForAgent === "function" &&
     typeof value.getSandboxPromptDefault === "function" &&
@@ -134,6 +137,7 @@ function isOnboardTestInternals(
     typeof value.normalizeSandboxAgentName === "function" &&
     typeof value.agentSupportsWebSearch === "function" &&
     typeof value.configureWebSearch === "function" &&
+    typeof value.shouldRunCompatibleEndpointSandboxSmoke === "function" &&
     typeof value.writeSandboxConfigSyncFile === "function"
   );
 }
@@ -310,6 +314,22 @@ describe("onboard helpers", () => {
     assert.match(command, /base64\.b64decode/);
     assert.match(command, /sh "\$tmp"/);
     assert.doesNotMatch(command, /COMPATIBLE_API_KEY/);
+  });
+
+  it("uses active sandbox channels for compatible-endpoint smoke gating", () => {
+    const source = fs.readFileSync(
+      path.join(import.meta.dirname, "..", "src", "lib", "onboard.ts"),
+      "utf-8",
+    );
+
+    assert.match(
+      source,
+      /const activeMessagingChannels = registry\.getSandbox\(sandboxName\)\?\.messagingChannels;/,
+    );
+    assert.match(
+      source,
+      /messagingChannels: Array\.isArray\(activeMessagingChannels\) \? activeMessagingChannels : \[\]/,
+    );
   });
 
   it("uses explicit messaging selections for policy suggestions when provided", () => {

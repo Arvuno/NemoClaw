@@ -8549,15 +8549,14 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     const recordedMessagingChannels = Array.isArray(latestSession?.messagingChannels)
       ? latestSession.messagingChannels
       : [];
-    const smokeMessagingChannels =
-      selectedMessagingChannels.length > 0 ? selectedMessagingChannels : recordedMessagingChannels;
+    const activeMessagingChannels = registry.getSandbox(sandboxName)?.messagingChannels;
     verifyCompatibleEndpointSandboxSmoke({
       sandboxName,
       provider,
       model,
       endpointUrl,
       credentialEnv,
-      messagingChannels: smokeMessagingChannels,
+      messagingChannels: Array.isArray(activeMessagingChannels) ? activeMessagingChannels : [],
       agent,
     });
     const resumePolicies =

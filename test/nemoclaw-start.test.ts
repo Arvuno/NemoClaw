@@ -1140,6 +1140,22 @@ describe("Telegram diagnostics (#2766)", () => {
     expect(src).toContain("agent turn failed after provider startup; inference error:");
     expect(src).toContain("LLM request failed");
     expect(src).toContain("Embedded agent failed before reply");
+    expect(src).toContain("var providerStarted = false;");
+    expect(src).toContain(
+      "if (!providerStarted && /\\[telegram\\] \\[default\\] starting provider\\b/i.test(text))",
+    );
+    expect(src).toContain(
+      "if (providerStarted && /Embedded agent failed before reply|LLM request failed|FailoverError/i.test(text))",
+    );
+  });
+
+  it("redacts colon-delimited Telegram-style token values in diagnostics", () => {
+    expect(src).toContain(
+      "/\\b(api[_-]?key|token|authorization)\\b([\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s,)]+/gi",
+    );
+    expect(src).not.toContain(
+      '/(api[_-]?key|token|authorization)["\':\\s]+[A-Za-z0-9._~+\\/=-]+/gi',
+    );
   });
 
   it("calls install_telegram_diagnostics in both entrypoint paths before gateway launch", () => {
