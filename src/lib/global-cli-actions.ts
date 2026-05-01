@@ -4,6 +4,7 @@
 /* v8 ignore start -- transitional action facade until implementations leave src/nemoclaw.ts. */
 
 import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
+import { help, version } from "./root-help-action";
 
 export async function runOnboardAction(args: string[] = []): Promise<void> {
   await getNemoClawRuntimeBridge().onboard(args);
@@ -34,11 +35,11 @@ export async function runGarbageCollectImagesAction(args: string[] = []): Promis
 }
 
 export function showRootHelp(): void {
-  getNemoClawRuntimeBridge().help();
+  help();
 }
 
 export function showVersion(): void {
-  getNemoClawRuntimeBridge().version();
+  version();
 }
 
 export async function recoverNamedGatewayRuntime(): Promise<{ recovered: boolean }> {

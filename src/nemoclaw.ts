@@ -27,7 +27,7 @@ const { ROOT, run, runInteractive, shellQuote, validateName } = require("./lib/r
 // Agent branding — derived from NEMOCLAW_AGENT when an alias launcher sets it;
 // otherwise the branding module falls back to the OpenClaw defaults.
 // ---------------------------------------------------------------------------
-const { CLI_NAME, CLI_DISPLAY_NAME, AGENT_PRODUCT_NAME } = require("./lib/branding");
+const { CLI_NAME, CLI_DISPLAY_NAME } = require("./lib/branding");
 
 const {
   dockerCapture,
@@ -53,6 +53,7 @@ const shields = require("./lib/shields");
 const { parseGatewayInference } = require("./lib/inference-config");
 const { probeProviderHealth } = require("./lib/inference-health");
 const { getVersion } = require("./lib/version");
+const { help, version } = require("./lib/root-help-action");
 const onboardSession = require("./lib/onboard-session");
 import type { Session } from "./lib/onboard-session";
 const { parseLiveSandboxNames } = require("./lib/runtime-recovery");
@@ -80,7 +81,6 @@ const {
 } = require("./lib/sandbox-session-state");
 
 const {
-  commandsByGroup: registryCommandsByGroup,
   canonicalUsageList,
   globalCommandTokens,
   sandboxActionTokens,
@@ -578,7 +578,6 @@ exports.runtimeBridge = {
   backupAll,
   deploy,
   garbageCollectImages,
-  help,
   onboard,
   recoverNamedGatewayRuntime,
   recoverRegistryEntries,
@@ -601,7 +600,6 @@ exports.runtimeBridge = {
   setup,
   setupSpark,
   upgradeSandboxes,
-  version,
 };
 
 function hasNamedGateway(output = ""): boolean {
@@ -3823,83 +3821,7 @@ async function garbageCollectImages(args: string[] = []): Promise<void> {
   if (failed > 0) process.exit(1);
 }
 
-// ── Help ─────────────────────────────────────────────────────────
-
-function version(): void {
-  console.log(`${CLI_NAME} v${getVersion()}`);
-}
-
-/** Print CLI usage with all commands, flags, and reconfiguration guidance. */
-function help() {
-  const PAD = 38; // column width for usage strings before description
-  const grouped = registryCommandsByGroup();
-  const lines = [];
-
-  lines.push("");
-  lines.push(`  ${B}${G}${CLI_DISPLAY_NAME}${R}  ${D}v${getVersion()}${R}`);
-  lines.push(`  ${D}Deploy more secure, always-on AI assistants with a single command.${R}`);
-
-  for (const [group, cmds] of grouped) {
-    lines.push("");
-    lines.push(`  ${G}${group}:${R}`);
-
-    let isFirstInGroup = true;
-    for (const cmd of cmds) {
-      const usage = cmd.usage;
-      const desc = cmd.description;
-      const flags = cmd.flags ? ` ${D}${cmd.flags}${R}` : "";
-
-      // Bold the first command in each group
-      const prefix = isFirstInGroup ? B : "";
-      const suffix = isFirstInGroup ? R : "";
-
-      // Deprecated commands get dim styling
-      const dPrefix = cmd.deprecated ? D : "";
-      const dSuffix = cmd.deprecated ? R : "";
-
-      const displayUsage = `${dPrefix}${prefix}${usage}${suffix}${dSuffix}`;
-      const displayDesc = cmd.deprecated ? `${D}${desc}${R}` : desc;
-
-      // Calculate plain-text length for padding (strip ANSI)
-      const padding = Math.max(1, PAD - usage.length);
-      lines.push(`    ${displayUsage}${" ".repeat(padding)}${displayDesc}${flags}`);
-
-      isFirstInGroup = false;
-    }
-  }
-
-  // ── Uninstall flags (static, not in registry) ──
-  lines.push("");
-  lines.push(`  ${G}Uninstall flags:${R}`);
-  lines.push(`    --yes${" ".repeat(29)}Skip the confirmation prompt`);
-  lines.push(`    --keep-openshell${" ".repeat(18)}Leave the openshell binary installed`);
-  lines.push(`    --delete-models${" ".repeat(19)}Remove ${CLI_DISPLAY_NAME}-pulled Ollama models`);
-
-  // ── Reconfiguration (no nemoclaw-prefixed lines to avoid parser phantoms) ──
-  lines.push("");
-  lines.push(`  ${G}Reconfiguration (after onboard):${R}`);
-  lines.push(
-    `    ${D}• Change inference model:  openshell inference set -g nemoclaw --model <model> --provider <provider>${R}`,
-  );
-  lines.push(`    ${D}• Add network presets:     use the policy-add command on your sandbox${R}`);
-  lines.push(
-    `    ${D}• Change credentials:      credentials reset <PROVIDER>, then re-run onboard${R}`,
-  );
-  lines.push(`    ${D}• Agent config is read-only inside the sandbox (Landlock enforced).${R}`);
-  lines.push(
-    `    ${D}  To change ${AGENT_PRODUCT_NAME} settings, re-run onboard to rebuild the sandbox.${R}`,
-  );
-
-  // ── Footer ──
-  lines.push("");
-  lines.push(`  ${D}Powered by NVIDIA OpenShell · Nemotron · Agent Toolkit`);
-  lines.push(`  Credentials registered with the OpenShell gateway${R}`);
-  lines.push(`  ${D}https://www.nvidia.com/nemoclaw${R}`);
-  lines.push("");
-
-  console.log(lines.join("\n"));
-}
-
+// ── Dispatch helpers ─────────────────────────────────────────────
 
 const VALID_SANDBOX_ACTIONS =
   "connect, status, logs, policy-add, policy-remove, policy-list, skill, snapshot, rebuild, shields, config, channels, gateway-token, destroy";

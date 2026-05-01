@@ -142,7 +142,8 @@ describe("image cleanup: gc command exists (#2086)", () => {
   });
 
   it("gc appears in help text via registry", () => {
+    const rootHelpSrc = fs.readFileSync(path.join(ROOT, "src/lib/root-help-action.ts"), "utf-8");
     expect(registrySrc).toContain('"nemoclaw gc"');
-    expect(nemoclawSrc).toContain("registryCommandsByGroup");
+    expect(rootHelpSrc).toContain("commandsByGroup");
   });
 });
