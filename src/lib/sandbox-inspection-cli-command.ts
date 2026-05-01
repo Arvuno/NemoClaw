@@ -6,7 +6,7 @@
 import { Args, Command, Flags } from "@oclif/core";
 
 import { CLI_NAME } from "./branding";
-import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
+import { listSandboxChannels, listSandboxPolicies } from "./policy-channel-actions";
 import { showSandboxStatus } from "./sandbox-runtime-actions";
 import * as sandboxConfig from "./sandbox-config";
 
@@ -50,7 +50,7 @@ export class SandboxPolicyListCommand extends Command {
 
   public async run(): Promise<void> {
     const { args } = await this.parse(SandboxPolicyListCommand);
-    getNemoClawRuntimeBridge().sandboxPolicyList(args.sandboxName);
+    listSandboxPolicies(args.sandboxName);
   }
 }
 
@@ -69,7 +69,7 @@ export class SandboxChannelsListCommand extends Command {
 
   public async run(): Promise<void> {
     const { args } = await this.parse(SandboxChannelsListCommand);
-    getNemoClawRuntimeBridge().sandboxChannelsList(args.sandboxName);
+    listSandboxChannels(args.sandboxName);
   }
 }
 
