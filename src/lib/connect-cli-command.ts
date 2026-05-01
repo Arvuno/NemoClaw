@@ -5,13 +5,7 @@
 
 import { Args, Command, Flags } from "@oclif/core";
 
-type RuntimeBridge = {
-  sandboxConnect: (sandboxName: string) => Promise<void>;
-};
-
-function getRuntimeBridge(): RuntimeBridge {
-  return require("../nemoclaw") as RuntimeBridge;
-}
+import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
 
 export default class ConnectCliCommand extends Command {
   static id = "sandbox:connect";
@@ -28,6 +22,6 @@ export default class ConnectCliCommand extends Command {
 
   public async run(): Promise<void> {
     const { args } = await this.parse(ConnectCliCommand);
-    await getRuntimeBridge().sandboxConnect(args.sandboxName);
+    await getNemoClawRuntimeBridge().sandboxConnect(args.sandboxName);
   }
 }

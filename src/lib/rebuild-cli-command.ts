@@ -5,13 +5,7 @@
 
 import { Args, Command, Flags } from "@oclif/core";
 
-type RuntimeBridge = {
-  sandboxRebuild: (sandboxName: string, args?: string[]) => Promise<void>;
-};
-
-function getRuntimeBridge(): RuntimeBridge {
-  return require("../nemoclaw") as RuntimeBridge;
-}
+import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
 
 export default class RebuildCliCommand extends Command {
   static id = "sandbox:rebuild";
@@ -35,6 +29,6 @@ export default class RebuildCliCommand extends Command {
     if (flags.yes) legacyArgs.push("--yes");
     if (flags.force) legacyArgs.push("--force");
     if (flags.verbose) legacyArgs.push("--verbose");
-    await getRuntimeBridge().sandboxRebuild(args.sandboxName, legacyArgs);
+    await getNemoClawRuntimeBridge().sandboxRebuild(args.sandboxName, legacyArgs);
   }
 }

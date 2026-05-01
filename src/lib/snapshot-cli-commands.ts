@@ -5,17 +5,16 @@
 
 import { Args, Command, Flags } from "@oclif/core";
 
-type RuntimeBridge = {
-  sandboxSnapshot: (sandboxName: string, subArgs: string[]) => Promise<void>;
-};
+import type { NemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
+import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
 
-let runtimeBridgeFactory = (): RuntimeBridge => require("../nemoclaw") as RuntimeBridge;
+let runtimeBridgeFactory = (): Pick<NemoClawRuntimeBridge, "sandboxSnapshot"> => getNemoClawRuntimeBridge();
 
-export function setSnapshotRuntimeBridgeFactoryForTest(factory: () => RuntimeBridge): void {
+export function setSnapshotRuntimeBridgeFactoryForTest(factory: () => Pick<NemoClawRuntimeBridge, "sandboxSnapshot">): void {
   runtimeBridgeFactory = factory;
 }
 
-function getRuntimeBridge(): RuntimeBridge {
+function getRuntimeBridge() {
   return runtimeBridgeFactory();
 }
 

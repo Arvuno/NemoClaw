@@ -5,13 +5,7 @@
 
 import { Args, Command, Flags } from "@oclif/core";
 
-type RuntimeBridge = {
-  sandboxDestroy: (sandboxName: string, args?: string[]) => Promise<void>;
-};
-
-function getRuntimeBridge(): RuntimeBridge {
-  return require("../nemoclaw") as RuntimeBridge;
-}
+import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
 
 export default class DestroyCliCommand extends Command {
   static id = "sandbox:destroy";
@@ -33,6 +27,6 @@ export default class DestroyCliCommand extends Command {
     const legacyArgs: string[] = [];
     if (flags.yes) legacyArgs.push("--yes");
     if (flags.force) legacyArgs.push("--force");
-    await getRuntimeBridge().sandboxDestroy(args.sandboxName, legacyArgs);
+    await getNemoClawRuntimeBridge().sandboxDestroy(args.sandboxName, legacyArgs);
   }
 }

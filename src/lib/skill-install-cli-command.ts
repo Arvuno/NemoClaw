@@ -5,19 +5,18 @@
 
 import { Args, Command, Flags } from "@oclif/core";
 
-type RuntimeBridge = {
-  sandboxSkillInstall: (sandboxName: string, args?: string[]) => Promise<void>;
-};
+import type { NemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
+import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
 
-let runtimeBridgeFactory = (): RuntimeBridge => require("../nemoclaw") as RuntimeBridge;
+let runtimeBridgeFactory = (): Pick<NemoClawRuntimeBridge, "sandboxSkillInstall"> => getNemoClawRuntimeBridge();
 
 export function setSkillInstallRuntimeBridgeFactoryForTest(
-  factory: () => RuntimeBridge,
+  factory: () => Pick<NemoClawRuntimeBridge, "sandboxSkillInstall">,
 ): void {
   runtimeBridgeFactory = factory;
 }
 
-function getRuntimeBridge(): RuntimeBridge {
+function getRuntimeBridge() {
   return runtimeBridgeFactory();
 }
 
