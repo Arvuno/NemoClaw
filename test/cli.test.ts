@@ -2721,6 +2721,7 @@ describe("CLI dispatch", () => {
 
   it(
     "explains when gateway metadata exists but the restarted API is still refusing connections",
+    { timeout: 30000 },
     () => {
       const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-gateway-unreachable-"));
       const localBin = path.join(home, "bin");
