@@ -56,12 +56,12 @@ $ nemohermes onboard
 The onboard wizard asks for a sandbox name, inference provider, model, credentials, and network policy preset.
 At any prompt, press Enter to accept the default shown in `[brackets]`, type `back` to return to the previous prompt, or type `exit` to quit.
 
-The default Hermes sandbox name is `my-hermes`.
-Use a distinct sandbox name so you can run Hermes and OpenClaw sandboxes side by side.
+The default Hermes sandbox name is `hermes`.
+Use a distinct sandbox name, such as `my-hermes`, so you can run Hermes and OpenClaw sandboxes side by side.
 NemoClaw prevents same-name reuse when an existing sandbox uses a different agent.
 
 ```text
-Sandbox name [my-hermes]: my-hermes
+Sandbox name [hermes]: my-hermes
 ```
 
 Choose the inference provider that matches where you want Hermes model traffic to go.
