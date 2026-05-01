@@ -578,6 +578,7 @@ exports.sandboxChannelsList = sandboxChannelsList;
 exports.sandboxLogs = sandboxLogs;
 exports.sandboxPolicyList = sandboxPolicyList;
 exports.sandboxSkillInstall = sandboxSkillInstall;
+exports.sandboxSnapshot = sandboxSnapshot;
 exports.sandboxStatus = sandboxStatus;
 exports.upgradeSandboxes = upgradeSandboxes;
 
@@ -4112,9 +4113,30 @@ const [cmd, ...args] = process.argv.slice(2);
       case "rebuild":
         await sandboxRebuild(cmd, actionArgs);
         break;
-      case "snapshot":
-        await sandboxSnapshot(cmd, actionArgs);
+      case "snapshot": {
+        const snapshotSub = actionArgs[0];
+        const snapshotArgs = actionArgs.slice(1);
+        switch (snapshotSub) {
+          case "list":
+            if (hasHelpFlag(snapshotArgs)) {
+              printSandboxActionUsage("snapshot list");
+              break;
+            }
+            await runOclif("sandbox:snapshot:list", [cmd, ...snapshotArgs]);
+            break;
+          case "create":
+            if (hasHelpFlag(snapshotArgs)) {
+              printSandboxActionUsage("snapshot create [--name <name>]");
+              break;
+            }
+            await runOclif("sandbox:snapshot:create", [cmd, ...snapshotArgs]);
+            break;
+          default:
+            await sandboxSnapshot(cmd, actionArgs);
+            break;
+        }
         break;
+      }
       case "shields": {
         const shieldsSub = actionArgs[0];
         const shieldsFlags = actionArgs.slice(1);
