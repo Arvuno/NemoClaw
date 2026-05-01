@@ -1922,7 +1922,7 @@ write_dependency_manifest() {
 import json, os, sys, datetime
 m = {
   "schema": 1,
-  "generated_at": datetime.datetime.utcnow().isoformat() + "Z",
+  "generated_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
   "platform": "${NEMOCLAW_DETECTED_PLATFORM}",
   "nemoclaw": {"version": "${nemoclaw_ver}"},
   "dependencies": {
