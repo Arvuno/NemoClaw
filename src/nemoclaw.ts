@@ -57,13 +57,13 @@ const { help, version } = require("./lib/root-help-action");
 const onboardSession = require("./lib/onboard-session");
 import type { Session } from "./lib/onboard-session";
 const { parseLiveSandboxNames } = require("./lib/runtime-recovery");
+const { stripAnsi } = require("./lib/openshell");
 const {
-  captureOpenshellCommand,
-  getInstalledOpenshellVersion,
-  runOpenshellCommand,
-  stripAnsi,
-  versionGte,
-} = require("./lib/openshell");
+  captureOpenshell,
+  getInstalledOpenshellVersionOrNull,
+  getOpenshellBinary,
+  runOpenshell,
+} = require("./lib/openshell-runtime");
 const { runRegisteredOclifCommand } = require("./lib/oclif-runner");
 const agentRuntime = require("../bin/lib/agent-runtime");
 const sandboxVersion = require("./lib/sandbox-version");
@@ -105,14 +105,6 @@ const onboardProviders = require("./lib/onboard-providers");
 
 const GLOBAL_COMMANDS = globalCommandTokens();
 
-type CommandArgs = string[];
-type RunnerOptions = {
-  env?: NodeJS.ProcessEnv;
-  stdio?: import("node:child_process").StdioOptions;
-  ignoreError?: boolean;
-  timeout?: number;
-};
-
 type SpawnLikeResult = {
   status: number | null;
   stdout?: string;
@@ -134,45 +126,10 @@ type RecoveredSandboxMetadata = Partial<
   policyPresets?: string[] | null;
 };
 
-let OPENSHELL_BIN: string | null = null;
 const NEMOCLAW_GATEWAY_NAME = "nemoclaw";
 const DASHBOARD_FORWARD_PORT = String(DASHBOARD_PORT);
 const DEFAULT_LOGS_PROBE_TIMEOUT_MS = 5000;
 const LOGS_PROBE_TIMEOUT_ENV = "NEMOCLAW_LOGS_PROBE_TIMEOUT_MS";
-
-function getOpenshellBinary(): string {
-  if (!OPENSHELL_BIN) {
-    OPENSHELL_BIN = resolveOpenshell();
-  }
-  if (!OPENSHELL_BIN) {
-    console.error("openshell CLI not found. Install OpenShell before using sandbox commands.");
-    process.exit(1);
-  }
-  return OPENSHELL_BIN;
-}
-
-function runOpenshell(args: CommandArgs, opts: RunnerOptions = {}) {
-  return runOpenshellCommand(getOpenshellBinary(), args, {
-    cwd: ROOT,
-    env: opts.env,
-    stdio: opts.stdio,
-    ignoreError: opts.ignoreError,
-    timeout: opts.timeout,
-    errorLine: console.error,
-    exit: (code: number) => process.exit(code),
-  });
-}
-
-function captureOpenshell(args: CommandArgs, opts: RunnerOptions = {}) {
-  return captureOpenshellCommand(getOpenshellBinary(), args, {
-    cwd: ROOT,
-    env: opts.env,
-    ignoreError: opts.ignoreError,
-    timeout: opts.timeout,
-    errorLine: console.error,
-    exit: (code: number) => process.exit(code),
-  });
-}
 
 function cleanupGatewayAfterLastSandbox() {
   runOpenshell(["forward", "stop", DASHBOARD_FORWARD_PORT], {
@@ -208,12 +165,6 @@ function getSandboxDeleteOutcome(deleteResult: SpawnLikeResult) {
     output,
     alreadyGone: deleteResult.status !== 0 && isMissingSandboxDeleteResult(output),
   };
-}
-
-function getInstalledOpenshellVersionOrNull() {
-  return getInstalledOpenshellVersion(getOpenshellBinary(), {
-    cwd: ROOT,
-  });
 }
 
 // ── Sandbox process health (OpenClaw gateway inside the sandbox) ─────────
