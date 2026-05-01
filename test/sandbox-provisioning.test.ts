@@ -8,9 +8,9 @@
 // preserve the mutable-by-default config layout (#2227) and the gateway
 // auth token externalization (#2378).
 //
-// These are static regression guards over the Dockerfile text — they fail
-// immediately if a future refactor drops one of the baked-in provisioning
-// steps, even before a full image build runs in CI.
+// These guards execute the relevant Dockerfile/startup snippets in temporary
+// fixtures where practical, so coverage follows behavior rather than source
+// text shape.
 
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
@@ -23,6 +23,10 @@ const DOCKERFILE = path.join(ROOT, "Dockerfile");
 const DOCKERFILE_BASE = path.join(ROOT, "Dockerfile.base");
 const DOCKERFILE_SANDBOX = path.join(ROOT, "test", "Dockerfile.sandbox");
 const HERMES_DOCKERFILE = path.join(ROOT, "agents", "hermes", "Dockerfile");
+const HERMES_DOCKERFILE_BASE = path.join(ROOT, "agents", "hermes", "Dockerfile.base");
+const HERMES_POLICY = path.join(ROOT, "agents", "hermes", "policy-additions.yaml");
+const HERMES_POLICY_PERMISSIVE = path.join(ROOT, "agents", "hermes", "policy-permissive.yaml");
+const HERMES_START = path.join(ROOT, "agents", "hermes", "start.sh");
 
 function dockerRunCommandBetween(
   dockerfile: string,
@@ -57,6 +61,23 @@ function runDockerShell(command: string, sandboxRoot: string) {
     rewritten,
   ].join("\n");
   const scriptPath = path.join(sandboxRoot, "run-docker-block.sh");
+  fs.writeFileSync(scriptPath, script, { mode: 0o700 });
+  const result = spawnSync("bash", [scriptPath], { encoding: "utf-8", timeout: 5000 });
+  const calls = fs.existsSync(logPath) ? fs.readFileSync(logPath, "utf-8") : "";
+  return { result, calls };
+}
+
+function runLoggedDockerShell(command: string, tmp: string, functionDefs: string[] = []) {
+  const logPath = path.join(tmp, "calls.log");
+  fs.rmSync(logPath, { force: true });
+  const script = [
+    "#!/usr/bin/env bash",
+    "set -euo pipefail",
+    `call_log=${JSON.stringify(logPath)}`,
+    ...functionDefs,
+    command,
+  ].join("\n");
+  const scriptPath = path.join(tmp, "run-docker-block.sh");
   fs.writeFileSync(scriptPath, script, { mode: 0o700 });
   const result = spawnSync("bash", [scriptPath], { encoding: "utf-8", timeout: 5000 });
   const calls = fs.existsSync(logPath) ? fs.readFileSync(logPath, "utf-8") : "";
@@ -117,6 +138,30 @@ describe("sandbox provisioning: unified .openclaw layout (#2227)", () => {
 });
 
 describe("sandbox provisioning: procps debug tools (#2343)", () => {
+  it("base apt layer requests procps and the SFTP server", () => {
+    const dockerfile = fs.readFileSync(DOCKERFILE_BASE, "utf-8");
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-base-apt-"));
+    const lists = path.join(tmp, "apt-lists");
+    fs.mkdirSync(lists);
+    const command = dockerRunCommandBetween(
+      dockerfile,
+      "RUN apt-get update",
+      "# gosu for privilege separation",
+    ).replaceAll("/var/lib/apt/lists", lists);
+
+    try {
+      const { result, calls } = runLoggedDockerShell(command, tmp, [
+        'apt-get() { printf "apt-get %s\\n" "$*" >> "$call_log"; }',
+      ]);
+      expect(result.status).toBe(0);
+      expect(calls).toContain("apt-get update");
+      expect(calls).toContain("procps=2:4.0.2-3");
+      expect(calls).toContain("openssh-sftp-server=1:9.2p1-2+deb12u9");
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
   it("runtime hardening installs procps when a stale base lacks ps", () => {
     const dockerfile = fs.readFileSync(DOCKERFILE, "utf-8");
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-procps-"));
@@ -200,6 +245,47 @@ describe("Hermes sandbox provisioning", () => {
     }
   }
 
+  function runHermesUserSetupBlock() {
+    const dockerfile = fs.readFileSync(HERMES_DOCKERFILE_BASE, "utf-8");
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-hermes-users-"));
+    const sandboxRoot = path.join(tmp, "sandbox");
+    const command = dockerRunCommandBetween(
+      dockerfile,
+      "# Create sandbox user (matches OpenShell convention)",
+      "# Create .hermes with mutable integration dirs",
+    ).replaceAll("/sandbox", sandboxRoot);
+    const result = runLoggedDockerShell(command, tmp, [
+      'groupadd() { printf "groupadd %s\\n" "$*" >> "$call_log"; }',
+      'useradd() { printf "useradd %s\\n" "$*" >> "$call_log"; }',
+      'usermod() { printf "usermod %s\\n" "$*" >> "$call_log"; }',
+      'chown() { printf "chown %s\\n" "$*" >> "$call_log"; }',
+    ]);
+    return { ...result, tmp, sandboxRoot };
+  }
+
+  function runHermesLayoutBlock(
+    dockerfilePath: string,
+    startMarker: string,
+    endMarker: string,
+    { precreateConfig = false }: { precreateConfig?: boolean } = {},
+  ) {
+    const dockerfile = fs.readFileSync(dockerfilePath, "utf-8");
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-hermes-layout-"));
+    const sandboxRoot = path.join(tmp, "sandbox");
+    const hermesDir = path.join(sandboxRoot, ".hermes");
+    fs.mkdirSync(hermesDir, { recursive: true });
+    if (precreateConfig) {
+      fs.writeFileSync(path.join(hermesDir, "config.yaml"), "model: test\n");
+      fs.writeFileSync(path.join(hermesDir, ".env"), "TOKEN=test\n");
+    }
+    const command = dockerRunCommandBetween(dockerfile, startMarker, endMarker).replaceAll(
+      "/root/.cache/pip",
+      path.join(tmp, "root-cache", "pip"),
+    );
+    const result = runDockerShell(command, sandboxRoot);
+    return { ...result, tmp, sandboxRoot };
+  }
+
   it("final image validates and runs the manifest-declared hermes binary path", () => {
     const result = runHermesPathValidation();
     expect(result.status).toBe(0);
@@ -220,6 +306,71 @@ describe("Hermes sandbox provisioning", () => {
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
+  });
+
+  it("adds root to the Hermes sandbox group during base user setup", () => {
+    const { result, calls, tmp, sandboxRoot } = runHermesUserSetupBlock();
+    try {
+      expect(result.status).toBe(0);
+      expect(calls).toContain("groupadd -r sandbox");
+      expect(calls).toContain("groupadd -r gateway");
+      expect(calls).toContain("usermod -a -G sandbox root");
+      expect(calls).toContain(`chown -R sandbox:sandbox ${sandboxRoot}`);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("grants the Hermes gateway group write access to runtime state directories", () => {
+    const runs = [
+      runHermesLayoutBlock(
+        HERMES_DOCKERFILE_BASE,
+        "# Create .hermes with mutable integration dirs",
+        "# Install Hermes Agent",
+      ),
+      runHermesLayoutBlock(
+        HERMES_DOCKERFILE,
+        "# Flatten stale published base images",
+        "# Pin config hash at build time",
+        { precreateConfig: true },
+      ),
+    ];
+
+    try {
+      for (const run of runs) {
+        expect(run.result.status).toBe(0);
+        const hermesDir = path.join(run.sandboxRoot, ".hermes");
+        expect((fs.statSync(hermesDir).mode & 0o777).toString(8)).toBe("750");
+        for (const dir of ["runtime", "logs", "cache"]) {
+          expect((fs.statSync(path.join(hermesDir, dir)).mode & 0o777).toString(8)).toBe("770");
+        }
+        expect(fs.readlinkSync(path.join(hermesDir, "gateway_state.json"))).toBe(
+          "runtime/gateway_state.json",
+        );
+        expect(run.calls).toContain(`chown gateway:sandbox ${path.join(hermesDir, "runtime")}`);
+      }
+    } finally {
+      for (const run of runs) {
+        fs.rmSync(run.tmp, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("captures Hermes entrypoint and gateway startup logs for diagnostics", () => {
+    const startSrc = fs.readFileSync(HERMES_START, "utf-8");
+    expect(startSrc).toContain('_START_LOG="/tmp/nemoclaw-start.log"');
+    expect(startSrc).toContain('exec > >(tee -a "$_START_LOG") 2> >(tee -a "$_START_LOG" >&2)');
+    expect(startSrc).toContain("start_gateway_log_stream");
+    expect(startSrc).toContain("sed -u 's/^/[gateway-log:] /'");
+    expect(startSrc).toContain('SANDBOX_CHILD_PIDS+=("$GATEWAY_LOG_TAIL_PID")');
+  });
+
+  it("allows OpenShell to execute the Hermes venv behind the /usr/local/bin symlink", () => {
+    const policySrc = fs.readFileSync(HERMES_POLICY, "utf-8");
+    const permissivePolicySrc = fs.readFileSync(HERMES_POLICY_PERMISSIVE, "utf-8");
+
+    expect(policySrc).toContain("- /opt/hermes");
+    expect(permissivePolicySrc).toContain("- /opt/hermes");
   });
 });
 
