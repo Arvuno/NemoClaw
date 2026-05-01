@@ -65,11 +65,15 @@ describe("WSL2 inference verification timeouts (issue #987)", () => {
   describe("retry logic in probeOpenAiLikeEndpoint", () => {
     function runProbeWithCurlStatuses(statuses: number[]) {
       const httpProbePath = require.resolve("../dist/lib/http-probe.js");
+      const platformPath = require.resolve("../dist/lib/platform.js");
       const probesPath = require.resolve("../dist/lib/onboard-inference-probes.js");
       const httpProbe = require(httpProbePath);
+      const platform = require(platformPath);
       const originalRunCurlProbe = httpProbe.runCurlProbe;
+      const originalIsWsl = platform.isWsl;
       const calls: string[][] = [];
       let index = 0;
+      platform.isWsl = () => false;
       httpProbe.runCurlProbe = (args: string[]) => {
         calls.push(args);
         const status = statuses[index++] ?? 0;
@@ -100,6 +104,7 @@ describe("WSL2 inference verification timeouts (issue #987)", () => {
         return { result, calls };
       } finally {
         httpProbe.runCurlProbe = originalRunCurlProbe;
+        platform.isWsl = originalIsWsl;
         delete require.cache[probesPath];
       }
     }

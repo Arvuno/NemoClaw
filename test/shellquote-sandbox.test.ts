@@ -5,11 +5,9 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { pathToFileURL } from "url";
 import { spawnSync } from "child_process";
-import { createRequire } from "module";
 import { describe, it, expect } from "vitest";
-
-const require = createRequire(import.meta.url);
 
 describe("sandboxName command hardening in onboard.js", () => {
   const src = fs.readFileSync(
@@ -18,7 +16,8 @@ describe("sandboxName command hardening in onboard.js", () => {
   );
 
   it("re-validates sandboxName at the createSandbox boundary", async () => {
-    const { createSandbox } = require("../dist/lib/onboard.js") as {
+    const onboardModule = await import("../dist/lib/onboard.js");
+    const { createSandbox } = (onboardModule.default ?? onboardModule) as unknown as {
       createSandbox: (
         gpu: null,
         model: string,
@@ -37,14 +36,24 @@ describe("sandboxName command hardening in onboard.js", () => {
     const repoRoot = path.join(import.meta.dirname, "..");
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-dns-argv-"));
     const fakeBin = path.join(tmpDir, "bin");
-    const scriptPath = path.join(tmpDir, "create-sandbox-dns-argv.js");
-    const onboardPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "onboard.js"));
-    const runnerPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "runner.js"));
-    const registryPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "registry.js"));
-    const preflightPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "preflight.js"));
-    const credentialsPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "credentials.js"));
-    const streamPath = JSON.stringify(
-      path.join(repoRoot, "dist", "lib", "sandbox-create-stream.js"),
+    const scriptPath = path.join(tmpDir, "create-sandbox-dns-argv.mjs");
+    const onboardUrl = JSON.stringify(
+      pathToFileURL(path.join(repoRoot, "dist", "lib", "onboard.js")).href,
+    );
+    const runnerUrl = JSON.stringify(
+      pathToFileURL(path.join(repoRoot, "dist", "lib", "runner.js")).href,
+    );
+    const registryUrl = JSON.stringify(
+      pathToFileURL(path.join(repoRoot, "dist", "lib", "registry.js")).href,
+    );
+    const preflightUrl = JSON.stringify(
+      pathToFileURL(path.join(repoRoot, "dist", "lib", "preflight.js")).href,
+    );
+    const credentialsUrl = JSON.stringify(
+      pathToFileURL(path.join(repoRoot, "dist", "lib", "credentials.js")).href,
+    );
+    const streamUrl = JSON.stringify(
+      pathToFileURL(path.join(repoRoot, "dist", "lib", "sandbox-create-stream.js")).href,
     );
 
     fs.mkdirSync(fakeBin, { recursive: true });
@@ -54,11 +63,11 @@ describe("sandboxName command hardening in onboard.js", () => {
     fs.writeFileSync(
       scriptPath,
       String.raw`
-const runner = require(${runnerPath});
-const registry = require(${registryPath});
-const preflight = require(${preflightPath});
-const credentials = require(${credentialsPath});
-const sandboxCreateStream = require(${streamPath});
+const runner = (await import(${runnerUrl})).default;
+const registry = (await import(${registryUrl})).default;
+const preflight = (await import(${preflightUrl})).default;
+const credentials = (await import(${credentialsUrl})).default;
+const sandboxCreateStream = (await import(${streamUrl})).default;
 for (const key of Object.keys(process.env)) {
   if (/^(NEMOCLAW|OPENSHELL)_/.test(key) || key === "CHAT_UI_URL") {
     delete process.env[key];
@@ -95,17 +104,17 @@ sandboxCreateStream.streamSandboxCreate = async () => ({
   output: "Built image openshell/sandbox-from:123\nCreated sandbox: my-assistant",
   sawProgress: true,
 });
-const { createSandbox } = require(${onboardPath});
-(async () => {
+const { createSandbox } = await import(${onboardUrl});
+try {
   process.env.OPENSHELL_GATEWAY = "nemoclaw";
   process.env.NEMOCLAW_NON_INTERACTIVE = "1";
   process.env.NEMOCLAW_HEALTH_POLL_COUNT = "1";
   const sandboxName = await createSandbox(null, "gpt-5.4", "nvidia-prod", null, "my-assistant");
   console.log(JSON.stringify({ sandboxName, commands }));
-})().catch((error) => {
+} catch (error) {
   console.error(error && error.stack ? error.stack : String(error));
   process.exit(1);
-});
+}
 `,
     );
 
@@ -142,39 +151,51 @@ const { createSandbox } = require(${onboardPath});
   });
 
   it("forwards opts to openshellArgv so openshellBinary overrides are not dropped", () => {
-    const runnerPath = require.resolve("../dist/lib/runner.js");
-    const onboardPath = require.resolve("../dist/lib/onboard.js");
-    const runner = require(runnerPath);
-    const originalRunCapture = runner.runCapture;
-    let captured: { command: string[]; opts: { ignoreError?: boolean } } | null = null;
+    const repoRoot = path.join(import.meta.dirname, "..");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-openshell-forward-"));
+    const scriptPath = path.join(tmpDir, "run-capture-openshell.mjs");
+    const runnerUrl = JSON.stringify(
+      pathToFileURL(path.join(repoRoot, "dist", "lib", "runner.js")).href,
+    );
+    const onboardUrl = JSON.stringify(
+      `${pathToFileURL(path.join(repoRoot, "dist", "lib", "onboard.js")).href}?stub=${Date.now()}`,
+    );
 
-    runner.runCapture = (command: string[], opts: { ignoreError?: boolean } = {}) => {
-      captured = { command, opts };
-      return "";
-    };
-    delete require.cache[onboardPath];
+    fs.writeFileSync(
+      scriptPath,
+      `
+const runner = (await import(${runnerUrl})).default;
+let captured = null;
+runner.runCapture = (command, opts = {}) => {
+  captured = { command, opts };
+  return "";
+};
+const { runCaptureOpenshell } = await import(${onboardUrl});
+runCaptureOpenshell(["--version"], {
+  openshellBinary: "/tmp/custom-openshell",
+  ignoreError: true,
+});
+console.log(JSON.stringify(captured));
+`,
+      { mode: 0o700 },
+    );
+
     try {
-      const { runCaptureOpenshell } = require(onboardPath) as {
-        runCaptureOpenshell: (
-          args: string[],
-          opts: { openshellBinary?: string; ignoreError?: boolean },
-        ) => string;
-      };
-      runCaptureOpenshell(["--version"], {
-        openshellBinary: "/tmp/custom-openshell",
-        ignoreError: true,
+      const result = spawnSync(process.execPath, [scriptPath], {
+        cwd: repoRoot,
+        encoding: "utf-8",
+        env: { HOME: tmpDir, PATH: process.env.PATH || "" },
+        timeout: 5000,
       });
-
-      expect(captured).not.toBeNull();
-      const capturedRun = captured as unknown as {
+      expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
+      const capturedRun = JSON.parse(result.stdout.trim()) as {
         command: string[];
         opts: { ignoreError?: boolean };
       };
       expect(capturedRun.command).toEqual(["/tmp/custom-openshell", "--version"]);
       expect(capturedRun.opts.ignoreError).toBe(true);
     } finally {
-      runner.runCapture = originalRunCapture;
-      delete require.cache[onboardPath];
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 

@@ -643,9 +643,31 @@ describe("regression guards", () => {
         export -f openshell
         export PATH="${tmpBin}:/usr/bin:/bin"
         command() { if [ "\${1:-}" = "-v" ] && [ "\${2:-}" = "gh" ]; then return 1; fi; builtin command "$@"; }
-        curl() { echo "CURL_DIRECT $*"; return 0; }
+        curl() {
+          echo "CURL_DIRECT $*"
+          local out=""
+          while [ "$#" -gt 0 ]; do
+            if [ "$1" = "-o" ]; then
+              shift
+              out="$1"
+            fi
+            shift || true
+          done
+          if [ -n "$out" ]; then
+            if [ "$(basename "$out")" = "openshell-checksums-sha256.txt" ]; then
+              printf '%s\n' \
+                'ignored  openshell-x86_64-unknown-linux-musl.tar.gz' \
+                'ignored  openshell-aarch64-unknown-linux-musl.tar.gz' \
+                'ignored  openshell-x86_64-apple-darwin.tar.gz' \
+                'ignored  openshell-aarch64-apple-darwin.tar.gz' > "$out"
+            else
+              : > "$out"
+            fi
+          fi
+          return 0
+        }
         export -f curl
-        shasum() { echo "checksum OK"; return 0; }
+        shasum() { cat >/dev/null; echo "checksum OK"; return 0; }
         export -f shasum
         tar() { return 0; }; export -f tar
         install() { return 0; }; export -f install
@@ -657,6 +679,7 @@ describe("regression guards", () => {
           timeout: 5000,
         });
         const out = (result.stdout || "") + (result.stderr || "");
+        expect(result.status, out).toBe(0);
         expect(out).toContain("CURL_DIRECT");
         expect(out).not.toContain("gh CLI download failed");
       } finally {
@@ -701,11 +724,39 @@ describe("regression guards", () => {
   });
 
   describe("curl-pipe-to-shell guards (#574, #583)", () => {
-    it("installers expose explicit, reviewable scripts instead of piping curl to shell", () => {
-      expect(fs.statSync(path.join(import.meta.dirname, "..", "install.sh")).isFile()).toBe(true);
-      expect(
-        fs.statSync(path.join(import.meta.dirname, "..", "scripts", "install.sh")).isFile(),
-      ).toBe(true);
+    it("installer entrypoints run local version checks without curl-to-shell bootstrap", () => {
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "installer-entrypoints-"));
+      const fakeBin = path.join(tmp, "bin");
+      const callLog = path.join(tmp, "calls.log");
+      fs.mkdirSync(fakeBin);
+      fs.writeFileSync(
+        path.join(fakeBin, "curl"),
+        `#!/usr/bin/env bash\nprintf 'curl %s\\n' "$*" >> ${JSON.stringify(callLog)}\nexit 70\n`,
+        { mode: 0o755 },
+      );
+      fs.writeFileSync(
+        path.join(fakeBin, "sh"),
+        `#!/usr/bin/env bash\nprintf 'sh %s\\n' "$*" >> ${JSON.stringify(callLog)}\nexit 71\n`,
+        { mode: 0o755 },
+      );
+
+      try {
+        for (const script of ["install.sh", path.join("scripts", "install.sh")]) {
+          const result = spawnSync(
+            "bash",
+            [path.join(import.meta.dirname, "..", script), "--version"],
+            {
+              encoding: "utf-8",
+              env: { ...process.env, HOME: tmp, PATH: `${fakeBin}:/usr/bin:/bin` },
+              timeout: 5000,
+            },
+          );
+          expect(result.status, `${script}: ${result.stdout}${result.stderr}`).toBe(0);
+        }
+        expect(fs.existsSync(callLog) ? fs.readFileSync(callLog, "utf-8") : "").toBe("");
+      } finally {
+        fs.rmSync(tmp, { recursive: true, force: true });
+      }
     });
 
     it("scripts/brev-setup.sh has been removed", () => {

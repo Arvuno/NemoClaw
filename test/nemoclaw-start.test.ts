@@ -762,7 +762,8 @@ describe("Slack channel guard — unhandled-rejection safety net (#2340)", () =>
       process.execPath,
       [
         "-e",
-        `${extractGuardScript()}
+        `process.env.OPENSHELL_SANDBOX = '1';
+${extractGuardScript()}
 ${body}`,
       ],
       { encoding: "utf-8" },

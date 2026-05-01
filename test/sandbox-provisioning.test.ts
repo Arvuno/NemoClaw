@@ -282,6 +282,7 @@ source ${JSON.stringify(path.join(ROOT, "scripts", "codex-acp-wrapper.sh"))} --s
       const result = spawnSync("bash", ["-c", sourceScript], {
         encoding: "utf-8",
         env: { ...process.env, NEMOCLAW_CODEX_ACP_HOME: tmp },
+        timeout: 5000,
       });
       expect(result.status).toBe(0);
       const output = fs.readFileSync(log, "utf-8");

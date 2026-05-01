@@ -325,15 +325,22 @@ function assertionFromCall(
   sourceFile: ts.SourceFile,
   node: ts.CallExpression,
   sourceVars: ReadonlySet<string>,
+  productionPathVars: ReadonlySet<string>,
 ): Assertion | null {
   const expectBase = getExpectBase(node.expression);
   if (!expectBase || expectBase.arguments.length === 0) {
     return null;
   }
 
-  const subject = expectBase.arguments[0].getText(sourceFile);
+  const subjectExpr = expectBase.arguments[0];
+  const subject = subjectExpr.getText(sourceFile);
   const referencesSource = [...sourceVars].some((name) => textContainsIdentifier(subject, name));
-  if (!referencesSource && !isReadFileCall(expectBase)) {
+  const directSourceRead =
+    ts.isCallExpression(subjectExpr) &&
+    isReadFileCall(subjectExpr) &&
+    subjectExpr.arguments.length > 0 &&
+    isProductionPathExpression(subjectExpr.arguments[0].getText(sourceFile), productionPathVars);
+  if (!referencesSource && !directSourceRead) {
     return null;
   }
 
@@ -347,15 +354,25 @@ function assertionFromCall(
   };
 }
 
-function isTestCall(node: ts.CallExpression): boolean {
-  const expression = node.expression;
+function isTestCallee(expression: ts.Expression): boolean {
   if (ts.isIdentifier(expression)) {
     return expression.text === "it" || expression.text === "test";
   }
   if (ts.isPropertyAccessExpression(expression)) {
-    return expression.name.text === "it" || expression.name.text === "test";
+    return (
+      expression.name.text === "it" ||
+      expression.name.text === "test" ||
+      isTestCallee(expression.expression)
+    );
+  }
+  if (ts.isCallExpression(expression)) {
+    return isTestCallee(expression.expression);
   }
   return false;
+}
+
+function isTestCall(node: ts.CallExpression): boolean {
+  return isTestCallee(node.expression);
 }
 
 function testCaseName(sourceFile: ts.SourceFile, node: ts.CallExpression): string {
@@ -380,12 +397,13 @@ function collectAssertionsInNode(
   sourceFile: ts.SourceFile,
   root: ts.Node,
   sourceVars: ReadonlySet<string>,
+  productionPathVars: ReadonlySet<string>,
 ): Assertion[] {
   const assertions: Assertion[] = [];
 
   function visit(node: ts.Node): void {
     if (ts.isCallExpression(node)) {
-      const assertion = assertionFromCall(sourceFile, node, sourceVars);
+      const assertion = assertionFromCall(sourceFile, node, sourceVars, productionPathVars);
       if (assertion) assertions.push(assertion);
     }
     ts.forEachChild(node, visit);
@@ -413,8 +431,12 @@ function scanFile(absPath: string): SourceShapeCase[] {
           variables,
           productionPathVars,
         );
-        const assertions =
-          sourceVars.size === 0 ? [] : collectAssertionsInNode(sourceFile, body, sourceVars);
+        const assertions = collectAssertionsInNode(
+          sourceFile,
+          body,
+          sourceVars,
+          productionPathVars,
+        );
         if (assertions.length > 0) {
           const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
           cases.push({
