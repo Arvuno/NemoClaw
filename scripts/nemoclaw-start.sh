@@ -919,7 +919,7 @@ install_telegram_diagnostics() {
   function maybeLogTelegramReady(info, statusCode) {
     if (readyLogged) return;
     if (!info || info.hostname !== 'api.telegram.org') return;
-    if (!/\/(?:getUpdates|getMe|getWebhookInfo)(?:\?|$)/.test(info.path)) return;
+    if (!/\/(?:bot[^/]+\/)?(?:getUpdates|getMe|getWebhookInfo)(?:\?|$)/.test(info.path)) return;
     if (Number(statusCode) < 200 || Number(statusCode) >= 300) return;
     providerStarted = true;
     readyLogged = true;

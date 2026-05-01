@@ -1125,6 +1125,7 @@ describe("Slack token rewriter (#2085)", () => {
 
 describe("Telegram diagnostics (#2766)", () => {
   const src = fs.readFileSync(START_SCRIPT, "utf-8");
+  const telegramDiagnosticsScript = startScriptHeredoc(src, "TELEGRAM_DIAGNOSTICS_EOF");
 
   it("installs a Telegram diagnostics preload only when Telegram is configured", () => {
     expect(src).toContain('_TELEGRAM_DIAGNOSTICS_SCRIPT="/tmp/nemoclaw-telegram-diagnostics.js"');
@@ -1140,6 +1141,9 @@ describe("Telegram diagnostics (#2766)", () => {
     expect(src).toContain("agent turn failed after provider startup; inference error:");
     expect(src).toContain("LLM request failed");
     expect(src).toContain("Embedded agent failed before reply");
+    expect(src).toContain(
+      "if (!/\\/(?:bot[^/]+\\/)?(?:getUpdates|getMe|getWebhookInfo)(?:\\?|$)/.test(info.path)) return;",
+    );
     expect(src).toContain("var providerStarted = false;");
     expect(src).toContain(
       "if (!providerStarted && /\\[telegram\\] \\[default\\] starting provider\\b/i.test(text))",
@@ -1156,6 +1160,57 @@ describe("Telegram diagnostics (#2766)", () => {
     expect(src).not.toContain(
       '/(api[_-]?key|token|authorization)["\':\\s]+[A-Za-z0-9._~+\\/=-]+/gi',
     );
+  });
+
+  it("emits provider readiness for successful Telegram Bot API startup probes", () => {
+    const run = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `
+const { EventEmitter } = require('node:events');
+const https = require('node:https');
+https.request = function () {
+  const req = new EventEmitter();
+  process.nextTick(() => req.emit('response', { statusCode: 200 }));
+  return req;
+};
+${telegramDiagnosticsScript}
+https.request('https://api.telegram.org/bot123456:SECRET/getMe');
+setTimeout(() => {}, 5);
+`,
+      ],
+      { encoding: "utf-8" },
+    );
+
+    expect(run.status).toBe(0);
+    expect(run.stderr).toContain(
+      "[telegram] [default] provider ready (Bot API reachable; agent replies use inference.local)",
+    );
+  });
+
+  it("emits inference diagnostics only after provider startup and redacts token values", () => {
+    const run = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `
+${telegramDiagnosticsScript}
+process.stderr.write('LLM request failed: token=123456:BEFORE\\n');
+process.stderr.write('[telegram] [default] starting provider\\n');
+process.stderr.write('LLM request failed: token=123456:AFTER\\n');
+`,
+      ],
+      { encoding: "utf-8" },
+    );
+
+    expect(run.status).toBe(0);
+    const diagnosticLines = run.stderr
+      .split(/\r?\n/)
+      .filter((line) => line.includes("agent turn failed after provider startup"));
+    expect(diagnosticLines).toHaveLength(1);
+    expect(diagnosticLines[0]).toContain("token=<redacted>");
+    expect(diagnosticLines[0]).not.toContain("AFTER");
   });
 
   it("calls install_telegram_diagnostics in both entrypoint paths before gateway launch", () => {
