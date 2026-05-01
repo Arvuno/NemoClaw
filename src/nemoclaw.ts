@@ -1156,60 +1156,6 @@ async function deploy(instanceName: string): Promise<void> {
   });
 }
 
-async function start(args: string[] = []): Promise<void> {
-  await runOclif("start", args);
-}
-
-async function stop(args: string[] = []): Promise<void> {
-  await runOclif("stop", args);
-}
-
-async function tunnel(args: string[]): Promise<void> {
-  const sub = args[0];
-  switch (sub) {
-    case "start":
-    case "stop":
-      await runOclif(`tunnel:${sub}`, args.slice(1));
-      return;
-    default:
-      console.error(`  Usage: ${CLI_NAME} tunnel <start|stop>`);
-      process.exit(1);
-  }
-}
-
-async function debug(args: string[]): Promise<void> {
-  await runOclif("debug", args);
-}
-
-async function uninstall(args: string[]): Promise<void> {
-  await runOclif("uninstall", args);
-}
-
-async function credentialsCommand(args: string[]): Promise<void> {
-  const sub = args[0];
-  if (!sub || sub === "help" || sub === "--help" || sub === "-h") {
-    await runOclif("credentials", []);
-    return;
-  }
-
-  switch (sub) {
-    case "list":
-      await runOclif("credentials:list", args.slice(1));
-      return;
-    case "reset":
-      await runOclif("credentials:reset", args.slice(1));
-      return;
-    default:
-      console.error(`  Unknown credentials subcommand: ${sub}`);
-      console.error(`  Run '${CLI_NAME} credentials help' for usage.`);
-      process.exit(1);
-  }
-}
-
-async function showStatus(args: string[] = []): Promise<void> {
-  await runOclif("status", args);
-}
-
 async function runOclif(commandId: string, args: string[] = []): Promise<void> {
   await runRegisteredOclifCommand(commandId, args, {
     rootDir: ROOT,
@@ -1218,21 +1164,8 @@ async function runOclif(commandId: string, args: string[] = []): Promise<void> {
   });
 }
 
-async function listSandboxes(args: string[] = []): Promise<void> {
-  await runOclif("list", args);
-}
-
-function hasHelpFlag(args: string[]): boolean {
-  return args.includes("--help") || args.includes("-h");
-}
-
 function printSandboxActionUsage(action: string): void {
   console.log(`  Usage: ${CLI_NAME} <name> ${action}`);
-}
-
-function hasMissingFlagValue(args: string[], flagName: string): boolean {
-  const index = args.indexOf(flagName);
-  return index !== -1 && (!args[index + 1] || args[index + 1].startsWith("--"));
 }
 
 // ── Sandbox-scoped actions ───────────────────────────────────────
