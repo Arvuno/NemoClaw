@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
+  ChannelsAddCommand,
+  ChannelsRemoveCommand,
+  ChannelsStartCommand,
+  ChannelsStopCommand,
+} from "./channels-mutate-cli-commands";
+import {
   CredentialsCommand,
   CredentialsListCommand,
   CredentialsResetCommand,
@@ -44,7 +50,11 @@ export default {
   "credentials:reset": CredentialsResetCommand,
   debug: DebugCliCommand,
   list: ListCommand,
+  "sandbox:channels:add": ChannelsAddCommand,
   "sandbox:channels:list": SandboxChannelsListCommand,
+  "sandbox:channels:remove": ChannelsRemoveCommand,
+  "sandbox:channels:start": ChannelsStartCommand,
+  "sandbox:channels:stop": ChannelsStopCommand,
   "sandbox:config:get": SandboxConfigGetCommand,
   "sandbox:logs": SandboxLogsCommand,
   "sandbox:policy-list": SandboxPolicyListCommand,

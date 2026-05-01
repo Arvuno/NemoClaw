@@ -574,7 +574,11 @@ exports.garbageCollectImages = garbageCollectImages;
 exports.recoverNamedGatewayRuntime = recoverNamedGatewayRuntime;
 exports.recoverRegistryEntries = recoverRegistryEntries;
 exports.runOpenshell = runOpenshell;
+exports.sandboxChannelsAdd = sandboxChannelsAdd;
 exports.sandboxChannelsList = sandboxChannelsList;
+exports.sandboxChannelsRemove = sandboxChannelsRemove;
+exports.sandboxChannelsStart = sandboxChannelsStart;
+exports.sandboxChannelsStop = sandboxChannelsStop;
 exports.sandboxLogs = sandboxLogs;
 exports.sandboxPolicyList = sandboxPolicyList;
 exports.sandboxSkillInstall = sandboxSkillInstall;
@@ -4187,16 +4191,32 @@ const [cmd, ...args] = process.argv.slice(2);
             await runOclif("sandbox:channels:list", [cmd]);
             break;
           case "add":
-            await sandboxChannelsAdd(cmd, channelsArgs);
+            if (hasHelpFlag(channelsArgs)) {
+              printSandboxActionUsage("channels add <channel> [--dry-run]");
+              break;
+            }
+            await runOclif("sandbox:channels:add", [cmd, ...channelsArgs]);
             break;
           case "remove":
-            await sandboxChannelsRemove(cmd, channelsArgs);
+            if (hasHelpFlag(channelsArgs)) {
+              printSandboxActionUsage("channels remove <channel> [--dry-run]");
+              break;
+            }
+            await runOclif("sandbox:channels:remove", [cmd, ...channelsArgs]);
             break;
           case "stop":
-            await sandboxChannelsStop(cmd, channelsArgs);
+            if (hasHelpFlag(channelsArgs)) {
+              printSandboxActionUsage("channels stop <channel> [--dry-run]");
+              break;
+            }
+            await runOclif("sandbox:channels:stop", [cmd, ...channelsArgs]);
             break;
           case "start":
-            await sandboxChannelsStart(cmd, channelsArgs);
+            if (hasHelpFlag(channelsArgs)) {
+              printSandboxActionUsage("channels start <channel> [--dry-run]");
+              break;
+            }
+            await runOclif("sandbox:channels:start", [cmd, ...channelsArgs]);
             break;
           case "--help":
           case "-h":

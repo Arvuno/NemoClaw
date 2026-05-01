@@ -728,10 +728,38 @@ describe("CLI dispatch", () => {
     expect(channels.out).toContain("<name> channels list");
     expect(channels.out).not.toContain("sandbox:channels:list");
 
+    for (const subcommand of ["add", "remove", "stop", "start"]) {
+      const result = runWithEnv(`alpha channels ${subcommand} --help`, { HOME: home });
+      expect(result.code).toBe(0);
+      expect(result.out).toContain(`<name> channels ${subcommand}`);
+      expect(result.out).not.toContain(`sandbox:channels:${subcommand}`);
+    }
+
     const config = runWithEnv("alpha config get --help", { HOME: home });
     expect(config.code).toBe(0);
     expect(config.out).toContain("<name> config get");
     expect(config.out).not.toContain("sandbox:config:get");
+  });
+
+  it("channels mutation dry-run paths dispatch through oclif", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-channels-dry-run-"));
+    writeSandboxRegistry(home);
+
+    const add = runWithEnv("alpha channels add telegram --dry-run", { HOME: home });
+    expect(add.code).toBe(0);
+    expect(add.out).toContain("--dry-run: would enable channel 'telegram' for 'alpha'.");
+
+    const remove = runWithEnv("alpha channels remove telegram --dry-run", { HOME: home });
+    expect(remove.code).toBe(0);
+    expect(remove.out).toContain("--dry-run: would remove channel 'telegram' for 'alpha'.");
+
+    const stop = runWithEnv("alpha channels stop telegram --dry-run", { HOME: home });
+    expect(stop.code).toBe(0);
+    expect(stop.out).toContain("--dry-run: would stop channel 'telegram' for 'alpha'.");
+
+    const start = runWithEnv("alpha channels start telegram --dry-run", { HOME: home });
+    expect(start.code).toBe(0);
+    expect(start.out).toContain("Channel 'telegram' is already enabled for 'alpha'. Nothing to do.");
   });
 
   it("shields help keeps public sandbox-scoped usage", () => {
