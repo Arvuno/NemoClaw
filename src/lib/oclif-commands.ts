@@ -19,6 +19,11 @@ import DestroyCliCommand from "./destroy-cli-command";
 import GatewayTokenCliCommand from "./gateway-token-cli-command";
 import ListCommand from "./list-command";
 import {
+  OnboardCliCommand,
+  SetupCliCommand,
+  SetupSparkCliCommand,
+} from "./onboard-cli-commands";
+import {
   BackupAllCommand,
   GarbageCollectImagesCommand,
   UpgradeSandboxesCommand,
@@ -60,6 +65,7 @@ export default {
   debug: DebugCliCommand,
   deploy: DeployCliCommand,
   list: ListCommand,
+  onboard: OnboardCliCommand,
   "sandbox:channels:add": ChannelsAddCommand,
   "sandbox:channels:list": SandboxChannelsListCommand,
   "sandbox:channels:remove": ChannelsRemoveCommand,
@@ -81,6 +87,8 @@ export default {
   "sandbox:snapshot:list": SnapshotListCommand,
   "sandbox:snapshot:restore": SnapshotRestoreCommand,
   "sandbox:status": SandboxStatusCommand,
+  setup: SetupCliCommand,
+  "setup-spark": SetupSparkCliCommand,
   status: StatusCommand,
   start: DeprecatedStartCommand,
   stop: DeprecatedStopCommand,

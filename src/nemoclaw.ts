@@ -572,6 +572,7 @@ exports.captureOpenshell = captureOpenshell;
 exports.backupAll = backupAll;
 exports.deploy = deploy;
 exports.garbageCollectImages = garbageCollectImages;
+exports.onboard = onboard;
 exports.recoverNamedGatewayRuntime = recoverNamedGatewayRuntime;
 exports.recoverRegistryEntries = recoverRegistryEntries;
 exports.runOpenshell = runOpenshell;
@@ -590,6 +591,8 @@ exports.sandboxRebuild = sandboxRebuild;
 exports.sandboxSkillInstall = sandboxSkillInstall;
 exports.sandboxSnapshot = sandboxSnapshot;
 exports.sandboxStatus = sandboxStatus;
+exports.setup = setup;
+exports.setupSpark = setupSpark;
 exports.upgradeSandboxes = upgradeSandboxes;
 
 function hasNamedGateway(output = ""): boolean {
@@ -3973,13 +3976,13 @@ const mainPromise = (async () => {
   if (GLOBAL_COMMANDS.has(cmd)) {
     switch (cmd) {
       case "onboard":
-        await onboard(args);
+        await runOclif("onboard", args);
         break;
       case "setup":
-        await setup(args);
+        await runOclif("setup", args);
         break;
       case "setup-spark":
-        await setupSpark(args);
+        await runOclif("setup-spark", args);
         break;
       case "deploy":
         await runOclif("deploy", args);
