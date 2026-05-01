@@ -5,18 +5,18 @@
 
 import { Args, Command, Flags } from "@oclif/core";
 
-type RuntimeBridge = {
-  sandboxPolicyAdd: (sandboxName: string, args?: string[]) => Promise<void>;
-  sandboxPolicyRemove: (sandboxName: string, args?: string[]) => Promise<void>;
-};
+import type { NemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
+import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
 
-let runtimeBridgeFactory = (): RuntimeBridge => require("../nemoclaw") as RuntimeBridge;
+type PolicyRuntimeBridge = Pick<NemoClawRuntimeBridge, "sandboxPolicyAdd" | "sandboxPolicyRemove">;
 
-export function setPolicyRuntimeBridgeFactoryForTest(factory: () => RuntimeBridge): void {
+let runtimeBridgeFactory = (): PolicyRuntimeBridge => getNemoClawRuntimeBridge();
+
+export function setPolicyRuntimeBridgeFactoryForTest(factory: () => PolicyRuntimeBridge): void {
   runtimeBridgeFactory = factory;
 }
 
-function getRuntimeBridge(): RuntimeBridge {
+function getRuntimeBridge(): PolicyRuntimeBridge {
   return runtimeBridgeFactory();
 }
 

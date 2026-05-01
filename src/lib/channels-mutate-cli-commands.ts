@@ -5,20 +5,23 @@
 
 import { Args, Command, Flags } from "@oclif/core";
 
-type RuntimeBridge = {
-  sandboxChannelsAdd: (sandboxName: string, args?: string[]) => Promise<void>;
-  sandboxChannelsRemove: (sandboxName: string, args?: string[]) => Promise<void>;
-  sandboxChannelsStart: (sandboxName: string, args?: string[]) => Promise<void>;
-  sandboxChannelsStop: (sandboxName: string, args?: string[]) => Promise<void>;
-};
+import type { NemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
+import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
 
-let runtimeBridgeFactory = (): RuntimeBridge => require("../nemoclaw") as RuntimeBridge;
+type ChannelsRuntimeBridge = Pick<
+  NemoClawRuntimeBridge,
+  "sandboxChannelsAdd" | "sandboxChannelsRemove" | "sandboxChannelsStart" | "sandboxChannelsStop"
+>;
 
-export function setChannelsRuntimeBridgeFactoryForTest(factory: () => RuntimeBridge): void {
+let runtimeBridgeFactory = (): ChannelsRuntimeBridge => getNemoClawRuntimeBridge();
+
+export function setChannelsRuntimeBridgeFactoryForTest(
+  factory: () => ChannelsRuntimeBridge,
+): void {
   runtimeBridgeFactory = factory;
 }
 
-function getRuntimeBridge(): RuntimeBridge {
+function getRuntimeBridge(): ChannelsRuntimeBridge {
   return runtimeBridgeFactory();
 }
 
