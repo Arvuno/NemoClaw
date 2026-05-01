@@ -57,11 +57,12 @@ RUN arch="$(dpkg --print-architecture)" \
 
 # Create sandbox user (matches OpenShell convention) and gateway user.
 # gateway is a member of the sandbox group so it can read Hermes config files
-# with group-read permissions while the sandbox user remains the only writer.
+# and write Hermes runtime state while config files remain non-group-writable.
 RUN groupadd -r sandbox \
     && groupadd -r gateway \
     && useradd -r -g gateway -G sandbox -d /sandbox -s /usr/sbin/nologin gateway \
     && useradd -r -g sandbox -d /sandbox -s /bin/bash sandbox \
+    && usermod -a -G sandbox root \
     && mkdir -p /sandbox/.nemoclaw \
     && chown -R sandbox:sandbox /sandbox
 
@@ -79,7 +80,20 @@ RUN mkdir -p /sandbox/.hermes/memories \
         /sandbox/.hermes/profiles \
         /sandbox/.hermes/cache \
         /sandbox/.hermes/pairing \
-    && chown -R sandbox:sandbox /sandbox/.hermes
+    && chown -R sandbox:sandbox /sandbox/.hermes \
+    && chmod 770 /sandbox/.hermes \
+        /sandbox/.hermes/memories \
+        /sandbox/.hermes/sessions \
+        /sandbox/.hermes/skills \
+        /sandbox/.hermes/plugins \
+        /sandbox/.hermes/cron \
+        /sandbox/.hermes/logs \
+        /sandbox/.hermes/skins \
+        /sandbox/.hermes/plans \
+        /sandbox/.hermes/workspace \
+        /sandbox/.hermes/profiles \
+        /sandbox/.hermes/cache \
+        /sandbox/.hermes/pairing
 
 # Install Hermes Agent from the selected GitHub release.
 # The image prebakes only the extras mapped to NemoClaw-supported onboarding
@@ -89,9 +103,10 @@ RUN mkdir -p /sandbox/.hermes/memories \
 RUN pip3 install --no-cache-dir --break-system-packages "uv==${UV_VERSION}"
 RUN mkdir -p /opt/hermes \
     && curl -fsSL "https://github.com/NousResearch/hermes-agent/archive/refs/tags/${HERMES_VERSION}.tar.gz" -o /tmp/hermes.tar.gz \
-    && echo "${HERMES_TARBALL_SHA256}  /tmp/hermes.tar.gz" | sha256sum -c - \
+    && printf '%s  /tmp/hermes.tar.gz\n' "${HERMES_TARBALL_SHA256}" > /tmp/hermes.tar.gz.sha256 \
+    && sha256sum -c /tmp/hermes.tar.gz.sha256 \
     && tar -xzf /tmp/hermes.tar.gz -C /opt/hermes --strip-components=1 \
-    && rm /tmp/hermes.tar.gz
+    && rm /tmp/hermes.tar.gz /tmp/hermes.tar.gz.sha256
 WORKDIR /opt/hermes
 RUN uv sync --frozen --no-dev --extra messaging --extra web --no-cache \
     && ln -sf /opt/hermes/.venv/bin/hermes /usr/local/bin/hermes \

@@ -79,7 +79,9 @@ HERMES="$(command -v hermes)" # Resolve once, use absolute path everywhere
 
 # Hermes writes state files (PID, state.db, .channel_directory) directly into
 # HERMES_HOME alongside config. Config is mutable by default for the sandbox user
-# and group-readable by the gateway user. Immutability is opt-in via `shields up`.
+# and group-readable by the gateway user. Runtime state dirs are group-writable
+# because the Hermes gateway writes logs, PID files, and channel directory state.
+# Immutability is opt-in via `shields up`.
 HERMES_DIR="/sandbox/.hermes"
 HERMES_HASH_FILE="/etc/nemoclaw/hermes.config-hash"
 
