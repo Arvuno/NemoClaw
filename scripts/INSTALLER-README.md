@@ -4,7 +4,20 @@
 # NemoClaw Installer Guide — DGX Station GB300 (Local vLLM)
 
 This guide covers the full installation of NemoClaw on a DGX Station GB300 using a
-locally-served vLLM inference backend with the Nemotron-3 Super 120B NVFP4 model.
+locally-served vLLM inference backend.
+
+On Station hardware the installer presents an interactive model picker with three
+options:
+
+| # | Model                                       | HF token | Notes |
+|---|---------------------------------------------|----------|-------|
+| 1 | `Qwen/Qwen2.5-72B-Instruct`                 | optional | Open weights |
+| 2 | `deepseek-ai/DeepSeek-R1-Distill-Llama-70B` | optional | Open weights, reasoning-tuned |
+| 3 | `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4` | required | Gated; default |
+
+A HuggingFace token is **required** for Nemotron and **strongly recommended** for the
+open-weight models — unauthenticated downloads from the HF Hub are rate-limited and a
+72B model can take 18+ minutes to download without one.
 
 ---
 
@@ -45,26 +58,80 @@ sudo rm -f /home/$USER/.nemoclaw/onboard-session.json
 
 ### 3. Obtain a HuggingFace token
 
-The Nemotron-3 Super 120B NVFP4 model is gated. You need a token with read access
-to the model repository:
+A token with read access to the gated Nemotron model is required, and recommended for
+all other models so HuggingFace doesn't rate-limit the download:
 
-- Accept the model license at: https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4
-- Create a token at: https://huggingface.co/settings/tokens
+- Accept the Nemotron license at <https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4>
+- Create a token at <https://huggingface.co/settings/tokens>
 
-Export it in every terminal session that runs the installer or vLLM:
+The installer resolves the token from the first source available, in this order:
+
+1. `HUGGING_FACE_HUB_TOKEN` env var
+2. `HF_TOKEN` env var
+3. `~/.cache/huggingface/token` (created by `huggingface-cli login`)
+4. `~/.huggingface/token` (legacy CLI cache)
+
+The recommended one-time setup is to log in with the HuggingFace CLI so the token is
+persisted on disk and every subsequent install picks it up automatically with no
+env-var dance:
+
+```bash
+pip install --user huggingface_hub
+huggingface-cli login   # paste your hf_... token when prompted
+```
+
+Alternatively, export it per-shell:
 
 ```bash
 export HUGGING_FACE_HUB_TOKEN="hf_..."
 ```
 
+When the installer launches vLLM it logs which source it used:
+
+```text
+[INFO]  HuggingFace token: using ~/.cache/huggingface/token (huggingface-cli login) — gated models and faster downloads enabled
+```
+
+If no token is found, the installer continues but warns that gated models will fail and
+open-weight downloads will be slow.
+
 ---
 
 ## Step 1: Start vLLM (optional — installer handles this automatically)
 
-The installer detects a running vLLM server on port 8000 and reuses it. If none is
-found, it automatically starts one via `install_vllm()`, selects the highest-VRAM GPU,
-and **waits up to 10 minutes for the HTTP `/health` endpoint to respond** before
-proceeding to the onboard wizard.
+On a Station the installer always runs the model picker before launching vLLM, even
+when an existing container is detected, so you can confirm or switch the loaded model.
+It then:
+
+1. Selects the highest-VRAM GPU automatically.
+2. Reuses the running vLLM container if the loaded model matches the chosen one.
+3. Otherwise stops the container, frees GPU memory, pulls the new model, and launches
+   a fresh container. The replacement is logged in red, e.g.:
+
+   ```text
+   [WARN]  vLLM is running a different model — replacing it:
+           Loaded:    nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4
+           Requested: Qwen/Qwen2.5-72B-Instruct
+           Stopping container 'nemoclaw-vllm'...
+           Container removed.
+           GPU 1 VRAM used: 245213 MiB → 802 MiB (memory released)
+   ```
+
+4. **Waits up to 60 minutes** for the HTTP `/health` endpoint to respond, parsing the
+   container logs every 5 seconds to classify the current stage:
+
+   ```text
+   [vLLM] stage: downloading weights from HuggingFace
+   [vLLM] downloading weights from HuggingFace — still loading… 12m45s elapsed (timeout in 47m15s)
+   [vLLM] stage: loading weights into GPU
+   [vLLM] loading weights into GPU — still loading… 18m12s elapsed (timeout in 41m48s)
+   [vLLM] stage: capturing CUDA graphs
+   ✓  vLLM ready on :8000 after 19m45s
+   ```
+
+   If the container exits or the timeout elapses, the installer aborts with the last
+   30 lines of container logs and clear retry instructions — it never falls through to
+   onboard while vLLM is still loading.
 
 Start vLLM manually only if you want explicit control over GPU selection or model
 parameters (e.g., during testing or when re-using an already-downloaded model).
@@ -170,8 +237,30 @@ From the NemoClaw source checkout:
 
 ```bash
 cd ~/NemoClaw && git pull
-HUGGING_FACE_HUB_TOKEN="${HUGGING_FACE_HUB_TOKEN}" bash scripts/install.sh
+bash scripts/install.sh
 ```
+
+If you ran `huggingface-cli login` once during the one-time setup the token is picked
+up automatically. Otherwise prefix the command with `HUGGING_FACE_HUB_TOKEN=hf_...`.
+
+### Choose a model
+
+After the dependency-status table, the Station picker prompts:
+
+```text
+  ──────────────────────────────────────────────────
+  Select inference model for this DGX Station
+  ──────────────────────────────────────────────────
+  1) Qwen2.5 72B Instruct         (open weights, no HF token required)
+  2) DeepSeek-R1 Distill 70B      (open weights, no HF token required)
+  3) Nemotron-3 Super 120B NVFP4  (gated — requires HF token)  [default]
+  ──────────────────────────────────────────────────
+  Choose 1-3 (Enter for default 3):
+```
+
+Press Enter for the Nemotron default, or type `1` / `2` for the open-weight options.
+To skip the prompt entirely (CI / scripted installs), set
+`NEMOCLAW_VLLM_MODEL=<exact-hf-id>` in the environment.
 
 ### Onboard wizard answers
 
@@ -180,7 +269,7 @@ HUGGING_FACE_HUB_TOKEN="${HUGGING_FACE_HUB_TOKEN}" bash scripts/install.sh
 | Inference option | `3` — Other OpenAI-compatible endpoint |
 | Base URL | `http://<host-lan-ip>:8000/v1` |
 | API key | Any non-empty string (vLLM has no auth by default) |
-| Model | `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4` |
+| Model | The exact HuggingFace ID you picked above (run `curl -s http://localhost:8000/v1/models` to confirm) |
 | Sandbox name | `my-assistant` (or any name you prefer) |
 | Web search | `N` (unless you have a Brave API key) |
 | Messaging | Enter to skip (or configure Slack/Discord/Telegram as needed) |
@@ -238,15 +327,28 @@ nemoclaw my-assistant status
 nemoclaw my-assistant logs --follow
 ```
 
-### Switch inference model at runtime
+### Switch inference model
 
-You can change the model or provider without rebuilding the sandbox:
+The simplest way to swap models is to re-run the installer — the Station model picker
+will offer the three choices, the loaded vLLM model is replaced (with a red warning and
+GPU-memory verification), and the sandbox is recreated to point at the new model.
+
+```bash
+cd ~/NemoClaw && git pull
+bash scripts/install.sh --fresh
+```
+
+To change the model that the OpenShell gateway routes to **without** restarting vLLM
+or the sandbox, you can also call:
 
 ```bash
 openshell inference set -g nemoclaw \
-  --model nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 \
+  --model <hf-model-id> \
   --provider compatible-endpoint
 ```
+
+Note that the vLLM container only serves the model it was launched with; pointing the
+gateway at a different model than vLLM is loading will fail.
 
 ---
 
@@ -274,12 +376,12 @@ Then re-run the installer:
 
 ```bash
 cd ~/NemoClaw && git pull
-HUGGING_FACE_HUB_TOKEN="${HUGGING_FACE_HUB_TOKEN}" bash scripts/install.sh --fresh
+bash scripts/install.sh --fresh
 ```
 
-On a clean install the installer launches vLLM automatically, waits for it to be
-healthy, then proceeds to the onboard wizard. You do not need to start vLLM or the
-gateway manually.
+On a clean install the installer prompts for a model, launches vLLM, waits up to
+60 minutes for it to be healthy (with stage-by-stage progress), then proceeds to the
+onboard wizard. You do not need to start vLLM or the gateway manually.
 
 ### Automatic backup before re-installation
 
@@ -382,17 +484,19 @@ and remaps the device to index 0 inside the container.
 
 ### Onboard wizard validation fails with `exit 7` (connection refused) on port 8000
 
-vLLM was launched by the installer in the background but the model had not finished
-loading when the wizard's probe ran. Watch the container logs in another terminal:
+The installer should never fall through to onboard with vLLM still loading — it polls
+the HTTP `/health` endpoint for up to 60 minutes, parses container logs to classify
+the load stage, and aborts cleanly with retry instructions if vLLM does not come up.
+If you see exit 7 anyway, vLLM either crashed or rebooted between the readiness check
+and the wizard probe. Diagnose with:
 
 ```bash
-docker logs -f nemoclaw-vllm
-# Wait for: INFO: Uvicorn running on http://0.0.0.0:8000
+docker ps | grep nemoclaw-vllm
+docker logs --tail 80 nemoclaw-vllm
+curl -sf http://localhost:8000/health && echo healthy || echo "not ready"
 ```
 
-Once that line appears, type `retry` in the wizard. This is fixed in the installer as
-of commit `b88861fa` — `install_vllm()` now polls the `/health` HTTP endpoint (not just
-port reachability) and waits up to 10 minutes before proceeding.
+Once `/health` returns 200, type `retry` in the wizard.
 
 ### Session file owned by root
 
@@ -427,13 +531,61 @@ command in Step 1 already uses `--network host` and `vllm/vllm-openai:latest`.
 
 ### Installer launches a new vLLM container instead of reusing the existing one
 
-The installer reuses a running vLLM server on port 8000. If it launches a new container,
-the existing one was not detected — check that it is running and actually serving:
+The installer reuses a running vLLM container only when the loaded model matches the
+one selected in the Station picker. If the picker selection differs from what the
+container is serving, the container is stopped, GPU memory is verified released, and a
+fresh container is launched with the new model. This is the expected behavior on a
+model swap — look for the red `replacing it` block in the install log.
+
+If you wanted to reuse the existing container, re-run the installer and pick the
+already-loaded model at the picker. To check what is currently loaded:
 
 ```bash
-docker ps | grep nemoclaw-vllm
+docker inspect --format '{{join .Config.Cmd " "}}' nemoclaw-vllm | grep -oP '(?<=--model )\S+'
 curl -sf http://localhost:8000/health && echo "healthy" || echo "not ready"
 ```
 
-If the container is running but the health check fails, wait for the model to finish
-loading (watch `docker logs -f nemoclaw-vllm`).
+### HuggingFace download is slow or warns "unauthenticated requests"
+
+The installer logs the token source at the start of the vLLM launch step. If you see:
+
+```text
+[WARN]  HuggingFace token: not provided — open models will download unauthenticated
+```
+
+…vLLM is fetching weights without auth and HF will rate-limit you (a 72B model takes
+18+ minutes that way). Set up `huggingface-cli login` once (see
+**One-Time System Preparation → Obtain a HuggingFace token**) and re-run the installer.
+
+### Dashboard port oscillates between 18789 and 18790 across reinstalls
+
+A previous install left an `openshell forward` process bound to the dashboard port,
+so on the next install the wizard's allocator sees the port as taken and bumps to the
+next free one. Each reinstall flips between the two ports.
+
+Stop the stale forward(s) before re-running the installer:
+
+```bash
+openshell forward list
+openshell forward stop <port>     # for each running entry
+```
+
+Or, if you don't mind losing the active forward, kill all forwards owned by the
+sandbox:
+
+```bash
+openshell forward list | awk 'NR>1 && /running/i {print $3}' \
+  | xargs -I{} openshell forward stop {}
+```
+
+### vLLM aborts with "container exited before becoming healthy"
+
+The installer streams the last 30 lines of container logs before exiting. The most
+common causes:
+
+- **Out of memory** — the chosen model doesn't fit on the selected GPU. Re-run the
+  installer and pick a smaller model, or set `NEMOCLAW_VLLM_MODEL` to a smaller HF ID.
+- **HuggingFace 401** — the model is gated and no token was found. Run
+  `huggingface-cli login`, then `bash scripts/install.sh --fresh`.
+- **HuggingFace 404** — wrong model ID. Use the exact HF repo name, not a NIM/NGC
+  catalog name.
