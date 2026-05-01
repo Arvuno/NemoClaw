@@ -718,6 +718,11 @@ describe("CLI dispatch", () => {
     expect(logs.out).toContain("<name> logs [--follow]");
     expect(logs.out).not.toContain("sandbox:logs");
 
+    const destroy = runWithEnv("alpha destroy --help", { HOME: home });
+    expect(destroy.code).toBe(0);
+    expect(destroy.out).toContain("<name> destroy [--yes|--force]");
+    expect(destroy.out).not.toContain("sandbox:destroy");
+
     for (const action of ["policy-add", "policy-remove", "policy-list"]) {
       const policy = runWithEnv(`alpha ${action} --help`, { HOME: home });
       expect(policy.code).toBe(0);

@@ -13,6 +13,7 @@ import {
   CredentialsResetCommand,
 } from "./credentials-cli-command";
 import DebugCliCommand from "./debug-cli-command";
+import DestroyCliCommand from "./destroy-cli-command";
 import GatewayTokenCliCommand from "./gateway-token-cli-command";
 import ListCommand from "./list-command";
 import {
@@ -61,6 +62,7 @@ export default {
   "sandbox:channels:start": ChannelsStartCommand,
   "sandbox:channels:stop": ChannelsStopCommand,
   "sandbox:config:get": SandboxConfigGetCommand,
+  "sandbox:destroy": DestroyCliCommand,
   "sandbox:logs": SandboxLogsCommand,
   "sandbox:policy-add": PolicyAddCommand,
   "sandbox:policy-list": SandboxPolicyListCommand,
