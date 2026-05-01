@@ -1483,6 +1483,17 @@ const { loadAgent } = require(${agentDefsPath});
     );
   });
 
+  it("allows slow sandbox create recovery to wait beyond 60 seconds", () => {
+    const source = fs.readFileSync(
+      path.join(import.meta.dirname, "..", "src", "lib", "onboard.ts"),
+      "utf-8",
+    );
+
+    assert.match(source, /NEMOCLAW_SANDBOX_READY_TIMEOUT", 180/);
+    assert.match(source, /Math\.ceil\(SANDBOX_READY_TIMEOUT_SECS \/ 2\)/);
+    assert.match(source, /within \$\{SANDBOX_READY_TIMEOUT_SECS\}s/);
+  });
+
   it("classifies gateway reuse states conservatively", () => {
     expect(
       getGatewayReuseState(
