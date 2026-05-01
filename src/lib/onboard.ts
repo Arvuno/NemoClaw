@@ -1770,6 +1770,13 @@ function agentSupportsWebSearch(
   agent: AgentDefinition | null | undefined,
   dockerfilePathOverride: string | null = null,
 ): boolean {
+  // Hermes has native web tools, but the NemoClaw onboarding wizard wires the
+  // OpenClaw Brave provider path. Do not offer a Brave prompt for Hermes until
+  // that provider is supported end to end.
+  if (agent?.name === "hermes") {
+    return false;
+  }
+
   const candidates = [
     dockerfilePathOverride,
     agent?.dockerfilePath,
@@ -8702,6 +8709,7 @@ module.exports = {
   startGateway,
   findDashboardForwardOwner,
   startGatewayForRecovery,
+  openshellArgv,
   runCaptureOpenshell,
   agentSupportsWebSearch,
   setupInference,
