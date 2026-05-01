@@ -28,6 +28,9 @@ import { describe, expect, it } from "vitest";
 function runRcFile(rcFileName: ".bashrc" | ".profile", proxyEnvContents?: string): string {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nc-2376-"));
   try {
+    const childEnv = { ...process.env };
+    delete childEnv.HERMES_HOME;
+
     const proxyEnv = path.join(tmp, "nemoclaw-proxy-env.sh");
     const rcFile = path.join(tmp, rcFileName);
 
@@ -38,6 +41,7 @@ function runRcFile(rcFileName: ".bashrc" | ".profile", proxyEnvContents?: string
 
     return execFileSync("bash", ["-c", `. "${rcFile}"; printf '%s' "\${HERMES_HOME:-}"`], {
       encoding: "utf-8",
+      env: childEnv,
     });
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
