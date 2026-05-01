@@ -1973,7 +1973,7 @@ function parseSandboxLogsArgs(args: string[]): SandboxLogsOptions | null {
         process.exit(1);
       }
       if (!/^[1-9][0-9]*$/.test(value)) {
-        console.error(`  Invalid log line count: ${value}`);
+        console.error(`  ${arg} requires a positive line count.`);
         printSandboxLogsUsage();
         process.exit(1);
       }

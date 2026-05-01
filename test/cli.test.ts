@@ -743,6 +743,24 @@ describe("CLI dispatch", () => {
     expect(setup.readCalls()).toEqual([]);
   });
 
+  it("rejects zero line count for -n", () => {
+    const setup = createLogsTestSetup("nemoclaw-cli-logs-n-zero-");
+    const r = setup.runLogs("alpha logs -n 0 2>&1");
+
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("-n requires a positive line count");
+    expect(setup.readCalls()).toEqual([]);
+  });
+
+  it("rejects non-numeric line count for -n", () => {
+    const setup = createLogsTestSetup("nemoclaw-cli-logs-n-nonnumeric-");
+    const r = setup.runLogs("alpha logs -n foo 2>&1");
+
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("-n requires a positive line count");
+    expect(setup.readCalls()).toEqual([]);
+  });
+
   it("passes --since to OpenShell logs without an unfiltered gateway tail", () => {
     const setup = createLogsTestSetup("nemoclaw-cli-logs-since-");
     const r = setup.runLogs("alpha logs --since 5m");
@@ -765,6 +783,15 @@ describe("CLI dispatch", () => {
     expect(calls).toContain("settings set alpha --key ocsf_json_enabled --value true");
     expect(calls).toContain("logs alpha -n 200 --source all --since 5m --tail");
     expect(calls.some((call) => call.startsWith("sandbox exec -n alpha"))).toBe(false);
+  });
+
+  it("rejects --since without a duration", () => {
+    const setup = createLogsTestSetup("nemoclaw-cli-logs-since-missing-");
+    const r = setup.runLogs("alpha logs --since 2>&1");
+
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("--since requires a duration");
+    expect(setup.readCalls()).toEqual([]);
   });
 
   it("rejects unknown logs flags", () => {
