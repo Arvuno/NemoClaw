@@ -195,7 +195,16 @@ function failAgentSetup(sandboxName: string, agent: AgentDefinition, message: st
 }
 
 function isHealthProbeOk(result: string | null | undefined): boolean {
-  return (result ?? "").trim() === "ok";
+  const body = (result ?? "").trim();
+  if (body === "ok") {
+    return true;
+  }
+  try {
+    const parsed = JSON.parse(body) as { status?: unknown };
+    return parsed.status === "ok";
+  } catch {
+    return false;
+  }
 }
 
 /**
