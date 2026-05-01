@@ -36,6 +36,7 @@ describe("sandboxName command hardening in onboard.js", () => {
   it("runs setup-dns-proxy.sh through the argv helper instead of bash -c interpolation", () => {
     const repoRoot = path.join(import.meta.dirname, "..");
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-dns-argv-"));
+    const fakeBin = path.join(tmpDir, "bin");
     const scriptPath = path.join(tmpDir, "create-sandbox-dns-argv.js");
     const onboardPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "onboard.js"));
     const runnerPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "runner.js"));
@@ -46,6 +47,10 @@ describe("sandboxName command hardening in onboard.js", () => {
       path.join(repoRoot, "dist", "lib", "sandbox-create-stream.js"),
     );
 
+    fs.mkdirSync(fakeBin, { recursive: true });
+    fs.writeFileSync(path.join(fakeBin, "openshell"), "#!/usr/bin/env bash\nexit 0\n", {
+      mode: 0o755,
+    });
     fs.writeFileSync(
       scriptPath,
       String.raw`
@@ -108,7 +113,7 @@ const { createSandbox } = require(${onboardPath});
       const result = spawnSync(process.execPath, [scriptPath], {
         cwd: repoRoot,
         encoding: "utf-8",
-        env: { HOME: tmpDir, PATH: process.env.PATH || "" },
+        env: { HOME: tmpDir, PATH: `${fakeBin}:${process.env.PATH || ""}` },
         timeout: 30_000,
       });
       expect(result.status, `stdout:\n${result.stdout}\nstderr:\n${result.stderr}`).toBe(0);
