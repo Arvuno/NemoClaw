@@ -14,7 +14,12 @@ const {
   shouldForceCompletionsApi,
 } = require("./validation");
 
-const { getCurlTimingArgs, runCurlProbe, runStreamingEventProbe } = httpProbe;
+const {
+  getCurlTimingArgs,
+  runCurlProbe,
+  runChatCompletionsStreamingProbe,
+  runStreamingEventProbe,
+} = httpProbe;
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -73,6 +78,24 @@ function getValidationProbeCurlArgs(opts) {
   return ["--connect-timeout", "10", "--max-time", "15"];
 }
 
+function getDeepSeekV4ProValidationProbeCurlArgs(opts) {
+  if (isWsl(opts)) {
+    return ["--connect-timeout", "30", "--max-time", "150"];
+  }
+  return ["--connect-timeout", "20", "--max-time", "120"];
+}
+
+function getCurlMaxTimeSeconds(args) {
+  const maxTimeIndex = args.indexOf("--max-time");
+  if (maxTimeIndex === -1) return 30;
+  const value = Number(args[maxTimeIndex + 1]);
+  return Number.isFinite(value) && value > 0 ? value : 30;
+}
+
+function getProbeProcessTimeoutMs(args) {
+  return (getCurlMaxTimeSeconds(args) + 5) * 1000;
+}
+
 const RETRIABLE_HTTP_PROBE_STATUSES = new Set([429]);
 const HTTP_PROBE_RETRY_DELAYS_MS = [5_000, 15_000, 30_000];
 
@@ -88,6 +111,10 @@ function shouldRetryHttpProbe(result) {
     result.curlStatus === 0 &&
     RETRIABLE_HTTP_PROBE_STATUSES.has(result.httpStatus)
   );
+}
+
+function isCurlTimeout(result) {
+  return result && !result.ok && result.curlStatus === 28;
 }
 
 function executeProbeWithHttpRetry(probe) {
@@ -186,6 +213,32 @@ function getChatCompletionsProbePayload(model) {
   return payload;
 }
 
+function getChatCompletionsProbeCurlArgs({ authHeader, model, url }) {
+  const timingArgs = isDeepSeekV4ProModel(model)
+    ? getDeepSeekV4ProValidationProbeCurlArgs()
+    : getValidationProbeCurlArgs();
+  return [
+    "-sS",
+    ...timingArgs,
+    "-H",
+    "Content-Type: application/json",
+    ...authHeader,
+    "-d",
+    JSON.stringify(getChatCompletionsProbePayload(model)),
+    url,
+  ];
+}
+
+function runChatCompletionsProbe({ authHeader, model, url }) {
+  const args = getChatCompletionsProbeCurlArgs({ authHeader, model, url });
+  if (isDeepSeekV4ProModel(model)) {
+    return runChatCompletionsStreamingProbe(args, {
+      timeoutMs: getProbeProcessTimeoutMs(args),
+    });
+  }
+  return runCurlProbe(args);
+}
+
 // eslint-disable-next-line complexity
 function probeOpenAiLikeEndpoint(endpointUrl, model, apiKey, options = {}) {
   const useQueryParam = options.authMode === "query-param";
@@ -229,16 +282,11 @@ function probeOpenAiLikeEndpoint(endpointUrl, model, apiKey, options = {}) {
     name: "Chat Completions API",
     api: "openai-completions",
     execute: () =>
-      runCurlProbe([
-        "-sS",
-        ...getValidationProbeCurlArgs(),
-        "-H",
-        "Content-Type: application/json",
-        ...authHeader,
-        "-d",
-        JSON.stringify(getChatCompletionsProbePayload(model)),
-        appendKey("/chat/completions"),
-      ]),
+      runChatCompletionsProbe({
+        authHeader,
+        model,
+        url: appendKey("/chat/completions"),
+      }),
   };
 
   // NVIDIA Build does not expose /v1/responses; probing it always returns
@@ -303,6 +351,22 @@ function probeOpenAiLikeEndpoint(endpointUrl, model, apiKey, options = {}) {
         }
       }
       return { ok: true, api: probe.api, label: probe.name };
+    }
+    if (
+      probe.api === "openai-completions" &&
+      isDeepSeekV4ProModel(model) &&
+      isCurlTimeout(result)
+    ) {
+      const warning =
+        "DeepSeek V4 Pro validation timed out before the stream returned data; continuing with NVIDIA Endpoints because this model can take longer than the onboarding probe budget to emit its first token.";
+      console.log(`  ⚠ ${warning}`);
+      return {
+        ok: true,
+        api: probe.api,
+        label: probe.name,
+        warning,
+        validated: false,
+      };
     }
     // Preserve the raw response body alongside the summarized message so the
     // NVCF "Function not found for account" detector below can fall back to
@@ -413,7 +477,9 @@ module.exports = {
   shouldRequireResponsesToolCalling,
   getProbeAuthMode,
   getValidationProbeCurlArgs,
+  getDeepSeekV4ProValidationProbeCurlArgs,
   getChatCompletionsProbePayload,
+  getChatCompletionsProbeCurlArgs,
   probeResponsesToolCalling,
   probeOpenAiLikeEndpoint,
   probeAnthropicEndpoint,

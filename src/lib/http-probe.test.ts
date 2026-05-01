@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   getCurlTimingArgs,
+  runChatCompletionsStreamingProbe,
   runCurlProbe,
   runStreamingEventProbe,
   summarizeCurlFailure,
@@ -85,6 +86,56 @@ describe("http-probe helpers", () => {
     expect(result.curlStatus).toBe(1);
     expect(result.message).toContain("curl failed");
     expect(result.stderr).toContain("spawn ENOENT");
+  });
+});
+
+describe("runChatCompletionsStreamingProbe", () => {
+  function mockStreaming(sseBody: string, exitCode = 0, stdout = "200", stderr = "") {
+    return (_command: string, args: readonly string[]) => {
+      const oIdx = args.indexOf("-o");
+      if (oIdx !== -1) {
+        const outputPath = args[oIdx + 1];
+        if (typeof outputPath === "string") {
+          fs.writeFileSync(outputPath, sseBody);
+        }
+      }
+      return {
+        pid: 1,
+        output: [],
+        stdout,
+        stderr,
+        status: exitCode,
+        signal: null,
+      };
+    };
+  }
+
+  it("passes when chat-completions SSE data arrives before curl max-time", () => {
+    const sseBody = [
+      'data: {"id":"chatcmpl-1","choices":[{"delta":{"content":"OK"}}]}',
+      "",
+      "data: [DONE]",
+      "",
+    ].join("\n");
+
+    const result = runChatCompletionsStreamingProbe(
+      ["-sS", "--max-time", "120", "https://example.test/v1/chat/completions"],
+      { spawnSyncImpl: mockStreaming(sseBody, 28) },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.curlStatus).toBe(28);
+    expect(result.body).toContain("chatcmpl-1");
+  });
+
+  it("fails when the stream has no chat-completions SSE data", () => {
+    const result = runChatCompletionsStreamingProbe(
+      ["-sS", "--max-time", "120", "https://example.test/v1/chat/completions"],
+      { spawnSyncImpl: mockStreaming("", 28, "000") },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.curlStatus).toBe(28);
   });
 });
 

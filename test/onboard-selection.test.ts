@@ -295,12 +295,18 @@ const { setupNim } = require(${onboardPath});
 body='{"id":"ok"}'
 status="200"
 outfile=""
+streaming=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -o) outfile="$2"; shift 2 ;;
+    -N) streaming="1"; shift ;;
+    -w) shift 2 ;;
     *) shift ;;
   esac
 done
+if [ "$streaming" = "1" ]; then
+  body='data: {"id":"chatcmpl-test","choices":[{"delta":{"content":"OK"}}]}'$'\\n\\n''data: [DONE]'$'\\n'
+fi
 printf '%s' "$body" > "$outfile"
 printf '%s' "$status"
 `,
