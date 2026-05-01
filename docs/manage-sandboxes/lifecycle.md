@@ -64,11 +64,6 @@ $ NEMOCLAW_DASHBOARD_PORT=19000 nemoclaw onboard
 
 For full details on port conflicts and overrides, refer to [Port already in use](../reference/troubleshooting.md#port-already-in-use).
 
-## Open the UI from a Remote Host
-
-If NemoClaw is running on a remote GPU instance and you want to open the UI from a laptop, refer to [Remote Dashboard Access](../deployment/deploy-to-remote-gpu.md#remote-dashboard-access).
-Set `CHAT_UI_URL` to the origin the browser uses before running onboard, so the gateway's CORS allowlist accepts the remote browser.
-
 ## Chat with the Agent from the Terminal
 
 Connect to the sandbox and use the OpenClaw terminal UI.
