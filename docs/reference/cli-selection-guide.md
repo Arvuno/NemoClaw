@@ -160,7 +160,7 @@ It waits for readiness, handles stale SSH host keys after gateway restarts, and 
 
 Use `openshell sandbox connect <name>` only when you intentionally want the raw OpenShell connection path.
 
-For a one-off command, use `openshell sandbox exec` instead of opening an interactive shell:
+For a one-off command, use `openshell sandbox exec` instead of opening an interactive shell.
 
 ```console
 $ openshell sandbox exec -n my-assistant -- cat /tmp/gateway.log
@@ -203,7 +203,7 @@ $ nemoclaw <name> status
 ### Update Network Policy
 
 Use `nemoclaw <name> policy-add` or `policy-remove` for NemoClaw presets and custom preset files.
-This is the safest path because NemoClaw merges with the live policy and reapplies presets during rebuilds.
+NemoClaw merges the new policy with the live policy and reapplies presets during rebuilds.
 
 Use `openshell policy update` for precise live endpoint or REST rule changes.
 Use `openshell policy get --full` and `openshell policy set` only when you need to edit and replace the raw policy file.
