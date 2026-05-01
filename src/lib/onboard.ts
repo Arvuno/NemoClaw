@@ -3688,6 +3688,17 @@ async function createSandbox(
                 "  [non-interactive] Set NEMOCLAW_RECREATE_SANDBOX=1 (or --recreate-sandbox) to force recreation.",
               );
             } else {
+              if (gpuPassthrough) {
+                const entry = registry.getSandbox(sandboxName);
+                if (entry && !entry.gpuEnabled) {
+                  console.error(`  Sandbox '${sandboxName}' exists but was created without --gpu.`);
+                  console.error(
+                    "  Pass --recreate-sandbox to recreate with GPU, or destroy and re-onboard:",
+                  );
+                  console.error(`    nemoclaw onboard --gpu --recreate-sandbox`);
+                  process.exit(1);
+                }
+              }
               note(`  [non-interactive] Sandbox '${sandboxName}' exists and is ready — reusing it`);
               note(
                 "  Pass --recreate-sandbox or set NEMOCLAW_RECREATE_SANDBOX=1 to force recreation.",
@@ -7442,6 +7453,12 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     console.error("  --resume and --fresh cannot both be set.");
     process.exit(1);
   }
+  if (resume && opts.gpu) {
+    console.error("  --gpu cannot be combined with --resume.");
+    console.error("  GPU mode is not persisted across sessions. Start a fresh onboard instead:");
+    console.error("    nemoclaw onboard --gpu");
+    process.exit(1);
+  }
   // In non-interactive mode also accept the env var so CI pipelines can set it.
   // This is the explicitly requested value; on resume it may be absent and the
   // session-recorded path is used instead (see below).
@@ -7726,7 +7743,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       onboardSession.markStepComplete("preflight");
     }
 
-    if (opts.gpu && (!gpu || gpu.count === 0)) {
+    if (opts.gpu && gpu?.type !== "nvidia") {
       console.error("  --gpu requires an NVIDIA GPU. None detected by nvidia-smi.");
       console.error("  Verify drivers are installed: nvidia-smi");
       process.exit(1);
