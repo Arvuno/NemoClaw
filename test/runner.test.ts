@@ -642,6 +642,7 @@ describe("regression guards", () => {
         openshell() { echo "openshell 0.0.1"; }
         export -f openshell
         export PATH="${tmpBin}:/usr/bin:/bin"
+        command() { if [ "\${1:-}" = "-v" ] && [ "\${2:-}" = "gh" ]; then return 1; fi; builtin command "$@"; }
         curl() { echo "CURL_DIRECT $*"; return 0; }
         export -f curl
         shasum() { echo "checksum OK"; return 0; }
@@ -702,9 +703,9 @@ describe("regression guards", () => {
   describe("curl-pipe-to-shell guards (#574, #583)", () => {
     it("installers expose explicit, reviewable scripts instead of piping curl to shell", () => {
       expect(fs.statSync(path.join(import.meta.dirname, "..", "install.sh")).isFile()).toBe(true);
-      expect(fs.statSync(path.join(import.meta.dirname, "..", "scripts", "install.sh")).isFile()).toBe(
-        true,
-      );
+      expect(
+        fs.statSync(path.join(import.meta.dirname, "..", "scripts", "install.sh")).isFile(),
+      ).toBe(true);
     });
 
     it("scripts/brev-setup.sh has been removed", () => {

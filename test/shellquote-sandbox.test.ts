@@ -54,6 +54,11 @@ const registry = require(${registryPath});
 const preflight = require(${preflightPath});
 const credentials = require(${credentialsPath});
 const sandboxCreateStream = require(${streamPath});
+for (const key of Object.keys(process.env)) {
+  if (/^(NEMOCLAW|OPENSHELL)_/.test(key) || key === "CHAT_UI_URL") {
+    delete process.env[key];
+  }
+}
 const commands = [];
 const asText = (command) => Array.isArray(command) ? command.join(" ") : String(command);
 runner.run = (command, opts = {}) => {
@@ -103,10 +108,10 @@ const { createSandbox } = require(${onboardPath});
       const result = spawnSync(process.execPath, [scriptPath], {
         cwd: repoRoot,
         encoding: "utf-8",
-        env: { ...process.env, HOME: tmpDir },
+        env: { HOME: tmpDir, PATH: process.env.PATH || "" },
         timeout: 30_000,
       });
-      expect(result.status).toBe(0);
+      expect(result.status, `stdout:\n${result.stdout}\nstderr:\n${result.stderr}`).toBe(0);
       const payloadLine = result.stdout
         .trim()
         .split("\n")
