@@ -558,32 +558,29 @@ ${JSON.stringify(process.execPath)} ${JSON.stringify(scriptFile)} < "$pipe"
   it("normal and secret prompts re-ref, cleanup stdin, and preserve masked input", () => {
     const script = `
 const { prompt } = require(${JSON.stringify(path.join(import.meta.dirname, "..", "dist", "lib", "credentials.js"))});
-const counts = { ref: 0, pause: 0, unref: 0, raw: [] };
+const counts = { ref: 0, resume: 0, pause: 0, unref: 0, raw: [] };
 process.stdin.ref = () => { counts.ref += 1; return process.stdin; };
+process.stdin.resume = () => { counts.resume += 1; return process.stdin; };
 process.stdin.pause = () => { counts.pause += 1; return process.stdin; };
 process.stdin.unref = () => { counts.unref += 1; return process.stdin; };
 process.stdin.setRawMode = (value) => { counts.raw.push(value); return process.stdin; };
 process.stdin.isTTY = true;
 process.stderr.isTTY = true;
 (async () => {
-  const normal = await prompt('normal: ');
-  const secret = await prompt('secret: ', { secret: true });
+  const normalPrompt = prompt('normal: ');
+  setImmediate(() => process.stdin.emit('data', 'alpha\\n'));
+  const normal = await normalPrompt;
+  const secretPrompt = prompt('secret: ', { secret: true });
+  setImmediate(() => process.stdin.emit('data', 'bravo\\n'));
+  const secret = await secretPrompt;
   console.log(JSON.stringify({ normal, secret, counts }));
 })().catch((err) => { console.error(err && err.stack ? err.stack : String(err)); process.exit(1); });
 `;
     const scriptFile = path.join(os.tmpdir(), `nemoclaw-credential-prompt-${process.pid}.js`);
     fs.writeFileSync(scriptFile, script, { mode: 0o700 });
-    const bash = `
-set -euo pipefail
-pipe="$(mktemp -u)"
-mkfifo "$pipe"
-trap 'rm -f "$pipe"' EXIT
-{ printf 'alpha\\n'; sleep 0.2; printf 'bravo\\n'; } > "$pipe" &
-${JSON.stringify(process.execPath)} ${JSON.stringify(scriptFile)} < "$pipe"
-`;
     let result: ReturnType<typeof spawnSync>;
     try {
-      result = spawnSync("bash", ["-lc", bash], {
+      result = spawnSync(process.execPath, [scriptFile], {
         encoding: "utf-8",
         timeout: 5000,
       });

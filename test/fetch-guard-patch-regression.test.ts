@@ -20,7 +20,10 @@ function dockerRunCommandBetween(startMarker: string, endMarker: string): string
   if (runIndex === -1 || runIndex > end) {
     throw new Error(`Expected RUN instruction after ${startMarker}`);
   }
-  return dockerfile.slice(runIndex, end).trim().replace(/^RUN\s+/, "");
+  return dockerfile
+    .slice(runIndex, end)
+    .trim()
+    .replace(/^RUN\s+/, "");
 }
 
 function runOpenClawUpgradeBlock(currentVersion: string) {
@@ -54,7 +57,9 @@ describe("fetch-guard patch regression guard", () => {
     const stale = runOpenClawUpgradeBlock("2026.3.11");
     expect(stale.result.status).toBe(0);
     expect(stale.result.stdout).toContain("upgrading to 2026.4.2");
-    expect(stale.calls).toContain("npm install -g --no-audit --no-fund --no-progress openclaw@2026.4.2");
+    expect(stale.calls).toContain(
+      "npm install -g --no-audit --no-fund --no-progress openclaw@2026.4.2",
+    );
 
     const current = runOpenClawUpgradeBlock("2026.4.2");
     expect(current.result.status).toBe(0);
@@ -84,12 +89,34 @@ describe("fetch-guard patch regression guard", () => {
       "# Patch OpenClaw media fetch for proxy-only sandbox",
       "# --- Patch 3: follow symlinks in plugin-install path checks (#2203)",
     ).replace("/usr/local/lib/node_modules/openclaw/dist", dist);
+    const fakeBin = path.join(tmp, "bin");
+    fs.mkdirSync(fakeBin);
+    const sedWrapper = path.join(fakeBin, "sed");
+    fs.writeFileSync(
+      sedWrapper,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        'if [ "${1:-}" = "-i" ] && [ "${2:-}" = "-E" ]; then',
+        "  expr=$3",
+        "  shift 3",
+        '  for file in "$@"; do perl -0pi -e "$expr" "$file"; done',
+        "  exit 0",
+        "fi",
+        'exec /usr/bin/sed "$@"',
+      ].join("\n"),
+      { mode: 0o755 },
+    );
     const scriptPath = path.join(tmp, "patch.sh");
     fs.writeFileSync(scriptPath, ["#!/usr/bin/env bash", command].join("\n"), { mode: 0o700 });
 
     try {
-      const patch = spawnSync("bash", [scriptPath], { encoding: "utf-8", timeout: 5000 });
-      expect(patch.status).toBe(0);
+      const patch = spawnSync("bash", [scriptPath], {
+        encoding: "utf-8",
+        env: { ...process.env, PATH: `${fakeBin}:${process.env.PATH || ""}` },
+        timeout: 5000,
+      });
+      expect(patch.status, `${patch.stdout}${patch.stderr}`).toBe(0);
       const verify = spawnSync(
         process.execPath,
         [
