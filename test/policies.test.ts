@@ -5,11 +5,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createRequire } from "node:module";
+import type { Interface as ReadlineInterface } from "node:readline";
 import { describe, it, expect, vi } from "vitest";
 import { spawnSync } from "node:child_process";
 import policies from "../dist/lib/policies";
 import { execTimeout } from "./helpers/timeouts";
 
+const requireForTest = createRequire(import.meta.url);
+const readline = requireForTest("node:readline") as typeof import("node:readline");
 const REPO_ROOT = path.join(import.meta.dirname, "..");
 const CLI_PATH = JSON.stringify(path.join(REPO_ROOT, "bin", "nemoclaw.js"));
 const CREDENTIALS_PATH = JSON.stringify(path.join(REPO_ROOT, "dist", "lib", "credentials.js"));
@@ -1516,55 +1520,65 @@ setImmediate(() => {
   });
 
   describe("interactive prompt cleanup", () => {
-    function runPromptLifecycle(
+    async function runPromptLifecycle(
       functionName: "selectFromList" | "selectForRemoval",
       input: string,
     ) {
-      const script = `
-const policies = require(${POLICIES_PATH});
-const counts = { ref: 0, resume: 0, pause: 0, unref: 0 };
-process.stdin.ref = () => { counts.ref += 1; return process.stdin; };
-process.stdin.resume = () => { counts.resume += 1; return process.stdin; };
-process.stdin.pause = () => { counts.pause += 1; return process.stdin; };
-process.stdin.unref = () => { counts.unref += 1; return process.stdin; };
-const items = [
-  { name: "alpha", description: "first" },
-  { name: "beta", description: "second" },
-];
-const options = ${functionName === "selectForRemoval" ? `{ applied: ["alpha"] }` : `{ applied: [] }`};
-const promptResult = policies[${JSON.stringify(functionName)}](items, options);
-setImmediate(() => process.stdin.emit("data", ${JSON.stringify(input)}));
-promptResult
-  .then((selected) => {
-    console.log(JSON.stringify({ selected, counts }));
-    process.exit(0);
-  })
-  .catch((err) => {
-    console.error(err && err.stack ? err.stack : String(err));
-    process.exit(1);
-  });
-`;
-      const result = spawnSync(process.execPath, ["-e", script], {
-        encoding: "utf-8",
-        timeout: 5000,
-      });
-      expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
-      return JSON.parse(result.stdout.trim()) as {
-        selected: string | null;
-        counts: { ref: number; pause: number; unref: number };
+      const counts = { ref: 0, pause: 0, unref: 0 };
+      const stdin = process.stdin as typeof process.stdin & {
+        ref: () => typeof process.stdin;
+        pause: () => typeof process.stdin;
+        unref: () => typeof process.stdin;
       };
+      const original = {
+        ref: stdin.ref,
+        pause: stdin.pause,
+        unref: stdin.unref,
+      };
+      const createInterface = vi.spyOn(readline, "createInterface").mockReturnValue({
+        question: (_question: string, callback: (answer: string) => void) => callback(input),
+        close: vi.fn(),
+      } as unknown as ReadlineInterface);
+      stdin.ref = () => {
+        counts.ref += 1;
+        return process.stdin;
+      };
+      stdin.pause = () => {
+        counts.pause += 1;
+        return process.stdin;
+      };
+      stdin.unref = () => {
+        counts.unref += 1;
+        return process.stdin;
+      };
+      const items = [
+        { name: "alpha", description: "first", file: "/tmp/alpha.yaml" },
+        { name: "beta", description: "second", file: "/tmp/beta.yaml" },
+      ];
+      const options =
+        functionName === "selectForRemoval" ? { applied: ["alpha"] } : { applied: [] };
+
+      try {
+        const selected = await policies[functionName](items, options);
+        return { selected, counts };
+      } finally {
+        stdin.ref = original.ref;
+        stdin.pause = original.pause;
+        stdin.unref = original.unref;
+        createInterface.mockRestore();
+      }
     }
 
-    it("releases and re-refs stdin around policy-add preset prompts", () => {
-      const result = runPromptLifecycle("selectFromList", "1\n");
+    it("releases and re-refs stdin around policy-add preset prompts", async () => {
+      const result = await runPromptLifecycle("selectFromList", "1\n");
       expect(result.selected).toBe("alpha");
       expect(result.counts.ref).toBeGreaterThanOrEqual(1);
       expect(result.counts.pause).toBeGreaterThanOrEqual(1);
       expect(result.counts.unref).toBeGreaterThanOrEqual(1);
     });
 
-    it("releases and re-refs stdin around policy-remove preset prompts", () => {
-      const result = runPromptLifecycle("selectForRemoval", "1\n");
+    it("releases and re-refs stdin around policy-remove preset prompts", async () => {
+      const result = await runPromptLifecycle("selectForRemoval", "1\n");
       expect(result.selected).toBe("alpha");
       expect(result.counts.ref).toBeGreaterThanOrEqual(1);
       expect(result.counts.pause).toBeGreaterThanOrEqual(1);

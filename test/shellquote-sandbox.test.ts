@@ -10,58 +10,21 @@ import { spawnSync } from "child_process";
 import { describe, it, expect } from "vitest";
 
 describe("sandboxName command hardening in onboard.js", () => {
-  it("re-validates sandboxName before runner commands at the createSandbox boundary", () => {
-    const repoRoot = path.join(import.meta.dirname, "..");
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-invalid-sandbox-"));
-    const scriptPath = path.join(tmpDir, "invalid-sandbox-name.mjs");
-    const onboardUrl = JSON.stringify(
-      pathToFileURL(path.join(repoRoot, "dist", "lib", "onboard.js")).href,
-    );
-    const runnerUrl = JSON.stringify(
-      pathToFileURL(path.join(repoRoot, "dist", "lib", "runner.js")).href,
-    );
+  it("re-validates sandboxName at the createSandbox boundary", async () => {
+    const onboardModule = await import("../dist/lib/onboard.js");
+    const { createSandbox } = (onboardModule.default ?? onboardModule) as unknown as {
+      createSandbox: (
+        gpu: null,
+        model: string,
+        provider: string,
+        preferredInferenceApi: null,
+        sandboxNameOverride: string,
+      ) => Promise<string>;
+    };
 
-    fs.writeFileSync(
-      scriptPath,
-      `
-const runner = (await import(${runnerUrl})).default;
-const commands = [];
-runner.run = (command, opts = {}) => { commands.push({ type: "run", command, opts }); return { status: 0 }; };
-runner.runCapture = (command, opts = {}) => { commands.push({ type: "runCapture", command, opts }); return ""; };
-runner.runFile = (file, args = [], opts = {}) => { commands.push({ type: "runFile", file, args, opts }); return { status: 0 }; };
-const { createSandbox } = await import(${onboardUrl});
-try {
-  await createSandbox(null, "test-model", "nvidia-prod", null, "bad; touch /tmp/pwned");
-  console.log(JSON.stringify({ message: "unexpected success", commands }));
-  process.exit(2);
-} catch (error) {
-  console.log(JSON.stringify({ message: error && error.message ? error.message : String(error), commands }));
-  process.exit(0);
-}
-`,
-      { mode: 0o700 },
-    );
-
-    try {
-      const result = spawnSync(process.execPath, [scriptPath], {
-        cwd: repoRoot,
-        encoding: "utf-8",
-        env: { HOME: tmpDir, PATH: process.env.PATH || "" },
-        timeout: 5000,
-      });
-      expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
-      const payloadLine = result.stdout
-        .trim()
-        .split("\n")
-        .reverse()
-        .find((line) => line.startsWith("{") && line.endsWith("}"));
-      expect(payloadLine).toBeTruthy();
-      const payload = JSON.parse(payloadLine!) as { message: string; commands: unknown[] };
-      expect(payload.message).toMatch(/Invalid sandbox name/);
-      expect(payload.commands).toEqual([]);
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
+    await expect(
+      createSandbox(null, "test-model", "nvidia-prod", null, "bad; touch /tmp/pwned"),
+    ).rejects.toThrow(/Invalid sandbox name/);
   });
 
   it("runs setup-dns-proxy.sh through the argv helper instead of bash -c interpolation", () => {

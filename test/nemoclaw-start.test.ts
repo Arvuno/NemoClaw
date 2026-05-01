@@ -1131,8 +1131,19 @@ describe("NC-2227-01: legacy migration behavior", () => {
       expect(fs.existsSync(sentinel)).toBe(true);
       expect((fs.statSync(sentinel).mode & 0o777).toString(8)).toBe("444");
     } finally {
-      spawnSync("chmod", ["-R", "u+rwx", tmpDir], { encoding: "utf-8" });
-      fs.rmSync(tmpDir, { recursive: true, force: true });
+      spawnSync(
+        "bash",
+        ["-lc", 'chmod -R u+rwx "$1" 2>/dev/null || true; rm -rf "$1"', "bash", tmpDir],
+        {
+          encoding: "utf-8",
+          timeout: 5000,
+        },
+      );
+      try {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      } catch {
+        /* best-effort cleanup on WSL/overlayfs can fail on chmod-preserved fixtures */
+      }
     }
   });
 
