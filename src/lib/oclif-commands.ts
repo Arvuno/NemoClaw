@@ -33,6 +33,7 @@ import {
   ShieldsStatusCommand,
   ShieldsUpCommand,
 } from "./shields-cli-commands";
+import ShareCommand from "./share-command";
 import SkillInstallCliCommand from "./skill-install-cli-command";
 import { SnapshotCreateCommand, SnapshotListCommand } from "./snapshot-cli-commands";
 import StatusCommand from "./status-command";
@@ -68,6 +69,7 @@ export default {
   "sandbox:snapshot:create": SnapshotCreateCommand,
   "sandbox:snapshot:list": SnapshotListCommand,
   "sandbox:status": SandboxStatusCommand,
+  share: ShareCommand,
   status: StatusCommand,
   start: DeprecatedStartCommand,
   stop: DeprecatedStopCommand,
