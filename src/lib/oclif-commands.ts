@@ -7,12 +7,12 @@ import {
   ChannelsStartCommand,
   ChannelsStopCommand,
 } from "./channels-mutate-cli-commands";
-import ConnectCliCommand from "./connect-cli-command";
 import {
   CredentialsCommand,
   CredentialsListCommand,
   CredentialsResetCommand,
 } from "./credentials-cli-command";
+import ConnectCliCommand from "./connect-cli-command";
 import DebugCliCommand from "./debug-cli-command";
 import DestroyCliCommand from "./destroy-cli-command";
 import GatewayTokenCliCommand from "./gateway-token-cli-command";
@@ -36,6 +36,7 @@ import {
   ShieldsStatusCommand,
   ShieldsUpCommand,
 } from "./shields-cli-commands";
+import ShareCommand from "./share-command";
 import SkillInstallCliCommand from "./skill-install-cli-command";
 import {
   SnapshotCreateCommand,
@@ -79,6 +80,7 @@ export default {
   "sandbox:snapshot:list": SnapshotListCommand,
   "sandbox:snapshot:restore": SnapshotRestoreCommand,
   "sandbox:status": SandboxStatusCommand,
+  share: ShareCommand,
   status: StatusCommand,
   start: DeprecatedStartCommand,
   stop: DeprecatedStopCommand,
