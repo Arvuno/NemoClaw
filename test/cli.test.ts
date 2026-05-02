@@ -1822,6 +1822,72 @@ describe("CLI dispatch", () => {
     expect(fs.existsSync(sshMarkerFile)).toBe(false);
   });
 
+  it("waits for recovered gateway health before failing probe-only", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-connect-probe-wait-"));
+    const localBin = path.join(home, "bin");
+    const markerFile = path.join(home, "openshell-calls");
+    const stateFile = path.join(home, "probe-state");
+    const readyCountFile = path.join(home, "ready-count");
+    fs.mkdirSync(localBin, { recursive: true });
+    writeSandboxRegistry(home);
+    fs.writeFileSync(stateFile, "stopped");
+    fs.writeFileSync(
+      path.join(localBin, "openshell"),
+      [
+        "#!/usr/bin/env bash",
+        `marker_file=${JSON.stringify(markerFile)}`,
+        `state_file=${JSON.stringify(stateFile)}`,
+        `ready_count_file=${JSON.stringify(readyCountFile)}`,
+        'printf \'%s\\n\' "$*" >> "$marker_file"',
+        'if [ "$1" = "sandbox" ] && [ "$2" = "get" ] && [ "$3" = "alpha" ]; then',
+        "  echo 'Sandbox:'",
+        "  echo",
+        "  echo '  Id: abc'",
+        "  echo '  Name: alpha'",
+        "  echo '  Namespace: openshell'",
+        "  echo '  Phase: Ready'",
+        "  exit 0",
+        "fi",
+        'if [ "$1" = "sandbox" ] && [ "$2" = "exec" ] && [ "$3" = "--name" ] && [ "$4" = "alpha" ]; then',
+        '  cmd="$8"',
+        '  case "$cmd" in',
+        '    *"OPENCLAW="*)',
+        '      echo recovered > "$state_file"',
+        "      echo '__NEMOCLAW_SANDBOX_EXEC_STARTED__'",
+        "      echo 'GATEWAY_PID=123'",
+        "      exit 0",
+        "      ;;",
+        "    *'curl -sf'*)",
+        "      echo '__NEMOCLAW_SANDBOX_EXEC_STARTED__'",
+        '      if [ "$(cat "$state_file")" != recovered ]; then echo STOPPED; exit 0; fi',
+        '      count=$(cat "$ready_count_file" 2>/dev/null || echo 0)',
+        "      count=$((count + 1))",
+        '      echo "$count" > "$ready_count_file"',
+        '      if [ "$count" -ge 3 ]; then echo RUNNING; else echo STOPPED; fi',
+        "      exit 0",
+        "      ;;",
+        "  esac",
+        "fi",
+        'if [ "$1" = "forward" ]; then',
+        "  exit 0",
+        "fi",
+        "exit 0",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+
+    const r = runWithEnv("alpha connect --probe-only", {
+      HOME: home,
+      PATH: `${localBin}:${process.env.PATH || ""}`,
+      NEMOCLAW_GATEWAY_RECOVERY_WAIT_SECONDS: "3",
+      NEMOCLAW_GATEWAY_RECOVERY_POLL_INTERVAL_SECONDS: "0",
+    });
+
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("Probe complete: recovered OpenClaw gateway");
+    expect(fs.readFileSync(readyCountFile, "utf8").trim()).toBe("3");
+  });
+
   it("treats leading --probe-only as an implicit connect probe", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-connect-probe-leading-"));
     const localBin = path.join(home, "bin");
