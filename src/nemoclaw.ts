@@ -57,16 +57,16 @@ const { help, version } = require("./lib/root-help-action");
 const onboardSession = require("./lib/onboard-session");
 import type { Session } from "./lib/onboard-session";
 const { parseLiveSandboxNames } = require("./lib/runtime-recovery");
-const { NOTICE_ACCEPT_ENV, NOTICE_ACCEPT_FLAG } = require("./lib/usage-notice");
-const { runDeprecatedOnboardAliasCommand, runOnboardCommand } = require("./lib/onboard-command");
+const { stripAnsi } = require("./lib/openshell");
 const {
-  captureOpenshellCommandAsync,
-  captureOpenshellCommand,
-  getInstalledOpenshellVersion,
-  runOpenshellCommand,
-  stripAnsi,
-  versionGte,
-} = require("./lib/openshell");
+  captureOpenshell,
+  captureOpenshellForStatus,
+  getInstalledOpenshellVersionOrNull,
+  getOpenshellBinary,
+  getStatusProbeTimeoutMs,
+  isCommandTimeout,
+  runOpenshell,
+} = require("./lib/openshell-runtime");
 const { runRegisteredOclifCommand } = require("./lib/oclif-runner");
 const { isErrnoException }: typeof import("./lib/errno") = require("./lib/errno");
 const agentRuntime = require("../bin/lib/agent-runtime");
@@ -109,14 +109,6 @@ const onboardProviders = require("./lib/onboard-providers");
 
 const GLOBAL_COMMANDS = globalCommandTokens();
 
-type CommandArgs = string[];
-type RunnerOptions = {
-  env?: NodeJS.ProcessEnv;
-  stdio?: import("node:child_process").StdioOptions;
-  ignoreError?: boolean;
-  timeout?: number;
-};
-
 type SpawnLikeResult = {
   status: number | null;
   stdout?: string;
@@ -140,7 +132,6 @@ type RecoveredSandboxMetadata = Partial<
   policyPresets?: string[] | null;
 };
 
-let OPENSHELL_BIN: string | null = null;
 const NEMOCLAW_GATEWAY_NAME = "nemoclaw";
 const DASHBOARD_FORWARD_PORT = String(DASHBOARD_PORT);
 const DEFAULT_LOGS_PROBE_TIMEOUT_MS = 5000;
@@ -162,60 +153,6 @@ type CommandCapture = {
   stderr: string;
   error?: Error;
 };
-
-function getOpenshellBinary(): string {
-  if (!OPENSHELL_BIN) {
-    OPENSHELL_BIN = resolveOpenshell();
-  }
-  if (!OPENSHELL_BIN) {
-    console.error("openshell CLI not found. Install OpenShell before using sandbox commands.");
-    process.exit(1);
-  }
-  return OPENSHELL_BIN;
-}
-
-function runOpenshell(args: CommandArgs, opts: RunnerOptions = {}) {
-  return runOpenshellCommand(getOpenshellBinary(), args, {
-    cwd: ROOT,
-    env: opts.env,
-    stdio: opts.stdio,
-    ignoreError: opts.ignoreError,
-    timeout: opts.timeout,
-    errorLine: console.error,
-    exit: (code: number) => process.exit(code),
-  });
-}
-
-function captureOpenshell(args: CommandArgs, opts: RunnerOptions = {}) {
-  return captureOpenshellCommand(getOpenshellBinary(), args, {
-    cwd: ROOT,
-    env: opts.env,
-    ignoreError: opts.ignoreError,
-    timeout: opts.timeout,
-    errorLine: console.error,
-    exit: (code: number) => process.exit(code),
-  });
-}
-
-function getStatusProbeTimeoutMs(): number {
-  const raw = process.env.NEMOCLAW_STATUS_PROBE_TIMEOUT_MS;
-  const parsed = raw ? Number(raw) : NaN;
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : OPENSHELL_PROBE_TIMEOUT_MS;
-}
-
-function captureOpenshellForStatus(args: CommandArgs, opts: RunnerOptions = {}) {
-  return captureOpenshellCommandAsync(getOpenshellBinary(), args, {
-    cwd: ROOT,
-    env: opts.env,
-    ignoreError: opts.ignoreError,
-    timeout: opts.timeout ?? getStatusProbeTimeoutMs(),
-    killGraceMs: 1000,
-  });
-}
-
-function isCommandTimeout(result: { error?: Error }) {
-  return (result.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT";
-}
 
 function cleanupGatewayAfterLastSandbox() {
   runOpenshell(["forward", "stop", DASHBOARD_FORWARD_PORT], {
@@ -251,12 +188,6 @@ function getSandboxDeleteOutcome(deleteResult: SpawnLikeResult) {
     output,
     alreadyGone: deleteResult.status !== 0 && isMissingSandboxDeleteResult(output),
   };
-}
-
-function getInstalledOpenshellVersionOrNull() {
-  return getInstalledOpenshellVersion(getOpenshellBinary(), {
-    cwd: ROOT,
-  });
 }
 
 // ── Sandbox process health (OpenClaw gateway inside the sandbox) ─────────
@@ -701,7 +632,6 @@ exports.runtimeBridge = {
   captureOpenshell,
   backupAll,
   garbageCollectImages,
-  onboard,
   recoverNamedGatewayRuntime,
   recoverRegistryEntries,
   runOpenshell,
@@ -712,7 +642,6 @@ exports.runtimeBridge = {
   sandboxChannelsRemove,
   sandboxChannelsStart,
   sandboxChannelsStop,
-  sandboxLogs,
   sandboxPolicyAdd,
   sandboxPolicyList,
   sandboxPolicyRemove,
@@ -720,8 +649,6 @@ exports.runtimeBridge = {
   sandboxSkillInstall,
   sandboxSnapshot,
   sandboxStatus,
-  setup,
-  setupSpark,
   upgradeSandboxes,
 };
 exports.ensureLiveSandboxOrExit = ensureLiveSandboxOrExit;
@@ -1271,40 +1198,6 @@ function exitWithSpawnResult(result: SpawnLikeResult & { signal?: NodeJS.Signals
 }
 
 // ── Commands ─────────────────────────────────────────────────────
-
-function buildOnboardCommandDeps(args: string[]) {
-  const { onboard: runOnboard } = require("./lib/onboard");
-  const { listAgents } = require("./lib/agent-defs");
-  return {
-    args,
-    noticeAcceptFlag: NOTICE_ACCEPT_FLAG,
-    noticeAcceptEnv: NOTICE_ACCEPT_ENV,
-    env: process.env,
-    runOnboard,
-    listAgents,
-    log: console.log,
-    error: console.error,
-    exit: (code: number) => process.exit(code),
-  };
-}
-
-async function onboard(args: string[]): Promise<void> {
-  await runOnboardCommand(buildOnboardCommandDeps(args));
-}
-
-async function setup(args: string[] = []): Promise<void> {
-  await runDeprecatedOnboardAliasCommand({
-    ...buildOnboardCommandDeps(args),
-    kind: "setup",
-  });
-}
-
-async function setupSpark(args: string[] = []): Promise<void> {
-  await runDeprecatedOnboardAliasCommand({
-    ...buildOnboardCommandDeps(args),
-    kind: "setup-spark",
-  });
-}
 
 async function runOclif(commandId: string, args: string[] = []): Promise<void> {
   await runRegisteredOclifCommand(commandId, args, {
@@ -2396,214 +2289,6 @@ async function sandboxStatus(sandboxName: string) {
     }
   }
   console.log("");
-}
-
-function sandboxLogs(sandboxName: string, follow: boolean) {
-  if (follow) {
-    streamSandboxFollowLogs(sandboxName);
-    return;
-  }
-
-  enableSandboxAuditLogs(sandboxName);
-  runOpenclawGatewayLogs(sandboxName, false);
-  const args = buildSandboxLogsArgs(sandboxName, false);
-  const result = runOpenshell(args, {
-    stdio: "inherit",
-    ignoreError: true,
-  });
-  if (result.status !== 0) {
-    console.error(`  Command failed (exit ${result.status}): openshell ${args.join(" ")}`);
-  }
-  exitWithSpawnResult(result);
-}
-
-function getLogsProbeTimeoutMs(): number {
-  const rawValue = process.env[LOGS_PROBE_TIMEOUT_ENV];
-  if (!rawValue) {
-    return DEFAULT_LOGS_PROBE_TIMEOUT_MS;
-  }
-  const parsed = Number(rawValue);
-  const timeoutMs = Number.isFinite(parsed) ? Math.floor(parsed) : Number.NaN;
-  return timeoutMs > 0 ? timeoutMs : DEFAULT_LOGS_PROBE_TIMEOUT_MS;
-}
-
-function describeLogProbeResult(result: SpawnLikeResult): string {
-  if (result.error) {
-    return result.error.message;
-  }
-  if (result.signal) {
-    return `signal ${result.signal}`;
-  }
-  return `exit ${result.status ?? "unknown"}`;
-}
-
-function runOpenclawGatewayLogs(sandboxName: string, follow: boolean): SpawnLikeResult {
-  const args = buildSandboxOpenclawGatewayLogsArgs(sandboxName, follow);
-  const result = runOpenshell(args, {
-    stdio: "inherit",
-    ignoreError: true,
-    timeout: getLogsProbeTimeoutMs(),
-  });
-  if (result.status !== 0) {
-    console.error(
-      `  OpenClaw log source unavailable (${describeLogProbeResult(result)}): ` +
-        `openshell ${args.join(" ")}`,
-    );
-  }
-  return result;
-}
-
-function streamSandboxFollowLogs(sandboxName: string): void {
-  const openclawArgs = buildSandboxOpenclawGatewayLogsArgs(sandboxName, true);
-  const openshellArgs = buildSandboxLogsArgs(sandboxName, true);
-  const spawnOptions = {
-    cwd: ROOT,
-    env: process.env,
-    stdio: "inherit" as const,
-  };
-  const sources: Array<{
-    label: string;
-    args: string[];
-    child: import("node:child_process").ChildProcess;
-    done: boolean;
-  }> = [];
-  let exiting = false;
-  let completedSources = 0;
-  let finalStatus = 0;
-  let requestedExitCode: number | null = null;
-  let forcedExitTimer: NodeJS.Timeout | null = null;
-  // Guard against early exit: a source spawned before enableSandboxAuditLogs
-  // can fire its exit event during the blocking spawnSync call, before the
-  // second source is registered. Without this flag, maybeExit would see
-  // completedSources === sources.length === 1 and exit prematurely.
-  let setupComplete = false;
-
-  const stopChildren = (signal: NodeJS.Signals) => {
-    for (const { child } of sources) {
-      if (!child.killed && child.exitCode === null && child.signalCode === null) {
-        child.kill(signal);
-      }
-    }
-  };
-  const maybeExit = () => {
-    if (!setupComplete || completedSources !== sources.length) {
-      return;
-    }
-    if (forcedExitTimer) {
-      clearTimeout(forcedExitTimer);
-      forcedExitTimer = null;
-    }
-    process.exit(requestedExitCode ?? finalStatus);
-  };
-  const exitFromSignal = (signal: NodeJS.Signals | null): number => {
-    if (!signal) return 1;
-    const signalNumber = os.constants.signals[signal];
-    return signalNumber ? 128 + signalNumber : 1;
-  };
-  const markSourceDone = (
-    source: (typeof sources)[number],
-    status: number,
-    detail: string | null = null,
-  ) => {
-    if (source.done) return;
-    source.done = true;
-    completedSources += 1;
-    if (status !== 0 && finalStatus === 0) {
-      finalStatus = status;
-    }
-    if (completedSources < sources.length && !exiting) {
-      const suffix = detail || `exit ${status}`;
-      console.error(`  ${source.label} stopped (${suffix}); continuing with remaining log source.`);
-    }
-    maybeExit();
-  };
-  const requestExitAfterSignal = (signal: NodeJS.Signals, exitCode: number) => {
-    if (requestedExitCode !== null) return;
-    exiting = true;
-    requestedExitCode = exitCode;
-    stopChildren(signal);
-    forcedExitTimer = setTimeout(() => process.exit(exitCode), 2000);
-    forcedExitTimer.unref?.();
-    maybeExit();
-  };
-
-  process.once("SIGINT", () => {
-    requestExitAfterSignal("SIGINT", 130);
-  });
-  process.once("SIGTERM", () => {
-    requestExitAfterSignal("SIGTERM", 143);
-  });
-
-  const addSource = (label: string, args: string[]) => {
-    const source = {
-      label,
-      args,
-      child: spawn(getOpenshellBinary(), args, spawnOptions),
-      done: false,
-    };
-    sources.push(source);
-    source.child.on("error", (error: Error) => {
-      markSourceDone(source, 1, error.message);
-    });
-    source.child.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
-      markSourceDone(source, code ?? exitFromSignal(signal), signal ? `signal ${signal}` : null);
-    });
-  };
-
-  addSource("OpenClaw log source", openclawArgs);
-  enableSandboxAuditLogs(sandboxName);
-  addSource("OpenShell log source", openshellArgs);
-  setupComplete = true;
-  maybeExit();
-}
-
-function enableSandboxAuditLogs(sandboxName: string) {
-  const args = buildEnableSandboxAuditLogsArgs(sandboxName);
-  const result = runOpenshell(args, {
-    stdio: ["ignore", "ignore", "pipe"],
-    ignoreError: true,
-    timeout: getLogsProbeTimeoutMs(),
-  });
-  if (result.status !== 0) {
-    warnSandboxAuditLogsUnavailable(sandboxName, args, result);
-  }
-}
-
-function warnSandboxAuditLogsUnavailable(
-  sandboxName: string,
-  args: string[],
-  result: SpawnLikeResult,
-): void {
-  const stderr = String(result.stderr || "").trim();
-  console.error(
-    `  Warning: failed to enable OpenShell audit logs for sandbox '${sandboxName}' ` +
-      `(${describeLogProbeResult(result)}): openshell ${args.join(" ")}`,
-  );
-  if (stderr) {
-    console.error(`  ${stderr}`);
-  }
-  console.error("  Policy denial events may be missing from OpenShell logs.");
-}
-
-function buildEnableSandboxAuditLogsArgs(sandboxName: string): string[] {
-  return ["settings", "set", sandboxName, "--key", "ocsf_json_enabled", "--value", "true"];
-}
-
-function buildSandboxOpenclawGatewayLogsArgs(sandboxName: string, follow: boolean): string[] {
-  const args = ["sandbox", "exec", "-n", sandboxName, "--", "tail", "-n", "200"];
-  if (follow) {
-    args.push("-f");
-  }
-  args.push("/tmp/gateway.log");
-  return args;
-}
-
-function buildSandboxLogsArgs(sandboxName: string, follow: boolean): string[] {
-  const args = ["logs", sandboxName, "-n", "200", "--source", "all"];
-  if (follow) {
-    args.push("--tail");
-  }
-  return args;
 }
 
 /**

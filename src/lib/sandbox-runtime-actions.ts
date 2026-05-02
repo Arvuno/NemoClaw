@@ -18,7 +18,10 @@ export async function showSandboxStatus(sandboxName: string): Promise<void> {
 }
 
 export function showSandboxLogs(sandboxName: string, follow: boolean): void {
-  getNemoClawRuntimeBridge().sandboxLogs(sandboxName, follow);
+  const { showSandboxLogs: showSandboxLogsAction } = require("./sandbox-logs-action") as {
+    showSandboxLogs: (sandboxName: string, follow: boolean) => void;
+  };
+  showSandboxLogsAction(sandboxName, follow);
 }
 
 export async function destroySandbox(sandboxName: string, args: string[] = []): Promise<void> {
