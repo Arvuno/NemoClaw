@@ -54,6 +54,12 @@ export function showVersion(): void {
 }
 
 export async function recoverNamedGatewayRuntime(): Promise<{ recovered: boolean }> {
+  const runtime = getNemoClawRuntimeBridge() as {
+    recoverNamedGatewayRuntime?: () => Promise<{ recovered: boolean }>;
+  };
+  if (typeof runtime.recoverNamedGatewayRuntime === "function") {
+    return runtime.recoverNamedGatewayRuntime();
+  }
   return recoverNamedGatewayRuntimeAction();
 }
 
