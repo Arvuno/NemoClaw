@@ -2776,6 +2776,13 @@ function waitForSandboxReady(sandboxName: string, attempts = 10, delaySeconds = 
 async function preflight(): Promise<ReturnType<typeof nim.detectGpu>> {
   step(1, 8, "Preflight checks");
 
+  // DGX Station vLLM lifecycle (model picker, container start/replace, HF
+  // token discovery + whoami validation, /health wait). No-op on non-Station
+  // hosts. Sets NEMOCLAW_PROVIDER / NEMOCLAW_ENDPOINT_URL / NEMOCLAW_MODEL /
+  // NEMOCLAW_PREFERRED_API so step [3/8] auto-prefills.
+  const stationPreflight: typeof import("./pre-flight-check") = require("./pre-flight-check");
+  await stationPreflight.runStationVllmPreflight();
+
   const host = assessHost();
 
   // Docker / runtime
@@ -6240,7 +6247,9 @@ async function setupMessagingChannels(): Promise<string[]> {
       output.write(`    [${i + 1}] ${marker} ${ch.name} — ${ch.description}${status}\n`);
     });
     output.write("\n");
-    output.write(`  Press 1-${MESSAGING_CHANNELS.length} to toggle, Enter when done: `);
+    output.write(
+      `  Press 1-${MESSAGING_CHANNELS.length} to toggle a channel, or Enter to continue (skip / confirm): `,
+    );
   };
 
   showList();
