@@ -13,6 +13,7 @@ import {
   CredentialsResetCommand,
 } from "./credentials-cli-command";
 import DebugCliCommand from "./debug-cli-command";
+import DestroyCliCommand from "./destroy-cli-command";
 import GatewayTokenCliCommand from "./gateway-token-cli-command";
 import ListCommand from "./list-command";
 import {
@@ -20,6 +21,7 @@ import {
   GarbageCollectImagesCommand,
   UpgradeSandboxesCommand,
 } from "./maintenance-cli-commands";
+import { PolicyAddCommand, PolicyRemoveCommand } from "./policy-mutate-cli-commands";
 import {
   SandboxChannelsListCommand,
   SandboxConfigGetCommand,
@@ -34,7 +36,11 @@ import {
 } from "./shields-cli-commands";
 import ShareCommand from "./share-command";
 import SkillInstallCliCommand from "./skill-install-cli-command";
-import { SnapshotCreateCommand, SnapshotListCommand } from "./snapshot-cli-commands";
+import {
+  SnapshotCreateCommand,
+  SnapshotListCommand,
+  SnapshotRestoreCommand,
+} from "./snapshot-cli-commands";
 import StatusCommand from "./status-command";
 import {
   DeprecatedStartCommand,
@@ -57,14 +63,18 @@ export default {
   "sandbox:channels:start": ChannelsStartCommand,
   "sandbox:channels:stop": ChannelsStopCommand,
   "sandbox:config:get": SandboxConfigGetCommand,
+  "sandbox:destroy": DestroyCliCommand,
   "sandbox:logs": SandboxLogsCommand,
+  "sandbox:policy-add": PolicyAddCommand,
   "sandbox:policy-list": SandboxPolicyListCommand,
+  "sandbox:policy-remove": PolicyRemoveCommand,
   "sandbox:shields:down": ShieldsDownCommand,
   "sandbox:shields:status": ShieldsStatusCommand,
   "sandbox:shields:up": ShieldsUpCommand,
   "sandbox:skill:install": SkillInstallCliCommand,
   "sandbox:snapshot:create": SnapshotCreateCommand,
   "sandbox:snapshot:list": SnapshotListCommand,
+  "sandbox:snapshot:restore": SnapshotRestoreCommand,
   "sandbox:status": SandboxStatusCommand,
   share: ShareCommand,
   status: StatusCommand,

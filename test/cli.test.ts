@@ -1068,10 +1068,17 @@ describe("CLI dispatch", () => {
     expect(logs.out).toContain("<name> logs [--follow]");
     expect(logs.out).not.toContain("sandbox:logs");
 
-    const policy = runWithEnv("alpha policy-list --help", { HOME: home });
-    expect(policy.code).toBe(0);
-    expect(policy.out).toContain("<name> policy-list");
-    expect(policy.out).not.toContain("sandbox:policy-list");
+    const destroy = runWithEnv("alpha destroy --help", { HOME: home });
+    expect(destroy.code).toBe(0);
+    expect(destroy.out).toContain("<name> destroy [--yes|--force]");
+    expect(destroy.out).not.toContain("sandbox:destroy");
+
+    for (const action of ["policy-add", "policy-remove", "policy-list"]) {
+      const policy = runWithEnv(`alpha ${action} --help`, { HOME: home });
+      expect(policy.code).toBe(0);
+      expect(policy.out).toContain(`<name> ${action}`);
+      expect(policy.out).not.toContain(`sandbox:${action}`);
+    }
 
     const channels = runWithEnv("alpha channels list --help", { HOME: home });
     expect(channels.code).toBe(0);
@@ -1089,6 +1096,24 @@ describe("CLI dispatch", () => {
     expect(config.code).toBe(0);
     expect(config.out).toContain("<name> config get");
     expect(config.out).not.toContain("sandbox:config:get");
+  });
+
+  it("policy mutation dry-run paths dispatch through oclif", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-policy-dry-run-"));
+    writeSandboxRegistry(home);
+
+    const add = runWithEnv("alpha policy-add github --dry-run", { HOME: home });
+    expect(add.code).toBe(0);
+    expect(add.out).toContain("--dry-run: no changes applied.");
+
+    const registryPath = path.join(home, ".nemoclaw", "sandboxes.json");
+    const registryJson = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+    registryJson.sandboxes.alpha.policies = ["github"];
+    fs.writeFileSync(registryPath, JSON.stringify(registryJson), { mode: 0o600 });
+
+    const remove = runWithEnv("alpha policy-remove github --dry-run", { HOME: home });
+    expect(remove.code).toBe(0);
+    expect(remove.out).toContain("--dry-run: no changes applied.");
   });
 
   it("channels mutation dry-run paths dispatch through oclif", () => {
@@ -1132,7 +1157,7 @@ describe("CLI dispatch", () => {
     expect(status.out).not.toContain("sandbox:shields:status");
   });
 
-  it("snapshot list/create help keeps public sandbox-scoped usage", () => {
+  it("snapshot subcommand help keeps public sandbox-scoped usage", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-snapshot-help-"));
     writeSandboxRegistry(home);
 
@@ -1145,6 +1170,11 @@ describe("CLI dispatch", () => {
     expect(create.code).toBe(0);
     expect(create.out).toContain("<name> snapshot create [--name <name>]");
     expect(create.out).not.toContain("sandbox:snapshot:create");
+
+    const restore = runWithEnv("alpha snapshot restore --help", { HOME: home });
+    expect(restore.code).toBe(0);
+    expect(restore.out).toContain("<name> snapshot restore [selector] [--to <dst>]");
+    expect(restore.out).not.toContain("sandbox:snapshot:restore");
   });
 
   it("snapshot list dispatches through oclif", () => {

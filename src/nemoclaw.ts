@@ -650,13 +650,16 @@ exports.garbageCollectImages = garbageCollectImages;
 exports.recoverNamedGatewayRuntime = recoverNamedGatewayRuntime;
 exports.recoverRegistryEntries = recoverRegistryEntries;
 exports.runOpenshell = runOpenshell;
+exports.sandboxDestroy = sandboxDestroy;
 exports.sandboxChannelsAdd = sandboxChannelsAdd;
 exports.sandboxChannelsList = sandboxChannelsList;
 exports.sandboxChannelsRemove = sandboxChannelsRemove;
 exports.sandboxChannelsStart = sandboxChannelsStart;
 exports.sandboxChannelsStop = sandboxChannelsStop;
 exports.sandboxLogs = sandboxLogs;
+exports.sandboxPolicyAdd = sandboxPolicyAdd;
 exports.sandboxPolicyList = sandboxPolicyList;
+exports.sandboxPolicyRemove = sandboxPolicyRemove;
 exports.sandboxSkillInstall = sandboxSkillInstall;
 exports.sandboxSnapshot = sandboxSnapshot;
 exports.sandboxStatus = sandboxStatus;
@@ -1290,6 +1293,11 @@ function hasHelpFlag(args: string[]): boolean {
 
 function printSandboxActionUsage(action: string): void {
   console.log(`  Usage: ${CLI_NAME} <name> ${action}`);
+}
+
+function hasMissingFlagValue(args: string[], flagName: string): boolean {
+  const index = args.indexOf(flagName);
+  return index !== -1 && (!args[index + 1] || args[index + 1].startsWith("--"));
 }
 
 // ── Sandbox-scoped actions ───────────────────────────────────────
@@ -4749,7 +4757,8 @@ function printConnectOrderHint(candidate: string | null): void {
 
 const [cmd, ...args] = process.argv.slice(2);
 
-(async () => {
+// eslint-disable-next-line complexity
+const mainPromise = (async () => {
   // No command → help
   if (!cmd || cmd === "help" || cmd === "--help" || cmd === "-h") {
     help();
@@ -4909,10 +4918,27 @@ const [cmd, ...args] = process.argv.slice(2);
         await runOclif("sandbox:logs", [cmd, ...actionArgs]);
         break;
       case "policy-add":
-        await sandboxPolicyAdd(cmd, actionArgs);
+        if (hasHelpFlag(actionArgs)) {
+          printSandboxActionUsage(
+            "policy-add [preset] [--yes|-y] [--dry-run] [--from-file <path>] [--from-dir <path>]",
+          );
+          break;
+        }
+        if (
+          hasMissingFlagValue(actionArgs, "--from-file") ||
+          hasMissingFlagValue(actionArgs, "--from-dir")
+        ) {
+          await sandboxPolicyAdd(cmd, actionArgs);
+          break;
+        }
+        await runOclif("sandbox:policy-add", [cmd, ...actionArgs]);
         break;
       case "policy-remove":
-        await sandboxPolicyRemove(cmd, actionArgs);
+        if (hasHelpFlag(actionArgs)) {
+          printSandboxActionUsage("policy-remove [preset] [--yes|-y] [--dry-run]");
+          break;
+        }
+        await runOclif("sandbox:policy-remove", [cmd, ...actionArgs]);
         break;
       case "policy-list":
         if (hasHelpFlag(actionArgs)) {
@@ -4922,7 +4948,11 @@ const [cmd, ...args] = process.argv.slice(2);
         await runOclif("sandbox:policy-list", [cmd, ...actionArgs]);
         break;
       case "destroy":
-        await sandboxDestroy(cmd, actionArgs);
+        if (hasHelpFlag(actionArgs)) {
+          printSandboxActionUsage("destroy [--yes|--force]");
+          break;
+        }
+        await runOclif("sandbox:destroy", [cmd, ...actionArgs]);
         break;
       case "gateway-token":
         if (actionArgs.includes("--help") || actionArgs.includes("-h")) {
@@ -4967,6 +4997,13 @@ const [cmd, ...args] = process.argv.slice(2);
               break;
             }
             await runOclif("sandbox:snapshot:create", [cmd, ...snapshotArgs]);
+            break;
+          case "restore":
+            if (hasHelpFlag(snapshotArgs)) {
+              printSandboxActionUsage("snapshot restore [selector] [--to <dst>]");
+              break;
+            }
+            await runOclif("sandbox:snapshot:restore", [cmd, ...snapshotArgs]);
             break;
           default:
             await sandboxSnapshot(cmd, actionArgs);
@@ -5125,3 +5162,5 @@ const [cmd, ...args] = process.argv.slice(2);
   console.error(`  Run '${CLI_NAME} help' for usage.`);
   process.exit(1);
 })();
+
+exports.mainPromise = mainPromise;
