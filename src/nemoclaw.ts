@@ -38,14 +38,12 @@ const {
 } = require("./lib/docker");
 const { resolveOpenshell } = require("./lib/resolve-openshell");
 const {
-  fetchGatewayAuthTokenFromSandbox,
   startGatewayForRecovery,
   pruneKnownHostsEntries,
   hydrateCredentialEnv,
   isNonInteractive,
 } = require("./lib/onboard");
 const { ensureOllamaAuthProxy } = require("./lib/onboard-ollama-proxy");
-const { parseGatewayTokenArgs, runGatewayTokenCommand } = require("./lib/gateway-token-command");
 const { getCredential, prompt: askPrompt } = require("./lib/credentials");
 const registry = require("./lib/registry");
 import type { SandboxEntry } from "./lib/registry";
@@ -55,12 +53,12 @@ const shields = require("./lib/shields");
 const sandboxConfig = require("./lib/sandbox-config");
 const { parseGatewayInference } = require("./lib/inference-config");
 const { probeProviderHealth } = require("./lib/inference-health");
+const { buildStatusCommandDeps } = require("./lib/status-command-deps");
 const { getVersion } = require("./lib/version");
 const onboardSession = require("./lib/onboard-session");
 import type { Session } from "./lib/onboard-session";
 const { parseLiveSandboxNames } = require("./lib/runtime-recovery");
 const { NOTICE_ACCEPT_ENV, NOTICE_ACCEPT_FLAG } = require("./lib/usage-notice");
-const { runDebugCommand } = require("./lib/debug-command");
 const { runDeprecatedOnboardAliasCommand, runOnboardCommand } = require("./lib/onboard-command");
 const {
   captureOpenshellCommand,
@@ -69,11 +67,8 @@ const {
   stripAnsi,
   versionGte,
 } = require("./lib/openshell");
-const { showStatusCommand } = require("./lib/inventory-commands");
 const { runRegisteredOclifCommand } = require("./lib/oclif-runner");
 const { executeDeploy } = require("./lib/deploy");
-const { runStartCommand, runStopCommand } = require("./lib/services-command");
-const { buildVersionedUninstallUrl, runUninstallCommand } = require("./lib/uninstall-command");
 const agentRuntime = require("../bin/lib/agent-runtime");
 const sandboxVersion = require("./lib/sandbox-version");
 const sandboxState = require("./lib/sandbox-state");
@@ -139,7 +134,6 @@ type RecoveredSandboxMetadata = Partial<
   policyPresets?: string[] | null;
 };
 
-const REMOTE_UNINSTALL_URL = buildVersionedUninstallUrl(getVersion());
 let OPENSHELL_BIN: string | null = null;
 const NEMOCLAW_GATEWAY_NAME = "nemoclaw";
 const DASHBOARD_FORWARD_PORT = String(DASHBOARD_PORT);
@@ -594,7 +588,9 @@ async function recoverRegistryEntries({
 }
 
 exports.captureOpenshell = captureOpenshell;
+exports.recoverNamedGatewayRuntime = recoverNamedGatewayRuntime;
 exports.recoverRegistryEntries = recoverRegistryEntries;
+exports.runOpenshell = runOpenshell;
 exports.ensureLiveSandboxOrExit = ensureLiveSandboxOrExit;
 exports.G = G;
 exports.R = R;
@@ -879,7 +875,6 @@ function printGatewayLifecycleHint(output = "", sandboxName = "", writer = conso
   }
 }
 
-// eslint-disable-next-line complexity
 async function getReconciledSandboxGatewayState(sandboxName: string) {
   let lookup = getSandboxGatewayState(sandboxName);
   if (lookup.state === "present") {
@@ -1153,30 +1148,20 @@ async function deploy(instanceName: string): Promise<void> {
   });
 }
 
-async function start() {
-  const { startAll } = require("./lib/services");
-  await runStartCommand({
-    listSandboxes: () => registry.listSandboxes(),
-    startAll,
-  });
+async function start(args: string[] = []): Promise<void> {
+  await runOclif("start", args);
 }
 
-function stop() {
-  const { stopAll } = require("./lib/services");
-  runStopCommand({
-    listSandboxes: () => registry.listSandboxes(),
-    stopAll,
-  });
+async function stop(args: string[] = []): Promise<void> {
+  await runOclif("stop", args);
 }
 
 async function tunnel(args: string[]): Promise<void> {
   const sub = args[0];
   switch (sub) {
     case "start":
-      await start();
-      return;
     case "stop":
-      stop();
+      await runOclif(`tunnel:${sub}`, args.slice(1));
       return;
     default:
       console.error(`  Usage: ${CLI_NAME} tunnel <start|stop>`);
@@ -1184,361 +1169,37 @@ async function tunnel(args: string[]): Promise<void> {
   }
 }
 
-function debug(args: string[]) {
-  const { runDebug } = require("./lib/debug");
-  const getDefaultSandbox = (): string | undefined => {
-    const { defaultSandbox, sandboxes } = registry.listSandboxes();
-    if (!defaultSandbox) return undefined;
-    if (!sandboxes.find((s: { name: string }) => s.name === defaultSandbox)) {
-      console.error(
-        `${_RD}Warning:${R} default sandbox '${defaultSandbox}' is no longer in the registry.`,
-      );
-      console.error(
-        `  Use ${B}--sandbox NAME${R} to target a specific sandbox, or run ${B}${CLI_NAME} onboard${R} again.\n`,
-      );
-      return undefined;
-    }
-    const liveList = captureOpenshell(["sandbox", "list"], {
-      ignoreError: true,
-      timeout: OPENSHELL_PROBE_TIMEOUT_MS,
-    });
-    if (liveList.status === 0 && !parseLiveSandboxNames(liveList.output).has(defaultSandbox)) {
-      console.error(
-        `${_RD}Warning:${R} default sandbox '${defaultSandbox}' exists in the local registry but not in OpenShell.`,
-      );
-      console.error(
-        `  Use ${B}--sandbox NAME${R} to target a specific sandbox, or run ${B}${CLI_NAME} onboard${R} again.\n`,
-      );
-      return undefined;
-    }
-    return defaultSandbox;
-  };
-  runDebugCommand(args, {
-    getDefaultSandbox,
-    runDebug,
-    log: console.log,
-    error: console.error,
-    exit: (code: number) => process.exit(code),
-  });
+async function debug(args: string[]): Promise<void> {
+  await runOclif("debug", args);
 }
 
-function uninstall(args: string[]) {
-  runUninstallCommand({
-    args,
-    rootDir: ROOT,
-    currentDir: __dirname,
-    remoteScriptUrl: REMOTE_UNINSTALL_URL,
-    env: process.env,
-    spawnSyncImpl: spawnSync,
-    log: console.log,
-    error: console.error,
-    exit: (code: number) => process.exit(code),
-  });
-}
-
-// Suffixes that mark a per-sandbox messaging integration in the gateway's
-// provider list, not a NemoClaw-managed credential. The bridge providers are
-// created during onboarding (see src/lib/onboard.ts:3203,3208,3218) and torn
-// down by the channels/sandbox-delete flows. `nemoclaw credentials list`
-// hides them and `nemoclaw credentials reset` refuses to touch them so
-// users cannot accidentally break a live integration via the credentials
-// surface.
-const BRIDGE_PROVIDER_SUFFIXES: readonly string[] = [
-  "-telegram-bridge",
-  "-discord-bridge",
-  "-slack-bridge",
-  // Slack registers a second provider for the App-Level Token (used for
-  // Socket Mode). bridgeProviderName() emits `${sandbox}-slack-app` for
-  // SLACK_APP_TOKEN, so the guardrails must match that suffix too —
-  // otherwise the slack-app provider shows up as an ordinary credential
-  // and `credentials reset` would happily delete it.
-  "-slack-app",
-];
-
-function isBridgeProviderName(name: string): boolean {
-  return BRIDGE_PROVIDER_SUFFIXES.some((suffix) => name.endsWith(suffix));
+async function uninstall(args: string[]): Promise<void> {
+  await runOclif("uninstall", args);
 }
 
 async function credentialsCommand(args: string[]): Promise<void> {
   const sub = args[0];
   if (!sub || sub === "help" || sub === "--help" || sub === "-h") {
-    console.log("");
-    console.log(`  Usage: ${CLI_NAME} credentials <subcommand>`);
-    console.log("");
-    console.log("  Subcommands:");
-    console.log(
-      "    list                  List provider credentials registered with the OpenShell gateway",
-    );
-    console.log(
-      "    reset <PROVIDER> [--yes]   Remove a provider credential so onboard re-prompts",
-    );
-    console.log("");
-    console.log(
-      "  Credentials live in the OpenShell gateway. Inspect with `openshell provider list`.",
-    );
-    console.log(
-      "  Nothing is persisted to host disk; deploy/non-onboard commands read from env vars.",
-    );
-    console.log("");
+    await runOclif("credentials", []);
     return;
   }
 
-  if (sub === "list") {
-    // Pin to the NemoClaw gateway so a different active gateway cannot make
-    // us list (or later delete) providers from the wrong place.
-    const recovery = await recoverNamedGatewayRuntime();
-    if (!recovery.recovered) {
-      console.error(`  Could not query the ${CLI_DISPLAY_NAME} OpenShell gateway. Is it running?`);
-      console.error(
-        `  Run 'openshell gateway start --name nemoclaw' or '${CLI_NAME} onboard' first.`,
-      );
+  switch (sub) {
+    case "list":
+      await runOclif("credentials:list", args.slice(1));
+      return;
+    case "reset":
+      await runOclif("credentials:reset", args.slice(1));
+      return;
+    default:
+      console.error(`  Unknown credentials subcommand: ${sub}`);
+      console.error(`  Run '${CLI_NAME} credentials help' for usage.`);
       process.exit(1);
-    }
-    const result = runOpenshell(["provider", "list", "--names"], {
-      ignoreError: true,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    if (result.status !== 0) {
-      console.error("  Could not query OpenShell gateway. Is it running?");
-      console.error(
-        `  Run 'openshell gateway start --name nemoclaw' or '${CLI_NAME} onboard' first.`,
-      );
-      process.exit(1);
-    }
-    const allNames = String(result.stdout || "")
-      .split("\n")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    // Show only credential providers. Per-sandbox messaging bridges are
-    // live integrations managed by the channels surface; surfacing them
-    // here would invite users to "reset" what looks like a credential and
-    // accidentally destroy a running bridge.
-    const credentialNames = allNames.filter((n) => !isBridgeProviderName(n)).sort();
-    const bridgeNames = allNames.filter((n) => isBridgeProviderName(n));
-    if (credentialNames.length === 0) {
-      console.log("  No provider credentials registered.");
-    } else {
-      console.log("  Providers registered with the OpenShell gateway:");
-      for (const name of credentialNames) {
-        console.log(`    ${name}`);
-      }
-    }
-    if (bridgeNames.length > 0) {
-      console.log("");
-      console.log(
-        `  ${String(bridgeNames.length)} per-sandbox messaging bridge(s) are also registered.`,
-      );
-      console.log(
-        `  Manage those with \`${CLI_NAME} <sandbox> channels list/remove/stop\` — not this command.`,
-      );
-    }
-    return;
-  }
-
-  if (sub === "reset") {
-    const key = args[1];
-    // Validate that <PROVIDER> is a real positional argument, not a flag like
-    // `--yes` that the user passed without a key.
-    if (!key || key.startsWith("-")) {
-      console.error(`  Usage: ${CLI_NAME} credentials reset <PROVIDER> [--yes]`);
-      console.error(
-        `  PROVIDER is an OpenShell provider name. Run '${CLI_NAME} credentials list' first.`,
-      );
-      process.exit(1);
-    }
-    // Reject unknown trailing arguments to keep scripted use predictable.
-    const extraArgs = args.slice(2).filter((arg) => arg !== "--yes" && arg !== "-y");
-    if (extraArgs.length > 0) {
-      console.error(`  Unknown argument(s) for credentials reset: ${extraArgs.join(", ")}`);
-      console.error(`  Usage: ${CLI_NAME} credentials reset <PROVIDER> [--yes]`);
-      process.exit(1);
-    }
-    // Refuse to delete a per-sandbox messaging bridge — those are live
-    // integrations created/destroyed by the channels surface, not
-    // NemoClaw-managed credentials. Without this guard, scripting against
-    // the gateway provider list could tear down a running bridge and
-    // leave the sandbox in a half-configured state.
-    if (isBridgeProviderName(key)) {
-      console.error(`  '${key}' is a per-sandbox messaging bridge, not a credential.`);
-      console.error(
-        `  Use \`${CLI_NAME} <sandbox> channels remove <telegram|discord|slack>\` to retire`,
-      );
-      console.error(
-        "  the integration (it tears down the bridge provider and rebuilds the sandbox),",
-      );
-      console.error(
-        `  or \`${CLI_NAME} <sandbox> channels stop <…>\` to pause it without clearing tokens.`,
-      );
-      process.exit(1);
-    }
-    const skipPrompt = args.includes("--yes") || args.includes("-y");
-    if (!skipPrompt) {
-      const answer = (
-        await askPrompt(`  Remove provider '${key}' from the OpenShell gateway? [y/N]: `)
-      )
-        .trim()
-        .toLowerCase();
-      if (answer !== "y" && answer !== "yes") {
-        console.log("  Cancelled.");
-        return;
-      }
-    }
-    // Pin to the NemoClaw gateway so we cannot accidentally delete a
-    // provider from a different active gateway. We deliberately do NOT
-    // touch process.env here — `key` is an OpenShell provider name, and
-    // calling deleteCredential on it would silently strip an unrelated
-    // env entry whenever a provider name happens to share the shape of
-    // a credential env variable.
-    const recovery = await recoverNamedGatewayRuntime();
-    if (!recovery.recovered) {
-      console.error(`  Could not reach the ${CLI_DISPLAY_NAME} OpenShell gateway. Is it running?`);
-      console.error(
-        `  Run 'openshell gateway start --name nemoclaw' or '${CLI_NAME} onboard' first.`,
-      );
-      process.exit(1);
-    }
-    const result = runOpenshell(["provider", "delete", key], {
-      ignoreError: true,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    if (result.status === 0) {
-      console.log(`  Removed provider '${key}' from the OpenShell gateway.`);
-      console.log(`  Re-run '${CLI_NAME} onboard' to enter a new value.`);
-    } else {
-      console.error(`  Could not remove provider '${key}'.`);
-      // Earlier releases accepted a credential env-var name (e.g.
-      // NVIDIA_API_KEY) here; the API now takes an OpenShell provider
-      // name (nvidia-prod, openai-api, telegram-bridge, …). Surface the
-      // rename to anyone whose script is still passing the old shape.
-      if (/^[A-Z][A-Z0-9_]+$/.test(key)) {
-        console.error("");
-        console.error(`  '${key}' looks like a credential env variable name.`);
-        console.error("  As of this release, 'credentials reset' takes an OpenShell");
-        console.error(`  provider name. Run '${CLI_NAME} credentials list' to see the`);
-        console.error("  registered providers, then retry with one of those names.");
-      }
-      const stderr = String(result.stderr || "").trim();
-      if (stderr) console.error(`  ${stderr}`);
-      process.exit(1);
-    }
-    return;
-  }
-
-  console.error(`  Unknown credentials subcommand: ${sub}`);
-  console.error(`  Run '${CLI_NAME} credentials help' for usage.`);
-  process.exit(1);
-}
-
-/**
- * Inspect gateway logs for known Telegram conflict signatures without blocking
- * the broader status command when the probe cannot run.
- */
-function checkMessagingBridgeHealth(sandboxName: string, channels: string[]) {
-  // Only Telegram currently emits a recognizable conflict signature in the
-  // gateway log. Discord/Slack have similar single-consumer constraints but
-  // log differently; we can extend the regex when those patterns are known.
-  if (!Array.isArray(channels) || !channels.includes("telegram")) return [];
-  const { spawnSync } = require("child_process");
-  const script =
-    'tail -n 200 /tmp/gateway.log 2>/dev/null | grep -cE "getUpdates conflict|409[[:space:]:]+Conflict" || true';
-  try {
-    const result = spawnSync(
-      getOpenshellBinary(),
-      ["sandbox", "exec", "-n", sandboxName, "--", "sh", "-c", script],
-      { encoding: "utf-8", timeout: 3000, stdio: ["ignore", "pipe", "pipe"] },
-    );
-    const count = Number.parseInt((result.stdout || "").trim(), 10);
-    if (!Number.isFinite(count) || count === 0) return [];
-    return [{ channel: "telegram", conflicts: count }];
-  } catch {
-    return [];
   }
 }
 
-function makeConflictProbe() {
-  // Upfront liveness check so we can distinguish "provider not attached" from
-  // "gateway unreachable". Without this, every non-zero `openshell provider
-  // get` collapses into "absent", and a transient gateway failure would
-  // persist messagingChannels: [] and permanently suppress future retries.
-  let gatewayAlive: boolean | null = null;
-  const isGatewayAlive = (): boolean => {
-    if (gatewayAlive === null) {
-      const result = captureOpenshell(["sandbox", "list"], {
-        ignoreError: true,
-        timeout: OPENSHELL_PROBE_TIMEOUT_MS,
-      });
-      gatewayAlive = result.status === 0;
-    }
-    return gatewayAlive;
-  };
-  return {
-    providerExists: (name: string) => {
-      if (!isGatewayAlive()) return "error";
-      const result = captureOpenshell(["provider", "get", name], {
-        ignoreError: true,
-        timeout: OPENSHELL_PROBE_TIMEOUT_MS,
-      });
-      return result.status === 0 ? "present" : "absent";
-    },
-  };
-}
-
-function backfillAndFindOverlaps() {
-  // Non-critical path: status must remain usable even if the gateway probe or
-  // registry write throws, so any failure yields an empty overlap list.
-  try {
-    const { backfillMessagingChannels, findAllOverlaps } = require("./lib/messaging-conflict");
-    backfillMessagingChannels(registry, makeConflictProbe());
-    return findAllOverlaps(registry);
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Read a short tail of the gateway log for degraded messaging diagnostics.
- */
-function readGatewayLog(sandboxName: string) {
-  const { spawnSync } = require("child_process");
-  try {
-    const result = spawnSync(
-      getOpenshellBinary(),
-      [
-        "sandbox",
-        "exec",
-        "-n",
-        sandboxName,
-        "--",
-        "sh",
-        "-c",
-        "tail -n 10 /tmp/gateway.log 2>/dev/null",
-      ],
-      { encoding: "utf-8", timeout: 3000, stdio: ["ignore", "pipe", "pipe"] },
-    );
-    const output = (result.stdout || "").trim();
-    return output || null;
-  } catch {
-    return null;
-  }
-}
-
-function showStatus() {
-  const { showStatus: showServiceStatus } = require("./lib/services");
-  showStatusCommand({
-    listSandboxes: () => registry.listSandboxes(),
-    getLiveInference: () =>
-      parseGatewayInference(
-        captureOpenshell(["inference", "get"], {
-          ignoreError: true,
-          timeout: OPENSHELL_PROBE_TIMEOUT_MS,
-        }).output,
-      ),
-    showServiceStatus,
-    checkMessagingBridgeHealth,
-    backfillAndFindOverlaps,
-    readGatewayLog,
-    log: console.log,
-  });
+async function showStatus(args: string[] = []): Promise<void> {
+  await runOclif("status", args);
 }
 
 async function runOclif(commandId: string, args: string[] = []): Promise<void> {
@@ -2022,7 +1683,7 @@ function messagingDoctorCheck(sandboxName: string, sb: SandboxEntry): DoctorChec
     };
   }
 
-  const degraded = checkMessagingBridgeHealth(sandboxName, channels);
+  const degraded = buildStatusCommandDeps(ROOT).checkMessagingBridgeHealth?.(sandboxName, channels) || [];
   const pausedSuffix =
     pausedChannels.length > 0 ? `; paused channels skipped: ${pausedChannels.join(", ")}` : "";
   if (degraded.length === 0) {
@@ -2102,24 +1763,22 @@ async function sandboxDoctor(sandboxName: string, args: string[] = []): Promise<
 
   let openshellConnected = false;
   if (openshellBin) {
-    const status = captureOpenshell(["status"], {
-      ignoreError: true,
-      timeout: OPENSHELL_PROBE_TIMEOUT_MS,
-    });
-    const cleanStatus = stripAnsi(status.output || "");
-    openshellConnected = status.status === 0 && /^\s*Status:\s*Connected\b/im.test(cleanStatus);
+    const recovery = await recoverNamedGatewayRuntime();
+    const lifecycle = recovery.after || recovery.before;
+    const cleanStatus = stripAnsi(lifecycle?.status || "");
+    openshellConnected = lifecycle?.state === "healthy_named";
     checks.push({
       group: "Gateway",
       label: "OpenShell status",
       status: openshellConnected ? "ok" : "fail",
-      detail: openshellConnected ? "connected" : oneLine(cleanStatus || "not connected"),
-      hint: openshellConnected
-        ? undefined
-        : "run `openshell status`; if needed start the nemoclaw gateway",
+      detail: openshellConnected
+        ? "connected to nemoclaw"
+        : oneLine(cleanStatus || lifecycle?.gatewayInfo || "not connected to nemoclaw"),
+      hint: openshellConnected ? undefined : "run `openshell gateway select nemoclaw` and retry",
     });
   }
 
-  if (openshellBin) {
+  if (openshellBin && openshellConnected) {
     const list = captureOpenshell(["sandbox", "list"], {
       ignoreError: true,
       timeout: OPENSHELL_PROBE_TIMEOUT_MS,
@@ -2131,17 +1790,29 @@ async function sandboxDoctor(sandboxName: string, args: string[] = []): Promise<
     checks.push({
       group: "Sandbox",
       label: "Live sandbox",
-      status: present && ready !== false ? "ok" : "fail",
+      status: present && ready === true ? "ok" : "fail",
       detail: present
         ? ready === true
           ? `${sandboxName} present (Ready)`
           : `${sandboxName} present${line ? ` (${oneLine(line)})` : ""}`
         : `${sandboxName} not present in live OpenShell sandbox list`,
-      hint: present ? undefined : `run \`${CLI_NAME} ${sandboxName} status\` or recreate with \`${CLI_NAME} onboard\``,
+      hint: present
+        ? ready === true
+          ? undefined
+          : `run \`${CLI_NAME} ${sandboxName} status\` or \`${CLI_NAME} ${sandboxName} logs --follow\``
+        : `run \`${CLI_NAME} ${sandboxName} status\` or recreate with \`${CLI_NAME} onboard\``,
+    });
+  } else if (openshellBin) {
+    checks.push({
+      group: "Sandbox",
+      label: "Live sandbox",
+      status: "fail",
+      detail: "skipped because the nemoclaw gateway is not connected",
+      hint: "fix the gateway check above before trusting sandbox readiness",
     });
   }
 
-  const live = openshellBin
+  const live = openshellBin && openshellConnected
     ? parseGatewayInference(
         captureOpenshell(["inference", "get"], {
           ignoreError: true,
@@ -4852,7 +4523,6 @@ function printConnectOrderHint(candidate: string | null): void {
 
 const [cmd, ...args] = process.argv.slice(2);
 
-// eslint-disable-next-line complexity
 (async () => {
   // No command → help
   if (!cmd || cmd === "help" || cmd === "--help" || cmd === "-h") {
@@ -4882,28 +4552,22 @@ const [cmd, ...args] = process.argv.slice(2);
         await deploy(args[0]);
         break;
       case "start":
-        console.error(
-          `  ${YW}Deprecated:${R} '${CLI_NAME} start' is now '${CLI_NAME} tunnel start'. See '${CLI_NAME} help'.`,
-        );
-        await start();
+        await start(args);
         break;
       case "stop":
-        console.error(
-          `  ${YW}Deprecated:${R} '${CLI_NAME} stop' is now '${CLI_NAME} tunnel stop'. See '${CLI_NAME} help'.`,
-        );
-        stop();
+        await stop(args);
         break;
       case "tunnel":
         await tunnel(args);
         break;
       case "status":
-        showStatus();
+        await showStatus(args);
         break;
       case "debug":
-        debug(args);
+        await debug(args);
         break;
       case "uninstall":
-        uninstall(args);
+        await uninstall(args);
         break;
       case "credentials":
         await credentialsCommand(args);
@@ -5025,25 +4689,13 @@ const [cmd, ...args] = process.argv.slice(2);
       case "destroy":
         await sandboxDestroy(cmd, actionArgs);
         break;
-      case "gateway-token": {
-        const { options: gatewayTokenOpts, unknown: gatewayTokenUnknown } =
-          parseGatewayTokenArgs(actionArgs);
-        if (gatewayTokenUnknown.length > 0) {
-          console.error(`  Unknown flag: ${gatewayTokenUnknown[0]}`);
-          console.error(`  Usage: ${CLI_NAME} <name> gateway-token [--quiet|-q]`);
-          process.exit(1);
+      case "gateway-token":
+        if (actionArgs.includes("--help") || actionArgs.includes("-h")) {
+          console.log(`  Usage: ${CLI_NAME} <name> gateway-token [--quiet|-q]`);
+          break;
         }
-        // Suppress EPIPE traces when the consumer closes the pipe early
-        // (e.g. `... | head -c 0`). The token has already been written.
-        process.stdout.on("error", (err: NodeJS.ErrnoException) => {
-          if (err.code === "EPIPE") process.exit(0);
-        });
-        const exitCode = runGatewayTokenCommand(cmd, gatewayTokenOpts, {
-          fetchToken: fetchGatewayAuthTokenFromSandbox,
-        });
-        if (exitCode !== 0) process.exit(exitCode);
+        await runOclif("sandbox:gateway-token", [cmd, ...actionArgs]);
         break;
-      }
       case "skill":
         await sandboxSkillInstall(cmd, actionArgs);
         break;
@@ -5153,44 +4805,12 @@ const [cmd, ...args] = process.argv.slice(2);
         const configSub = actionArgs[0];
         switch (configSub) {
           case "get": {
-            const configOpts: { key: string | null; format: string } = {
-              key: null,
-              format: "json",
-            };
-            for (let i = 1; i < actionArgs.length; i++) {
-              const flag = actionArgs[i];
-              if (flag === "--key") {
-                if (i + 1 >= actionArgs.length || actionArgs[i + 1].startsWith("--")) {
-                  console.error("  --key requires a value.");
-                  console.error(
-                    `  Usage: ${CLI_NAME} <name> config get [--key dotpath] [--format json|yaml]`,
-                  );
-                  process.exit(1);
-                }
-                configOpts.key = actionArgs[++i];
-              } else if (flag === "--format") {
-                if (i + 1 >= actionArgs.length || actionArgs[i + 1].startsWith("--")) {
-                  console.error("  --format requires a value (json|yaml).");
-                  console.error(
-                    `  Usage: ${CLI_NAME} <name> config get [--key dotpath] [--format json|yaml]`,
-                  );
-                  process.exit(1);
-                }
-                const format = actionArgs[++i];
-                if (format !== "json" && format !== "yaml") {
-                  console.error(`  Unknown format: ${format}. Use json or yaml.`);
-                  process.exit(1);
-                }
-                configOpts.format = format;
-              } else {
-                console.error(`  Unknown flag: ${flag}`);
-                console.error(
-                  `  Usage: ${CLI_NAME} <name> config get [--key dotpath] [--format json|yaml]`,
-                );
-                process.exit(1);
-              }
+            const parsedConfigGet = sandboxConfig.parseConfigGetArgs(actionArgs.slice(1), CLI_NAME);
+            if (!parsedConfigGet.ok) {
+              for (const line of parsedConfigGet.errors) console.error(line);
+              process.exit(1);
             }
-            sandboxConfig.configGet(cmd, configOpts);
+            sandboxConfig.configGet(cmd, parsedConfigGet.opts);
             break;
           }
           default:

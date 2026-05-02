@@ -67,6 +67,7 @@ function runWithEnv(
   try {
     const out = execSync(`node "${CLI}" ${args}`, {
       encoding: "utf-8",
+      stdio: "pipe",
       timeout,
       env: {
         ...process.env,
@@ -161,6 +162,56 @@ function createLogsTestSetup(prefix: string, openshellLines: string[] = []) {
   };
 }
 
+function createDoctorTestSetup(prefix: string, openshellLines: string[]) {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const localBin = path.join(home, "bin");
+  const markerFile = path.join(home, "doctor-calls");
+  fs.mkdirSync(localBin, { recursive: true });
+  writeSandboxRegistry(home);
+
+  fs.writeFileSync(
+    path.join(localBin, "openshell"),
+    [
+      "#!/usr/bin/env bash",
+      `marker_file=${JSON.stringify(markerFile)}`,
+      'printf \'%s\\n\' "$*" >> "$marker_file"',
+      ...openshellLines,
+      "exit 0",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  fs.writeFileSync(
+    path.join(localBin, "docker"),
+    [
+      "#!/usr/bin/env bash",
+      'if [ "$1" = "info" ]; then echo "24.0.0"; exit 0; fi',
+      'if [ "$1" = "inspect" ]; then printf "true\\tnone\\topenshell:test\\n"; exit 0; fi',
+      'if [ "$1" = "port" ]; then echo "0.0.0.0:8080"; exit 0; fi',
+      "exit 0",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  fs.writeFileSync(path.join(localBin, "curl"), ["#!/usr/bin/env bash", "exit 7"].join("\n"), {
+    mode: 0o755,
+  });
+
+  return {
+    home,
+    localBin,
+    readCalls: () =>
+      fs.existsSync(markerFile) ? fs.readFileSync(markerFile, "utf8").trim().split(/\n/) : [],
+    runDoctor: (args = "alpha doctor --json") =>
+      runWithEnv(
+        args,
+        {
+          HOME: home,
+          PATH: `${localBin}:${process.env.PATH || ""}`,
+        },
+        30000,
+      ),
+  };
+}
+
 function createDebugCommandTestEnv(prefix: string): Record<string, string> {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   const localBin = path.join(home, "bin");
@@ -188,20 +239,52 @@ function createDebugCommandTestEnv(prefix: string): Record<string, string> {
 }
 
 describe("CLI dispatch", () => {
-  it("config get validates flags and values before dispatch", () => {
-    const src = fs.readFileSync(
-      path.join(import.meta.dirname, "..", "src", "nemoclaw.ts"),
-      "utf-8",
+  it("config get validates flags and values before dispatch", async () => {
+    const sandboxConfigModule = await import("../dist/lib/sandbox-config.js");
+    const { parseConfigGetArgs } = (sandboxConfigModule.default ?? sandboxConfigModule) as {
+      parseConfigGetArgs: (
+        args: string[],
+      ) =>
+        | { ok: true; opts: { key: string | null; format: string } }
+        | { ok: false; errors: string[] };
+    };
+
+    const missingKey = parseConfigGetArgs(["--key"]);
+    expect(missingKey.ok).toBe(false);
+    expect(missingKey).toEqual(
+      expect.objectContaining({
+        errors: expect.arrayContaining([expect.stringContaining("--key requires a value")]),
+      }),
     );
-    const configGet = src.match(
-      /case "get": \{([\s\S]*?)sandboxConfig\.configGet\(cmd, configOpts\);/,
+
+    const missingFormat = parseConfigGetArgs(["--format"]);
+    expect(missingFormat.ok).toBe(false);
+    expect(missingFormat).toEqual(
+      expect.objectContaining({
+        errors: expect.arrayContaining([expect.stringContaining("--format requires a value")]),
+      }),
     );
-    expect(configGet).toBeTruthy();
-    expect(configGet![1]).toContain("--key requires a value");
-    expect(configGet![1]).toContain("--format requires a value");
-    expect(configGet![1]).toContain("Unknown format");
-    expect(configGet![1]).toContain("Unknown flag");
-    expect(configGet![1]).toContain('format !== "json" && format !== "yaml"');
+
+    const badFormat = parseConfigGetArgs(["--format", "xml"]);
+    expect(badFormat.ok).toBe(false);
+    expect(badFormat).toEqual(
+      expect.objectContaining({
+        errors: expect.arrayContaining([expect.stringContaining("Unknown format: xml")]),
+      }),
+    );
+
+    const unknownFlag = parseConfigGetArgs(["--bogus"]);
+    expect(unknownFlag.ok).toBe(false);
+    expect(unknownFlag).toEqual(
+      expect.objectContaining({
+        errors: expect.arrayContaining([expect.stringContaining("Unknown flag: --bogus")]),
+      }),
+    );
+
+    expect(parseConfigGetArgs(["--key", "gateway.auth", "--format", "yaml"])).toEqual({
+      ok: true,
+      opts: { key: "gateway.auth", format: "yaml" },
+    });
   });
 
   it("help exits 0 and shows sections", () => {
@@ -322,6 +405,7 @@ describe("CLI dispatch", () => {
   it("nemohermes list --help uses alias branding", () => {
     const out = execSync(`node "${HERMES_CLI}" list --help`, {
       encoding: "utf-8",
+      stdio: "pipe",
       timeout: execTimeout(),
       env: {
         ...process.env,
@@ -422,6 +506,63 @@ describe("CLI dispatch", () => {
     expect(r.code).toBe(2);
     expect(r.out.includes("Nonexistent flag: --bogus")).toBeTruthy();
     expect(r.out.includes("See more help with --help")).toBeTruthy();
+  });
+
+  it("status --help exits 0 and shows status usage", () => {
+    const r = run("status --help");
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("status");
+    expect(r.out).toContain("Show sandbox list and service status");
+  });
+
+  it("tunnel start --help exits 0 and shows tunnel usage", () => {
+    const r = run("tunnel start --help");
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("tunnel start");
+    expect(r.out).toContain("Start the cloudflared public-URL tunnel");
+  });
+
+  it("deprecated start --help exits 0 and shows alias usage", () => {
+    const r = run("start --help");
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("start");
+    expect(r.out).toContain("Deprecated alias");
+  });
+
+  it("tunnel stop --help exits 0 and shows tunnel usage", () => {
+    const r = run("tunnel stop --help");
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("tunnel stop");
+    expect(r.out).toContain("Stop the cloudflared public-URL tunnel");
+  });
+
+  it("deprecated stop --help exits 0 and shows alias usage", () => {
+    const r = run("stop --help");
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("stop");
+    expect(r.out).toContain("Deprecated alias");
+  });
+
+  it("credentials help exits 0 and shows credential subcommands", () => {
+    const r = run("credentials --help");
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("Usage: nemoclaw credentials <subcommand>");
+    expect(r.out).toContain("list");
+    expect(r.out).toContain("reset <PROVIDER> [--yes]");
+  });
+
+  it("credentials list --help exits 0 and shows list usage", () => {
+    const r = run("credentials list --help");
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("credentials list");
+    expect(r.out).toContain("List provider credentials");
+  });
+
+  it("credentials reset without provider keeps provider-specific usage", () => {
+    const r = run("credentials reset --yes");
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("Usage: nemoclaw credentials reset <PROVIDER> [--yes]");
+    expect(r.out).toContain("PROVIDER is an OpenShell provider name");
   });
 
   it("shows skill install help when --help follows install", () => {
@@ -679,6 +820,61 @@ describe("CLI dispatch", () => {
     expect(r.code).toBe(0);
     expect(r.out).not.toContain("Warning");
     expect(r.out).toContain("Collecting diagnostics for sandbox 'mybox'");
+  });
+
+  it("gateway-token help keeps the public sandbox-scoped usage", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-token-help-"));
+    writeSandboxRegistry(home);
+
+    const r = runWithEnv("alpha gateway-token --help", { HOME: home });
+
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("Usage: nemoclaw <name> gateway-token [--quiet|-q]");
+    expect(r.out).not.toContain("sandbox:gateway-token");
+  });
+
+  it("doctor fails a present sandbox that is not Ready", () => {
+    const setup = createDoctorTestSetup("nemoclaw-cli-doctor-not-ready-", [
+      'case "$*" in',
+      '  "status") printf "Server Status\\n\\n  Gateway: nemoclaw\\n  Status: Connected\\n"; exit 0 ;;',
+      '  "gateway info -g nemoclaw") printf "Gateway: nemoclaw\\n"; exit 0 ;;',
+      '  "sandbox list") printf "NAME STATUS\\nalpha Creating\\n"; exit 0 ;;',
+      '  "inference get") printf "Provider: nvidia-prod\\nModel: test-model\\n"; exit 0 ;;',
+      "esac",
+    ]);
+
+    const r = setup.runDoctor();
+
+    expect(r.code).toBe(1);
+    const report = JSON.parse(r.out) as {
+      checks: Array<{ label: string; status: string; detail: string }>;
+    };
+    const liveSandbox = report.checks.find((check) => check.label === "Live sandbox");
+    expect(liveSandbox).toEqual(
+      expect.objectContaining({
+        status: "fail",
+        detail: expect.stringContaining("Creating"),
+      }),
+    );
+  });
+
+  it("doctor does not query sandbox state from a different active gateway", () => {
+    const setup = createDoctorTestSetup("nemoclaw-cli-doctor-wrong-gateway-", [
+      'case "$*" in',
+      '  "status") printf "Server Status\\n\\n  Gateway: other\\n  Status: Connected\\n"; exit 0 ;;',
+      '  "gateway info -g nemoclaw") printf "Gateway: nemoclaw\\n"; exit 0 ;;',
+      '  "gateway select nemoclaw") exit 1 ;;',
+      '  "gateway start --name nemoclaw --port 8080") exit 1 ;;',
+      '  "sandbox list") echo "queried wrong gateway sandbox list" >> "$marker_file"; exit 0 ;;',
+      "esac",
+    ]);
+
+    const r = setup.runDoctor("alpha doctor");
+
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("OpenShell status");
+    expect(r.out).toContain("Gateway: other");
+    expect(setup.readCalls()).not.toContain("sandbox list");
   });
 
   it("routes logs to OpenClaw and OpenShell log sources", () => {
