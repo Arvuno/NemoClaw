@@ -10,7 +10,6 @@ export interface SandboxConnectOptions {
 export interface NemoClawRuntimeBridge {
   sandboxConnect: (sandboxName: string, options?: SandboxConnectOptions) => Promise<void>;
   sandboxDestroy: (sandboxName: string, args?: string[]) => Promise<void>;
-  sandboxLogs: (sandboxName: string, follow: boolean) => void;
   sandboxRebuild: (sandboxName: string, args?: string[]) => Promise<void>;
   sandboxSkillInstall: (sandboxName: string, args?: string[]) => Promise<void>;
   sandboxStatus: (sandboxName: string) => Promise<void>;
