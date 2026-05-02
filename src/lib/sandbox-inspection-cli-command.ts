@@ -7,8 +7,8 @@ import { Args, Command, Flags } from "@oclif/core";
 
 import { CLI_NAME } from "./branding";
 import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
-import { showSandboxStatus } from "./sandbox-runtime-actions";
 import * as sandboxConfig from "./sandbox-config";
+import { showSandboxStatus } from "./sandbox-runtime-actions";
 
 const sandboxNameArg = Args.string({
   name: "sandbox",
