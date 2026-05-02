@@ -7,8 +7,8 @@ import { Args, Command, Flags } from "@oclif/core";
 
 import { CLI_DISPLAY_NAME, CLI_NAME } from "./branding";
 import { prompt as askPrompt } from "./credentials";
-
 import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
+import { OPENSHELL_OPERATION_TIMEOUT_MS } from "./openshell-timeouts";
 
 // Suffixes that mark per-sandbox messaging integrations in the gateway's
 // provider list. These are managed by `channels`, not `credentials`.
@@ -85,6 +85,7 @@ export class CredentialsListCommand extends Command {
     const result = runtime.runOpenshell(["provider", "list", "--names"], {
       ignoreError: true,
       stdio: ["ignore", "pipe", "pipe"],
+      timeout: OPENSHELL_OPERATION_TIMEOUT_MS,
     });
     if (result.status !== 0) {
       console.error("  Could not query OpenShell gateway. Is it running?");
@@ -169,6 +170,7 @@ export class CredentialsResetCommand extends Command {
     const result = runtime.runOpenshell(["provider", "delete", key], {
       ignoreError: true,
       stdio: ["ignore", "pipe", "pipe"],
+      timeout: OPENSHELL_OPERATION_TIMEOUT_MS,
     });
     if (result.status === 0) {
       this.log(`  Removed provider '${key}' from the OpenShell gateway.`);
