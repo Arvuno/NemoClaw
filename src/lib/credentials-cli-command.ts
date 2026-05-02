@@ -7,7 +7,7 @@ import { Args, Command, Flags } from "@oclif/core";
 
 import { CLI_DISPLAY_NAME, CLI_NAME } from "./branding";
 import { prompt as askPrompt } from "./credentials";
-import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
+import { recoverNamedGatewayRuntime, runOpenshellProviderCommand } from "./global-cli-actions";
 import { OPENSHELL_OPERATION_TIMEOUT_MS } from "./openshell-timeouts";
 
 // Suffixes that mark per-sandbox messaging integrations in the gateway's
@@ -37,8 +37,7 @@ function printCredentialsUsage(log: (message?: string) => void = console.log): v
 }
 
 async function recoverGatewayOrExit(kind: "query" | "reach"): Promise<void> {
-  const runtime = getNemoClawRuntimeBridge();
-  const recovery = await runtime.recoverNamedGatewayRuntime();
+  const recovery = await recoverNamedGatewayRuntime();
   if (recovery.recovered) return;
 
   if (kind === "query") {
@@ -81,8 +80,7 @@ export class CredentialsListCommand extends Command {
     await this.parse(CredentialsListCommand);
     await recoverGatewayOrExit("query");
 
-    const runtime = getNemoClawRuntimeBridge();
-    const result = runtime.runOpenshell(["provider", "list", "--names"], {
+    const result = runOpenshellProviderCommand(["provider", "list", "--names"], {
       ignoreError: true,
       stdio: ["ignore", "pipe", "pipe"],
       timeout: OPENSHELL_OPERATION_TIMEOUT_MS,
@@ -166,8 +164,7 @@ export class CredentialsResetCommand extends Command {
 
     await recoverGatewayOrExit("reach");
 
-    const runtime = getNemoClawRuntimeBridge();
-    const result = runtime.runOpenshell(["provider", "delete", key], {
+    const result = runOpenshellProviderCommand(["provider", "delete", key], {
       ignoreError: true,
       stdio: ["ignore", "pipe", "pipe"],
       timeout: OPENSHELL_OPERATION_TIMEOUT_MS,

@@ -5,7 +5,7 @@
 
 import { Args, Command, Flags } from "@oclif/core";
 
-import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
+import { destroySandbox } from "./sandbox-runtime-actions";
 
 export default class DestroyCliCommand extends Command {
   static id = "sandbox:destroy";
@@ -27,6 +27,6 @@ export default class DestroyCliCommand extends Command {
     const legacyArgs: string[] = [];
     if (flags.yes) legacyArgs.push("--yes");
     if (flags.force) legacyArgs.push("--force");
-    await getNemoClawRuntimeBridge().sandboxDestroy(args.sandboxName, legacyArgs);
+    await destroySandbox(args.sandboxName, legacyArgs);
   }
 }

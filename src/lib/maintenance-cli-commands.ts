@@ -5,7 +5,11 @@
 
 import { Command, Flags } from "@oclif/core";
 
-import { getNemoClawRuntimeBridge } from "./nemoclaw-runtime-bridge";
+import {
+  runBackupAllAction,
+  runGarbageCollectImagesAction,
+  runUpgradeSandboxesAction,
+} from "./global-cli-actions";
 
 export class BackupAllCommand extends Command {
   static id = "backup-all";
@@ -19,7 +23,7 @@ export class BackupAllCommand extends Command {
 
   public async run(): Promise<void> {
     await this.parse(BackupAllCommand);
-    getNemoClawRuntimeBridge().backupAll();
+    runBackupAllAction();
   }
 }
 
@@ -42,7 +46,7 @@ export class UpgradeSandboxesCommand extends Command {
     if (flags.check) args.push("--check");
     if (flags.auto) args.push("--auto");
     if (flags.yes) args.push("--yes");
-    await getNemoClawRuntimeBridge().upgradeSandboxes(args);
+    await runUpgradeSandboxesAction(args);
   }
 }
 
@@ -65,6 +69,6 @@ export class GarbageCollectImagesCommand extends Command {
     if (flags["dry-run"]) args.push("--dry-run");
     if (flags.yes) args.push("--yes");
     if (flags.force) args.push("--force");
-    await getNemoClawRuntimeBridge().garbageCollectImages(args);
+    await runGarbageCollectImagesAction(args);
   }
 }
