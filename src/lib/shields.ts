@@ -279,6 +279,9 @@ function applyStateDirLockMode(sandboxName: string, configDir: string, owner: st
     }
     try {
       kubectlExec(sandboxName, ["chmod", dirMode, dirPath]);
+      if (isLocking) {
+        kubectlExec(sandboxName, ["chmod", "g-s", dirPath]);
+      }
       kubectlExec(sandboxName, ["chmod", "-R", writeStrip, dirPath]);
     } catch {
       // Silently skip
@@ -287,6 +290,7 @@ function applyStateDirLockMode(sandboxName: string, configDir: string, owner: st
 
   // Multi-agent OpenClaw workspaces are named workspace-<agent>. They are
   // discovered dynamically because they are configured by openclaw.json.
+  const clearSetgid = isLocking ? "1" : "0";
   try {
     kubectlExec(sandboxName, [
       "sh",
@@ -297,10 +301,12 @@ config_dir="$1"
 owner="$2"
 write_strip="$3"
 dir_mode="$4"
+clear_setgid="$5"
 for dir in "$config_dir"/workspace-*; do
   [ -d "$dir" ] || continue
   chown -R "$owner" "$dir" 2>/dev/null || true
   chmod "$dir_mode" "$dir" 2>/dev/null || true
+  [ "$clear_setgid" = "1" ] && chmod g-s "$dir" 2>/dev/null || true
   chmod -R "$write_strip" "$dir" 2>/dev/null || true
 done
 `,
@@ -309,6 +315,7 @@ done
       owner,
       writeStrip,
       dirMode,
+      clearSetgid,
     ]);
   } catch {
     // Best effort; verification below catches the primary config lock.
@@ -339,8 +346,8 @@ function assertNoLegacyStateLayout(sandboxName: string, configDir: string): void
 // ---------------------------------------------------------------------------
 // Config unlock — returns config to the default (mutable) state
 //
-// Sets permissions to sandbox:sandbox 0600/0700, matching what OpenClaw
-// writes natively (mode 384 = 0o600). This keeps `openclaw doctor` happy.
+// Sets OpenClaw permissions to sandbox:sandbox 0660/2770 so the gateway UID
+// can mutate config while the setgid bit keeps new files readable to sandbox.
 //
 // Note on chattr: best-effort — it may silently fail if kubectl exec
 // lacks CAP_LINUX_IMMUTABLE or if the file was never immutable. That's fine:
@@ -482,6 +489,11 @@ function lockAgentConfig(
     kubectlExec(sandboxName, ["chmod", "755", target.configDir]);
   } catch {
     errors.push("chmod 755 config dir");
+  }
+  try {
+    kubectlExec(sandboxName, ["chmod", "g-s", target.configDir]);
+  } catch {
+    errors.push("chmod g-s config dir");
   }
 
   try {

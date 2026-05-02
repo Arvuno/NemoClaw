@@ -54,7 +54,7 @@ function mkdtempOnPosixFs(prefix: string): string {
 }
 
 describe("Issue #2681 — mutable OpenClaw config permissions", () => {
-  it("restores group-write and setgid on mutable config trees during root startup", () => {
+  it("restores group-write and setgid on mutable config trees during non-root startup", () => {
     const tmpDir = mkdtempOnPosixFs("nemoclaw-2681-perms-");
     const configDir = path.join(tmpDir, ".openclaw");
     const nestedDir = path.join(configDir, "agents", "main");
@@ -73,7 +73,7 @@ describe("Issue #2681 — mutable OpenClaw config permissions", () => {
           "-c",
           [
             "set -euo pipefail",
-            'id() { if [ "${1:-}" = "-u" ]; then printf "0"; else command id "$@"; fi; }',
+            'id() { if [ "${1:-}" = "-u" ]; then printf "1000"; else command id "$@"; fi; }',
             normalizeMutableConfigPermsFor(configDir),
             "normalize_mutable_config_perms",
           ].join("\n"),
@@ -82,9 +82,12 @@ describe("Issue #2681 — mutable OpenClaw config permissions", () => {
       );
 
       expect(result.status).toBe(0);
+      expect(modeBits(configDir) & 0o070).toBe(0o070);
       expect(modeBits(configDir) & 0o020).toBe(0o020);
+      expect(modeBits(configFile) & 0o060).toBe(0o060);
       expect(modeBits(configFile) & 0o020).toBe(0o020);
       expect(modeBits(configDir) & 0o2000).toBe(0o2000);
+      expect(modeBits(nestedDir) & 0o070).toBe(0o070);
       expect(modeBits(nestedDir) & 0o2000).toBe(0o2000);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });

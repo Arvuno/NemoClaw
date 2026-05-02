@@ -138,12 +138,10 @@ function verifyAgentBinaryAvailable(
   const binaryPath = typeof agent.binary_path === "string" ? agent.binary_path.trim() : "";
   const script = binaryPath
     ? [
+        `binary_path=${shellQuote(binaryPath)}`,
         `resolved="$(command -v ${shellQuote(executable)} 2>/dev/null || true)"`,
-        `[ -n "$resolved" ] || { echo not_found; exit 1; }`,
-        `[ -x ${shellQuote(binaryPath)} ] || { echo not_executable; exit 1; }`,
-        `[ "$resolved" = ${shellQuote(binaryPath)} ] || { printf 'path_mismatch:%s\\n' "$resolved"; exit 1; }`,
-        "echo ok",
-      ].join(" && ")
+        'if [ ! -x "$binary_path" ]; then echo not_executable; elif [ -n "$resolved" ] && [ "$resolved" != "$binary_path" ]; then printf \'path_mismatch:%s\\n\' "$resolved"; else echo ok; fi',
+      ].join("; ")
     : `command -v ${shellQuote(executable)} >/dev/null 2>&1 && echo ok || echo not_found`;
   const result = runCaptureOpenshell(
     ["sandbox", "exec", "-n", sandboxName, "--", "sh", "-lc", script],

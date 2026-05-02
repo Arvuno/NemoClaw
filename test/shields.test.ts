@@ -419,6 +419,7 @@ describe("NC-2227-05: shields.ts locks state directories", () => {
     expect(src).toContain("workspace-*");
     expect(fnBody).toContain("applyStateDirLockMode");
     expect(fnBody).toContain("chown");
+    expect(fnBody).toContain("g-s");
     expect(fnBody).toContain("root:root");
   });
 

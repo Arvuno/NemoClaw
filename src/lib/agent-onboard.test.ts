@@ -131,7 +131,8 @@ describe("handleAgentSetup guards", () => {
     expect(source).toContain(
       'resolved="$(command -v ${shellQuote(executable)} 2>/dev/null || true)"',
     );
-    expect(source).toContain('[ "$resolved" = ${shellQuote(binaryPath)} ]');
+    expect(source).toContain("binary_path=${shellQuote(binaryPath)}");
+    expect(source).toContain('[ "$resolved" != "$binary_path" ]');
     expect(source).toMatch(
       /"sandbox",\s*"exec",\s*"-n",\s*sandboxName,\s*"--",\s*"sh",\s*"-lc",\s*script/,
     );
