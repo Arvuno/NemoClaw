@@ -6098,13 +6098,13 @@ async function setupNim(
           if (!isWsl() && hasOllamaSystemdUnit) {
             console.log("  Configuring Ollama systemd override...");
             const dropInBody = `[Service]\nEnvironment="OLLAMA_HOST=0.0.0.0:${OLLAMA_PORT}"\n`;
-            const tmpDropIn = path.join(os.tmpdir(), `nemoclaw-ollama-${Date.now()}.conf`);
+            const tmpDropIn = secureTempFile("nemoclaw-ollama-override", ".conf");
             fs.writeFileSync(tmpDropIn, dropInBody, { mode: 0o644 });
             runShell(
               `sudo install -D -m 0644 ${shellQuote(tmpDropIn)} ${shellQuote("/etc/systemd/system/ollama.service.d/override.conf")} && sudo systemctl daemon-reload && sudo systemctl restart ollama`,
               { ignoreError: true },
             );
-            fs.unlinkSync(tmpDropIn);
+            cleanupTempDir(tmpDropIn, "nemoclaw-ollama-override");
             sleep(2);
           }
           // Fall back to manual start if systemd path failed or isn't present.
