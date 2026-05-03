@@ -53,6 +53,8 @@ const ANSI_RE = /\x1B(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\)|[@-_])/g;
 const runner: typeof import("./runner") = require("./runner");
 const { ROOT, SCRIPTS, redact, run, runShell, runCapture, runFile, shellQuote, validateName } =
   runner;
+const nameValidation: typeof import("./name-validation") = require("./name-validation");
+const { NAME_ALLOWED_FORMAT, getNameValidationGuidance } = nameValidation;
 const docker: typeof import("./docker") = require("./docker");
 const {
   dockerContainerInspectFormat,
@@ -3846,7 +3848,7 @@ async function promptValidatedSandboxName(agent: AgentDefinition | null = null) 
   const defaultSandboxName = getSandboxPromptDefault(agent);
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const nameAnswer = await promptOrDefault(
-      `  Sandbox name (lowercase, starts with letter, hyphens ok) [${defaultSandboxName}]: `,
+      `  Sandbox name (${NAME_ALLOWED_FORMAT}) [${defaultSandboxName}]: `,
       "NEMOCLAW_SANDBOX_NAME",
       defaultSandboxName,
     );
@@ -3871,11 +3873,10 @@ async function promptValidatedSandboxName(agent: AgentDefinition | null = null) 
       console.error(`  ${errorMessage}`);
     }
 
-    if (/^[0-9]/.test(sandboxName)) {
-      console.error("  Names must start with a letter, not a digit.");
-    } else {
-      console.error("  Names must be lowercase, contain only letters, numbers, and hyphens,");
-      console.error("  must start with a letter, and end with a letter or number.");
+    for (const line of getNameValidationGuidance("sandbox name", sandboxName, {
+      includeAllowedFormat: false,
+    })) {
+      console.error(`  ${line}`);
     }
 
     // Non-interactive runs cannot re-prompt — abort so the caller can fix the
@@ -8362,6 +8363,11 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       requestedSandboxName = validated;
     } catch (error) {
       console.error(`  ${error instanceof Error ? error.message : String(error)}`);
+      for (const line of getNameValidationGuidance("sandbox name", requestedSandboxName, {
+        includeAllowedFormat: false,
+      })) {
+        console.error(`  ${line}`);
+      }
       process.exit(1);
     }
   }

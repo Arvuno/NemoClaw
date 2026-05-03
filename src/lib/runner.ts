@@ -6,6 +6,7 @@ import type {
   SpawnSyncOptionsWithStringEncoding,
   SpawnSyncReturns,
 } from "node:child_process";
+import { NAME_ALLOWED_FORMAT } from "./name-validation";
 
 const { spawnSync } = require("child_process");
 const path = require("path");
@@ -268,7 +269,7 @@ function validateName(name: string, label = "name"): string {
   }
   if (!/^[a-z]([a-z0-9-]*[a-z0-9])?$/.test(name)) {
     throw new Error(
-      `Invalid ${label}: '${name}'. Must start with a letter and contain only lowercase alphanumerics with optional internal hyphens.`,
+      `Invalid ${label}: '${name}'. Allowed format: ${NAME_ALLOWED_FORMAT}.`,
     );
   }
   return name;
