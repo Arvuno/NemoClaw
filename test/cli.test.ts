@@ -1063,8 +1063,8 @@ describe("CLI dispatch", () => {
     const r = runWithEnv("alpha gateway-token --help", { HOME: home });
 
     expect(r.code).toBe(0);
-    expect(r.out).toContain("Usage: nemoclaw <name> gateway-token [--quiet|-q]");
-    expect(r.out).not.toContain("sandbox:gateway-token");
+    expect(r.out).toContain("$ nemoclaw <name> gateway-token [--quiet|-q]");
+    expect(r.out).not.toContain("sandbox:gateway");
   });
 
   it("doctor fails a present sandbox that is not Ready", () => {
