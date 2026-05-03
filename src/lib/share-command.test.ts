@@ -13,12 +13,10 @@ vi.mock("child_process", () => ({
   spawnSync: spawnSyncMock,
 }));
 
-import {
+import ShareCommand, {
   defaultShareMountDir,
   isMountPoint,
   resolveLinuxUnmount,
-  runShareMount,
-  runShareStatus,
 } from "./share-command";
 import type { ShareCommandDeps } from "./share-command-deps";
 
@@ -169,7 +167,14 @@ describe("ShareCommand mount/status actions", () => {
         return { status: 1, stdout: "", stderr: `unexpected ${cmd} ${args.join(" ")}` };
       });
 
-      await runShareMount({ sandboxName: "alpha", remotePath: "/workspace", localMount }, deps);
+      await (ShareCommand.prototype as any).mount.call(
+        {},
+        "alpha",
+        ["/workspace", localMount],
+        deps,
+        "",
+        "",
+      );
 
       expect(deps.ensureLive).toHaveBeenCalledWith("alpha");
       expect(deps.getSshConfig).toHaveBeenCalledWith("alpha");
@@ -198,9 +203,9 @@ describe("ShareCommand mount/status actions", () => {
       return { status: 1, stdout: "", stderr: "" };
     });
 
-    await expect(runShareMount({ sandboxName: "alpha" }, deps)).rejects.toThrow(
-      "process.exit:1",
-    );
+    await expect(
+      (ShareCommand.prototype as any).mount.call({}, "alpha", [], deps, "", ""),
+    ).rejects.toThrow("process.exit:1");
 
     expect(deps.ensureLive).not.toHaveBeenCalled();
     expect(errorSpy.mock.calls.map((call: unknown[]) => String(call[0])).join("\n")).toContain(
@@ -222,7 +227,14 @@ describe("ShareCommand mount/status actions", () => {
       });
 
       await expect(
-        runShareMount({ sandboxName: "alpha", remotePath: "/sandbox", localMount }, deps),
+        (ShareCommand.prototype as any).mount.call(
+          {},
+          "alpha",
+          ["/sandbox", localMount],
+          deps,
+          "",
+          "",
+        ),
       ).rejects.toThrow("process.exit:1");
 
       const stderr = errorSpy.mock.calls.map((call: unknown[]) => String(call[0])).join("\n");
@@ -242,7 +254,7 @@ describe("ShareCommand mount/status actions", () => {
       return { status: 1, stdout: "", stderr: "" };
     });
 
-    runShareStatus({ sandboxName: "alpha", localMount: mountDir }, makeDeps());
+    (ShareCommand.prototype as any).status.call({}, "alpha", [mountDir], "", "");
 
     expect(logSpy.mock.calls.map((call: unknown[]) => String(call[0])).join("\n")).toContain(
       `Mounted at ${mountDir}`,
