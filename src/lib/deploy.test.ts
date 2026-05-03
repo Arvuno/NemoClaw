@@ -246,6 +246,7 @@ describe("executeDeploy", () => {
     expect(errorText).toContain(
       "Brev deploy is non-interactive and cannot prompt for a corrected sandbox name.",
     );
+    expect(errorText).toContain("Set NEMOCLAW_SANDBOX_NAME to a valid sandbox name and retry.");
     expect(fixture.calls).toEqual([]);
     expect(fixture.interactive).toEqual([]);
   });
