@@ -41,6 +41,20 @@ function makeAgent(overrides: Partial<AgentDefinition> = {}): AgentDefinition {
 }
 
 const minimalAgent = makeAgent();
+const hermesAgent = makeAgent({
+  name: "hermes",
+  displayName: "Hermes Agent",
+  binary_path: "/usr/local/bin/hermes",
+  gateway_command: "hermes gateway run",
+  healthProbe: { url: "http://localhost:8642/health", port: 8642, timeout_seconds: 90 },
+  forwardPort: 8642,
+  configPaths: {
+    dir: "/sandbox/.hermes",
+    configFile: "/sandbox/.hermes/config.yaml",
+    envFile: "/sandbox/.hermes/.env",
+    format: "yaml",
+  },
+});
 
 function extractGatewayProcessPattern(script: string | null): string {
   const match = script?.match(/_GATEWAY_PROC_PATTERN='([^']+)'/);
@@ -73,6 +87,14 @@ describe("buildRecoveryScript", () => {
     expect(script).toContain('"$AGENT_BIN" gateway run --port 19000');
   });
 
+  it("omits --port for Hermes so config.yaml controls the internal listen port (#2426)", () => {
+    const script = buildRecoveryScript(hermesAgent, 8642);
+    expect(script).toContain("export HERMES_HOME=/sandbox/.hermes");
+    expect(script).toContain('"$AGENT_BIN" gateway run');
+    expect(script).not.toContain('"$AGENT_BIN" gateway run --port 8642');
+    expect(script).not.toContain("hermes gateway run --port 8642");
+  });
+
   it("falls back to openclaw gateway run when gateway_command is absent", () => {
     const agent = makeAgent({ gateway_command: undefined });
     const script = buildRecoveryScript(agent, 19000);
@@ -91,6 +113,16 @@ describe("buildRecoveryScript", () => {
       toJsRegex(extractGatewayProcessPattern(script)),
     );
     expect(script).toContain("nohup custom-launch --mode recovery --port 19000");
+  });
+
+  it("does not append the external forward port to custom Hermes launch commands (#2426)", () => {
+    const agent = makeAgent({
+      ...hermesAgent,
+      gateway_command: "hermes gateway run --profile recovery",
+    });
+    const script = buildRecoveryScript(agent, 8642);
+    expect(script).toContain("nohup hermes gateway run --profile recovery");
+    expect(script).not.toContain("hermes gateway run --profile recovery --port 8642");
   });
 
   // Regression coverage for #2478. The recovery script must explicitly source

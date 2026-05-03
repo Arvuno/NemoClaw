@@ -193,11 +193,11 @@ export function buildRecoveryScript(agent: AgentDefinition | null, port: number)
   // survive past the gateway launch — otherwise the warning explaining
   // *why* the gateway is about to crash gets wiped by the same launch
   // that's about to crash on a missing guard. (#2478)
-  const launchCommand = usesValidatedBinary
-    ? gatewayLaunchCommand(`"$AGENT_BIN" gateway run --port ${port}`)
-    : gatewayLaunchCommand(`${configuredGatewayCommand} --port ${port}`);
   const isHermes = agent.name === "hermes";
   const hermesHome = isHermes ? "export HERMES_HOME=/sandbox/.hermes; " : "";
+  const launchCommand = usesValidatedBinary
+    ? gatewayLaunchCommand(`"$AGENT_BIN" gateway run${isHermes ? "" : ` --port ${port}`}`)
+    : gatewayLaunchCommand(`${configuredGatewayCommand}${isHermes ? "" : ` --port ${port}`}`);
 
   // Source /tmp/nemoclaw-proxy-env.sh immediately before launching. That file
   // is the single source of truth for NODE_OPTIONS preload guards (safety-net,
