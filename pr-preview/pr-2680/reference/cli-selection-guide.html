@@ -9,7 +9,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Switch Inference Models at Runtime &#8212; NVIDIA NemoClaw Developer Guide</title>
+    <title>CLI Selection Guide &#8212; NVIDIA NemoClaw Developer Guide</title>
   
   
   
@@ -52,7 +52,7 @@
     <script src="../_static/copybutton.js?v=6dbb43f8"></script>
     <script src="../_static/search-assets.bundle.js?v=099b119e"></script>
     <script src="../_static/design-tabs.js?v=f930bc37"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'inference/switch-inference-providers';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'reference/cli-selection-guide';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = '../versions1.json';
@@ -61,12 +61,12 @@
             false;
         </script>
 
-    <link rel="canonical" href="https://docs.nvidia.com/nemoclaw/latest/inference/switch-inference-providers.html" />
+    <link rel="canonical" href="https://docs.nvidia.com/nemoclaw/latest/reference/cli-selection-guide.html" />
     <link rel="icon" href="../_static/favicon.png"/>
 
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Set Up Task-Specific Sub-Agents" href="set-up-sub-agent.html" />
-    <link rel="prev" title="Use a Local Inference Server" href="use-local-inference.html" />
+    <link rel="next" title="Network Policies" href="network-policies.html" />
+    <link rel="prev" title="CLI Commands Reference" href="commands.html" />
 
 
 
@@ -398,11 +398,11 @@
 <li class="toctree-l1"><a class="reference internal" href="../get-started/quickstart-hermes.html">Quickstart with Hermes</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Inference</span></p>
-<ul class="current nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="inference-options.html">Inference Options</a></li>
-<li class="toctree-l1"><a class="reference internal" href="use-local-inference.html">Use Local Inference</a></li>
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">Switch Inference Providers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="set-up-sub-agent.html">Set Up Task-Specific Sub-Agents</a></li>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../inference/inference-options.html">Inference Options</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../inference/use-local-inference.html">Use Local Inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../inference/switch-inference-providers.html">Switch Inference Providers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../inference/set-up-sub-agent.html">Set Up Task-Specific Sub-Agents</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Manage Sandboxes</span></p>
 <ul class="nav bd-sidenav">
@@ -433,12 +433,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../security/openclaw-controls.html">OpenClaw Controls</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Reference</span></p>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="../reference/architecture.html">Architecture</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../reference/commands.html">CLI Commands Reference</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../reference/cli-selection-guide.html">CLI Selection Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../reference/network-policies.html">Network Policies</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../reference/troubleshooting.html">Troubleshooting</a></li>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commands.html">CLI Commands Reference</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">CLI Selection Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="network-policies.html">Network Policies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Resources</span></p>
 <ul class="nav bd-sidenav">
@@ -480,7 +480,7 @@
         <i class="fa-solid fa-home"></i>
       </a>
     </li>
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Switch Inference Models at Runtime</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">CLI Selection Guide</span></li>
   </ul>
 </nav>
 </div>
@@ -498,192 +498,186 @@
                 <article class="bd-article">
                   
   <!--
-  SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
   SPDX-License-Identifier: Apache-2.0
 -->
-<section class="tex2jax_ignore mathjax_ignore" id="switch-inference-models-at-runtime">
-<h1>Switch Inference Models at Runtime<a class="headerlink" href="#switch-inference-models-at-runtime" title="Link to this heading">#</a></h1>
-<p>Change the active inference model while the sandbox is running.
-No restart is required.</p>
-<section id="prerequisites">
-<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h2>
-<ul class="simple">
-<li><p>A running NemoClaw sandbox.</p></li>
-<li><p>The OpenShell CLI on your <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p></li>
-</ul>
+<section class="tex2jax_ignore mathjax_ignore" id="cli-selection-guide">
+<h1>CLI Selection Guide<a class="headerlink" href="#cli-selection-guide" title="Link to this heading">#</a></h1>
+<p>NemoClaw uses two host-side CLIs.
+Use <code class="docutils literal notranslate"><span class="pre">nemoclaw</span></code> for NemoClaw-managed workflows.
+Use <code class="docutils literal notranslate"><span class="pre">openshell</span></code> when you need a lower-level OpenShell operation that NemoClaw intentionally exposes.</p>
+<section id="rule-of-thumb">
+<h2>Rule of Thumb<a class="headerlink" href="#rule-of-thumb" title="Link to this heading">#</a></h2>
+<p>If the task changes how NemoClaw creates, rebuilds, preserves, or configures a sandbox, start with <code class="docutils literal notranslate"><span class="pre">nemoclaw</span></code>.</p>
+<p>If the task inspects or changes the live OpenShell gateway, TUI, raw policy, port forwarding, inference route, or sandbox file transfer, use <code class="docutils literal notranslate"><span class="pre">openshell</span></code>.</p>
+<p>Do not create or recreate NemoClaw-managed sandboxes directly with <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">sandbox</span> <span class="pre">create</span></code> unless you intend to manage OpenShell yourself.
+Run <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span></code> afterward if you need to return to a NemoClaw-managed environment.</p>
 </section>
-<section id="switch-to-a-different-model">
-<h2>Switch to a Different Model<a class="headerlink" href="#switch-to-a-different-model" title="Link to this heading">#</a></h2>
-<p>Switching happens through the OpenShell inference route.
-Use the provider and model that match the upstream you want to use.
-This is one of the cases where a NemoClaw workflow intentionally uses <code class="docutils literal notranslate"><span class="pre">openshell</span></code>; see <a class="reference internal" href="../reference/cli-selection-guide.html"><span class="std std-doc">CLI Selection Guide</span></a> for the general boundary.</p>
-<section id="nvidia-endpoints">
-<h3>NVIDIA Endpoints<a class="headerlink" href="#nvidia-endpoints" title="Link to this heading">#</a></h3>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>inference<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--provider<span class="w"> </span>nvidia-prod<span class="w"> </span>--model<span class="w"> </span>nvidia/nemotron-3-super-120b-a12b
-</pre></div>
-</div>
-</section>
-<section id="openai">
-<h3>OpenAI<a class="headerlink" href="#openai" title="Link to this heading">#</a></h3>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>inference<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--provider<span class="w"> </span>openai-api<span class="w"> </span>--model<span class="w"> </span>gpt-5.4
-</pre></div>
-</div>
-</section>
-<section id="anthropic">
-<h3>Anthropic<a class="headerlink" href="#anthropic" title="Link to this heading">#</a></h3>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>inference<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--provider<span class="w"> </span>anthropic-prod<span class="w"> </span>--model<span class="w"> </span>claude-sonnet-4-6
-</pre></div>
-</div>
-</section>
-<section id="google-gemini">
-<h3>Google Gemini<a class="headerlink" href="#google-gemini" title="Link to this heading">#</a></h3>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>inference<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--provider<span class="w"> </span>gemini-api<span class="w"> </span>--model<span class="w"> </span>gemini-2.5-flash
-</pre></div>
-</div>
-</section>
-<section id="compatible-endpoints">
-<h3>Compatible Endpoints<a class="headerlink" href="#compatible-endpoints" title="Link to this heading">#</a></h3>
-<p>If you onboarded a custom compatible endpoint, switch models with the provider created for that endpoint:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>inference<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--provider<span class="w"> </span>compatible-endpoint<span class="w"> </span>--model<span class="w"> </span>&lt;model-name&gt;
-</pre></div>
-</div>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>inference<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--provider<span class="w"> </span>compatible-anthropic-endpoint<span class="w"> </span>--model<span class="w"> </span>&lt;model-name&gt;
-</pre></div>
-</div>
-<p>If the provider itself needs to change, rerun <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span></code>.</p>
-<section id="switching-from-responses-api-to-chat-completions">
-<h4>Switching from Responses API to Chat Completions<a class="headerlink" href="#switching-from-responses-api-to-chat-completions" title="Link to this heading">#</a></h4>
-<p>If onboarding selected <code class="docutils literal notranslate"><span class="pre">/v1/responses</span></code> but the agent fails at runtime (for
-example, because the backend does not emit the streaming events OpenClaw
-requires), re-run onboarding so the wizard re-probes the endpoint and bakes
-the correct API path into the image:</p>
+<section id="use-nemoclaw-for-nemoclaw-workflows">
+<h2>Use <code class="docutils literal notranslate"><span class="pre">nemoclaw</span></code> For NemoClaw Workflows<a class="headerlink" href="#use-nemoclaw-for-nemoclaw-workflows" title="Link to this heading">#</a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">nemoclaw</span></code> for operations where NemoClaw adds product-specific state, safety checks, backup behavior, credential handling, or OpenClaw configuration.</p>
+<ul>
+<li><p>Install, onboard, or recreate a NemoClaw sandbox:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>onboard
-</pre></div>
-</div>
-<p>Select the same provider and endpoint again.
-The updated streaming probe will detect incomplete <code class="docutils literal notranslate"><span class="pre">/v1/responses</span></code> support
-and select <code class="docutils literal notranslate"><span class="pre">/v1/chat/completions</span></code> automatically.</p>
-<p>For the compatible-endpoint provider, NemoClaw uses <code class="docutils literal notranslate"><span class="pre">/v1/chat/completions</span></code> by
-default, so no env var is required to keep the safe path.
-To opt in to <code class="docutils literal notranslate"><span class="pre">/v1/responses</span></code> for a backend you have verified end to end, set
-<code class="docutils literal notranslate"><span class="pre">NEMOCLAW_PREFERRED_API</span></code> before onboarding:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nv">NEMOCLAW_PREFERRED_API</span><span class="o">=</span>openai-responses<span class="w"> </span>nemoclaw<span class="w"> </span>onboard
-</pre></div>
-</div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_INFERENCE_API_OVERRIDE</span></code> patches the config at container startup but
-does not update the Dockerfile ARG baked into the image.
-If you recreate the sandbox without the override env var, the image reverts to
-the original API path.
-A fresh <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span></code> is the reliable fix because it updates both the
-session and the baked image.</p>
-</div>
-</section>
-</section>
-</section>
-<section id="cross-provider-switching">
-<h2>Cross-Provider Switching<a class="headerlink" href="#cross-provider-switching" title="Link to this heading">#</a></h2>
-<p>Switching to a different provider family (for example, from NVIDIA Endpoints to Anthropic) requires updating both the gateway route and the sandbox config.</p>
-<p>Set the gateway route on the host:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>inference<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--provider<span class="w"> </span>anthropic-prod<span class="w"> </span>--model<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>--no-verify
-</pre></div>
-</div>
-<p>Then set the override env vars and recreate the sandbox so they take effect at startup:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">NEMOCLAW_MODEL_OVERRIDE</span><span class="o">=</span><span class="s2">&quot;anthropic/claude-sonnet-4-6&quot;</span>
-<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">NEMOCLAW_INFERENCE_API_OVERRIDE</span><span class="o">=</span><span class="s2">&quot;anthropic-messages&quot;</span>
 <span class="gp">$ </span>nemoclaw<span class="w"> </span>onboard<span class="w"> </span>--resume<span class="w"> </span>--recreate-sandbox
 </pre></div>
 </div>
-<p>The entrypoint patches <code class="docutils literal notranslate"><span class="pre">openclaw.json</span></code> at container startup with the override values.
-You do not need to rebuild the image.
-Remove the env vars and recreate the sandbox to revert to the original model.</p>
-<p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_INFERENCE_API_OVERRIDE</span></code> accepts <code class="docutils literal notranslate"><span class="pre">openai-completions</span></code> (for NVIDIA, OpenAI, Gemini, compatible endpoints) or <code class="docutils literal notranslate"><span class="pre">anthropic-messages</span></code> (for Anthropic and Anthropic-compatible endpoints).
-This variable is only needed when switching between provider families.</p>
-</section>
-<section id="tune-model-metadata">
-<h2>Tune Model Metadata<a class="headerlink" href="#tune-model-metadata" title="Link to this heading">#</a></h2>
-<p>The sandbox image bakes model metadata (context window, max output tokens, reasoning mode, and accepted input modalities) into <code class="docutils literal notranslate"><span class="pre">openclaw.json</span></code> at build time.
-To change these values, set the corresponding environment variables before running <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span></code> so they patch into the Dockerfile before the image builds.</p>
-<div class="pst-scrollable-table-container"><table class="table">
-<thead>
-<tr class="row-odd"><th class="head"><p>Variable</p></th>
-<th class="head"><p>Values</p></th>
-<th class="head"><p>Default</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_CONTEXT_WINDOW</span></code></p></td>
-<td><p>Positive integer (tokens)</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">131072</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_MAX_TOKENS</span></code></p></td>
-<td><p>Positive integer (tokens)</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">4096</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_REASONING</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_INFERENCE_INPUTS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">text</span></code> or <code class="docutils literal notranslate"><span class="pre">text,image</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">text</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_AGENT_TIMEOUT</span></code></p></td>
-<td><p>Positive integer (seconds)</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">600</span></code></p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>Invalid values are ignored, and the default bakes into the image.
-Use <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_INFERENCE_INPUTS=text,image</span></code> only for a model that accepts image input through the selected provider.</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">NEMOCLAW_CONTEXT_WINDOW</span><span class="o">=</span><span class="m">65536</span>
-<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">NEMOCLAW_MAX_TOKENS</span><span class="o">=</span><span class="m">8192</span>
-<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">NEMOCLAW_REASONING</span><span class="o">=</span><span class="nb">true</span>
-<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">NEMOCLAW_INFERENCE_INPUTS</span><span class="o">=</span>text,image
-<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">NEMOCLAW_AGENT_TIMEOUT</span><span class="o">=</span><span class="m">1800</span>
-<span class="gp">$ </span>nemoclaw<span class="w"> </span>onboard
+</li>
+<li><p>List, connect to, check, or delete NemoClaw-managed sandboxes:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>list
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>connect
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>status
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>logs<span class="w"> </span>--follow
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>destroy
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_AGENT_TIMEOUT</span></code> controls the per-request inference timeout baked into
-<code class="docutils literal notranslate"><span class="pre">agents.defaults.timeoutSeconds</span></code>. Increase it for slow local inference (for
-example, CPU-only Ollama or vLLM on modest hardware). <code class="docutils literal notranslate"><span class="pre">openclaw.json</span></code> is
-immutable at runtime, so this value can only be changed by rebuilding the
-sandbox via <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span></code>.</p>
-<p>These variables are build-time settings.
-If you change them on an existing sandbox, recreate the sandbox so the new values bake into the image:</p>
+</li>
+<li><p>Rebuild or upgrade while preserving workspace state:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>rebuild
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>upgrade-sandboxes<span class="w"> </span>--check
+</pre></div>
+</div>
+</li>
+<li><p>Snapshot, restore, or mount sandbox state:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>snapshot<span class="w"> </span>create<span class="w"> </span>--name<span class="w"> </span>before-change
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>snapshot<span class="w"> </span>restore<span class="w"> </span>before-change
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>share<span class="w"> </span>mount
+</pre></div>
+</div>
+</li>
+<li><p>Add or remove NemoClaw policy presets:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>policy-add<span class="w"> </span>pypi<span class="w"> </span>--yes
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>policy-list
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>policy-remove<span class="w"> </span>pypi<span class="w"> </span>--yes
+</pre></div>
+</div>
+</li>
+<li><p>Manage NemoClaw messaging channels, credentials, diagnostics, and cleanup:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>channels<span class="w"> </span>add<span class="w"> </span>slack
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>credentials<span class="w"> </span>list
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>credentials<span class="w"> </span>reset<span class="w"> </span>nvidia-prod
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>debug<span class="w"> </span>--sandbox<span class="w"> </span>my-assistant
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>gc<span class="w"> </span>--dry-run
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="use-openshell-for-openshell-operations">
+<h2>Use <code class="docutils literal notranslate"><span class="pre">openshell</span></code> For OpenShell Operations<a class="headerlink" href="#use-openshell-for-openshell-operations" title="Link to this heading">#</a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">openshell</span></code> when the docs explicitly call for a live OpenShell gateway operation or when you need a lower-level view beneath the NemoClaw wrapper.</p>
+<ul>
+<li><p>Open the OpenShell TUI for network approvals and live activity:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>term
+</pre></div>
+</div>
+</li>
+<li><p>Change the live gateway inference route:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>inference<span class="w"> </span><span class="nb">set</span><span class="w"> </span>-g<span class="w"> </span>nemoclaw<span class="w"> </span>--provider<span class="w"> </span>&lt;provider&gt;<span class="w"> </span>--model<span class="w"> </span>&lt;model&gt;
+<span class="gp">$ </span>openshell<span class="w"> </span>inference<span class="w"> </span>get<span class="w"> </span>-g<span class="w"> </span>nemoclaw
+</pre></div>
+</div>
+</li>
+<li><p>Manage dashboard or service port forwards:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>forward<span class="w"> </span>start<span class="w"> </span>--background<span class="w"> </span>&lt;port&gt;<span class="w"> </span>&lt;sandbox-name&gt;
+<span class="gp">$ </span>openshell<span class="w"> </span>forward<span class="w"> </span>list
+</pre></div>
+</div>
+</li>
+<li><p>Inspect the underlying sandbox state:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>sandbox<span class="w"> </span>list
+<span class="gp">$ </span>openshell<span class="w"> </span>sandbox<span class="w"> </span>get<span class="w"> </span>&lt;sandbox-name&gt;
+<span class="gp">$ </span>openshell<span class="w"> </span>logs<span class="w"> </span>&lt;sandbox-name&gt;<span class="w"> </span>--tail
+</pre></div>
+</div>
+</li>
+<li><p>Run one-off commands or move files without starting a NemoClaw chat session:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>sandbox<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-n<span class="w"> </span>&lt;sandbox-name&gt;<span class="w"> </span>--<span class="w"> </span>ls<span class="w"> </span>-la<span class="w"> </span>/sandbox
+<span class="gp">$ </span>openshell<span class="w"> </span>sandbox<span class="w"> </span>upload<span class="w"> </span>&lt;sandbox-name&gt;<span class="w"> </span>./local-file<span class="w"> </span>/sandbox/
+<span class="gp">$ </span>openshell<span class="w"> </span>sandbox<span class="w"> </span>download<span class="w"> </span>&lt;sandbox-name&gt;<span class="w"> </span>/sandbox/output<span class="w"> </span>./output
+</pre></div>
+</div>
+</li>
+<li><p>Inspect or replace raw OpenShell policy:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>policy<span class="w"> </span>get<span class="w"> </span>--full<span class="w"> </span>&lt;sandbox-name&gt;<span class="w"> </span>&gt;<span class="w"> </span>live-policy.yaml
+<span class="gp">$ </span>openshell<span class="w"> </span>policy<span class="w"> </span>update<span class="w"> </span>&lt;sandbox-name&gt;<span class="w"> </span>--add-endpoint<span class="w"> </span>api.example.com:443:read-only:rest:enforce
+<span class="gp">$ </span>openshell<span class="w"> </span>policy<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--policy<span class="w"> </span>live-policy.yaml<span class="w"> </span>&lt;sandbox-name&gt;
+</pre></div>
+</div>
+</li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">policy</span> <span class="pre">update</span></code> merges specific endpoint and rule changes into the live sandbox policy.
+<code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">policy</span> <span class="pre">set</span></code> replaces the live policy with the file you provide.
+For normal NemoClaw network access changes, prefer <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">policy-add</span></code> so NemoClaw preserves presets and records the change for rebuilds.</p>
+</section>
+<section id="common-decisions">
+<h2>Common Decisions<a class="headerlink" href="#common-decisions" title="Link to this heading">#</a></h2>
+<p>This section covers common decisions when using the NemoClaw CLI and the OpenShell CLI.</p>
+<section id="first-setup-or-full-recreate">
+<h3>First Setup or Full Recreate<a class="headerlink" href="#first-setup-or-full-recreate" title="Link to this heading">#</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span></code>.
+It starts the OpenShell gateway when needed, registers providers, builds the OpenClaw sandbox image, applies NemoClaw policy choices, and creates the sandbox.</p>
+<p>Avoid running <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">gateway</span> <span class="pre">start</span> <span class="pre">--recreate</span></code> or <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">sandbox</span> <span class="pre">create</span></code> directly for NemoClaw-managed sandboxes.
+Those commands do not update NemoClaw’s registry, session metadata, workspace-preservation flow, or OpenClaw-specific configuration.</p>
+</section>
+<section id="connect-to-the-sandbox">
+<h3>Connect to the Sandbox<a class="headerlink" href="#connect-to-the-sandbox" title="Link to this heading">#</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">connect</span></code> for an interactive NemoClaw sandbox shell.
+It waits for readiness, handles stale SSH host keys after gateway restarts, and prints agent-specific hints.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">sandbox</span> <span class="pre">connect</span> <span class="pre">&lt;name&gt;</span></code> only when you intentionally want the raw OpenShell connection path.</p>
+<p>For a one-off command, use <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">sandbox</span> <span class="pre">exec</span></code> instead of opening an interactive shell.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>sandbox<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-n<span class="w"> </span>my-assistant<span class="w"> </span>--<span class="w"> </span>cat<span class="w"> </span>/tmp/gateway.log
+</pre></div>
+</div>
+</section>
+<section id="check-health-or-logs">
+<h3>Check Health or Logs<a class="headerlink" href="#check-health-or-logs" title="Link to this heading">#</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">status</span></code> and <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">logs</span></code> first.
+They combine NemoClaw registry data, OpenShell state, OpenClaw process health, inference health, policy details, and messaging-channel warnings.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">sandbox</span> <span class="pre">list</span></code>, <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">sandbox</span> <span class="pre">get</span></code>, or <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">logs</span></code> when debugging lower-level OpenShell behavior.</p>
+</section>
+<section id="approve-blocked-network-requests">
+<h3>Approve Blocked Network Requests<a class="headerlink" href="#approve-blocked-network-requests" title="Link to this heading">#</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">term</span></code>.
+The OpenShell TUI owns live network activity and operator approval prompts.</p>
+<p>Approved endpoints are session-scoped unless you also add them to the policy through a NemoClaw preset or raw OpenShell policy update.</p>
+</section>
+<section id="change-models-or-providers">
+<h3>Change Models or Providers<a class="headerlink" href="#change-models-or-providers" title="Link to this heading">#</a></h3>
+<p>For a same-provider model switch, change the live OpenShell inference route:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openshell<span class="w"> </span>inference<span class="w"> </span><span class="nb">set</span><span class="w"> </span>-g<span class="w"> </span>nemoclaw<span class="w"> </span>--provider<span class="w"> </span>nvidia-prod<span class="w"> </span>--model<span class="w"> </span>nvidia/nemotron-3-super-120b-a12b
+</pre></div>
+</div>
+<p>For a provider-family change or a build-time OpenClaw setting change, rerun onboarding so the sandbox configuration is recreated consistently:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>onboard<span class="w"> </span>--resume<span class="w"> </span>--recreate-sandbox
 </pre></div>
 </div>
-</section>
-<section id="verify-the-active-model">
-<h2>Verify the Active Model<a class="headerlink" href="#verify-the-active-model" title="Link to this heading">#</a></h2>
-<p>Run the status command to confirm the change:</p>
+<p>Verify either path with:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>&lt;name&gt;<span class="w"> </span>status
 </pre></div>
 </div>
-<p>Add the <code class="docutils literal notranslate"><span class="pre">--json</span></code> flag for machine-readable output:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>&lt;name&gt;<span class="w"> </span>status<span class="w"> </span>--json
-</pre></div>
-</div>
-<p>The output includes the active provider, model, and endpoint.</p>
 </section>
-<section id="notes">
-<h2>Notes<a class="headerlink" href="#notes" title="Link to this heading">#</a></h2>
-<ul class="simple">
-<li><p>The host keeps provider credentials.</p></li>
-<li><p>The sandbox continues to use <code class="docutils literal notranslate"><span class="pre">inference.local</span></code>.</p></li>
-<li><p>Same-provider model switches take effect immediately via the gateway route alone.</p></li>
-<li><p>Cross-provider switches also require <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_MODEL_OVERRIDE</span></code> (and <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_INFERENCE_API_OVERRIDE</span></code>) plus a sandbox recreate so the entrypoint patches the config at startup.</p></li>
-<li><p>Overrides are applied at container startup. Changing or removing env vars requires a sandbox recreate to take effect.</p></li>
-<li><p>Local Ollama and local vLLM routes use local provider tokens rather than <code class="docutils literal notranslate"><span class="pre">OPENAI_API_KEY</span></code>. Rebuilds of older local-inference sandboxes clear the stale OpenAI credential requirement automatically.</p></li>
-</ul>
+<section id="update-network-policy">
+<h3>Update Network Policy<a class="headerlink" href="#update-network-policy" title="Link to this heading">#</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">policy-add</span></code> or <code class="docutils literal notranslate"><span class="pre">policy-remove</span></code> for NemoClaw presets and custom preset files.
+NemoClaw merges the new policy with the live policy and reapplies presets during rebuilds.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">policy</span> <span class="pre">update</span></code> for precise live endpoint or REST rule changes.
+Use <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">policy</span> <span class="pre">get</span> <span class="pre">--full</span></code> and <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">policy</span> <span class="pre">set</span></code> only when you need to edit and replace the raw policy file.</p>
+</section>
+<section id="move-workspace-files">
+<h3>Move Workspace Files<a class="headerlink" href="#move-workspace-files" title="Link to this heading">#</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">snapshot</span> <span class="pre">create</span></code>, <code class="docutils literal notranslate"><span class="pre">snapshot</span> <span class="pre">restore</span></code>, or <code class="docutils literal notranslate"><span class="pre">share</span> <span class="pre">mount</span></code> for normal workspace preservation and editing.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">sandbox</span> <span class="pre">upload</span></code> and <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">sandbox</span> <span class="pre">download</span></code> for manual file copies when you need exact control over source and destination paths.</p>
+</section>
 </section>
 <section id="related-topics">
 <h2>Related Topics<a class="headerlink" href="#related-topics" title="Link to this heading">#</a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="inference-options.html"><span class="std std-doc">Inference Options</span></a> for the full list of providers available during onboarding.</p></li>
+<li><p><a class="reference internal" href="commands.html"><span class="std std-doc">Commands</span></a> for the full NemoClaw command reference.</p></li>
+<li><p><a class="reference internal" href="../manage-sandboxes/lifecycle.html"><span class="std std-doc">Manage Sandbox Lifecycle</span></a> for day-two operations.</p></li>
+<li><p><a class="reference internal" href="../inference/switch-inference-providers.html"><span class="std std-doc">Switch Inference Models</span></a> for inference route examples.</p></li>
+<li><p><a class="reference internal" href="../network-policy/customize-network-policy.html"><span class="std std-doc">Customize the Network Policy</span></a> for persistent network access changes.</p></li>
+<li><p><a class="reference internal" href="../network-policy/approve-network-requests.html"><span class="std std-doc">Approve or Deny Network Requests</span></a> for the OpenShell TUI approval flow.</p></li>
 </ul>
 </section>
 </section>
@@ -699,20 +693,20 @@ If you change them on an existing sandbox, recreate the sandbox so the new value
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="use-local-inference.html"
+       href="commands.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Use a Local Inference Server</p>
+        <p class="prev-next-title">CLI Commands Reference</p>
       </div>
     </a>
     <a class="right-next"
-       href="set-up-sub-agent.html"
+       href="network-policies.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Set Up Task-Specific Sub-Agents</p>
+        <p class="prev-next-title">Network Policies</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -737,22 +731,19 @@ If you change them on an existing sandbox, recreate the sandbox so the new value
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#prerequisites">Prerequisites</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#switch-to-a-different-model">Switch to a Different Model</a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nvidia-endpoints">NVIDIA Endpoints</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#openai">OpenAI</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#anthropic">Anthropic</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#google-gemini">Google Gemini</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#compatible-endpoints">Compatible Endpoints</a><ul class="nav section-nav flex-column">
-<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#switching-from-responses-api-to-chat-completions">Switching from Responses API to Chat Completions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#rule-of-thumb">Rule of Thumb</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#use-nemoclaw-for-nemoclaw-workflows">Use <code class="docutils literal notranslate"><span class="pre">nemoclaw</span></code> For NemoClaw Workflows</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#use-openshell-for-openshell-operations">Use <code class="docutils literal notranslate"><span class="pre">openshell</span></code> For OpenShell Operations</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#common-decisions">Common Decisions</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#first-setup-or-full-recreate">First Setup or Full Recreate</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#connect-to-the-sandbox">Connect to the Sandbox</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#check-health-or-logs">Check Health or Logs</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#approve-blocked-network-requests">Approve Blocked Network Requests</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#change-models-or-providers">Change Models or Providers</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#update-network-policy">Update Network Policy</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#move-workspace-files">Move Workspace Files</a></li>
 </ul>
 </li>
-</ul>
-</li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#cross-provider-switching">Cross-Provider Switching</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#tune-model-metadata">Tune Model Metadata</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#verify-the-active-model">Verify the Active Model</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#notes">Notes</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#related-topics">Related Topics</a></li>
 </ul>
   </nav></div>

@@ -9,7 +9,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>NemoClaw Agent Skills for Your AI Coding Assistant &#8212; NVIDIA NemoClaw Developer Guide</title>
+    <title>Messaging Channels &#8212; NVIDIA NemoClaw Developer Guide</title>
   
   
   
@@ -52,7 +52,7 @@
     <script src="../_static/copybutton.js?v=6dbb43f8"></script>
     <script src="../_static/search-assets.bundle.js?v=099b119e"></script>
     <script src="../_static/design-tabs.js?v=f930bc37"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'resources/agent-skills';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'manage-sandboxes/messaging-channels';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = '../versions1.json';
@@ -61,12 +61,12 @@
             false;
         </script>
 
-    <link rel="canonical" href="https://docs.nvidia.com/nemoclaw/latest/resources/agent-skills.html" />
+    <link rel="canonical" href="https://docs.nvidia.com/nemoclaw/latest/manage-sandboxes/messaging-channels.html" />
     <link rel="icon" href="../_static/favicon.png"/>
 
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="License" href="license.html" />
-    <link rel="prev" title="Troubleshooting" href="../reference/troubleshooting.html" />
+    <link rel="next" title="Workspace Files" href="workspace-files.html" />
+    <link rel="prev" title="Manage Sandbox Lifecycle" href="lifecycle.html" />
 
 
 
@@ -405,11 +405,11 @@
 <li class="toctree-l1"><a class="reference internal" href="../inference/set-up-sub-agent.html">Set Up Task-Specific Sub-Agents</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Manage Sandboxes</span></p>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="../manage-sandboxes/lifecycle.html">Manage Sandbox Lifecycle</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../manage-sandboxes/messaging-channels.html">Set Up Messaging Channels</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../manage-sandboxes/workspace-files.html">Workspace Files</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../manage-sandboxes/backup-restore.html">Backup and Restore</a></li>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="lifecycle.html">Manage Sandbox Lifecycle</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Set Up Messaging Channels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workspace-files.html">Workspace Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backup-restore.html">Backup and Restore</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Network Policy</span></p>
 <ul class="nav bd-sidenav">
@@ -441,10 +441,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../reference/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Resources</span></p>
-<ul class="current nav bd-sidenav">
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">Agent Skills</a></li>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../resources/agent-skills.html">Agent Skills</a></li>
 <li class="toctree-l1"><a class="reference external" href="https://github.com/NVIDIA/NemoClaw/blob/main/SECURITY.md">Report Vulnerabilities</a></li>
-<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../resources/license.html">License</a></li>
 <li class="toctree-l1"><a class="reference external" href="https://discord.gg/XFpfPv9Uvx">Discord</a></li>
 </ul>
 </div>
@@ -480,7 +480,7 @@
         <i class="fa-solid fa-home"></i>
       </a>
     </li>
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">NemoClaw Agent Skills for Your AI Coding Assistant</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Messaging Channels</span></li>
   </ul>
 </nav>
 </div>
@@ -501,143 +501,162 @@
   SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
   SPDX-License-Identifier: Apache-2.0
 -->
-<section class="tex2jax_ignore mathjax_ignore" id="nemoclaw-agent-skills-for-your-ai-coding-assistant">
-<h1>NemoClaw Agent Skills for Your AI Coding Assistant<a class="headerlink" href="#nemoclaw-agent-skills-for-your-ai-coding-assistant" title="Link to this heading">#</a></h1>
-<p>NemoClaw ships agent skills that are generated directly from this documentation.
-Each skill is a converted version of one or more doc pages, structured so AI coding assistants can consume it as context.
-This means you can interact with the full NemoClaw documentation as skills inside your agent chat session, instead of reading the docs separately.</p>
-<p>Ask your assistant a question about NemoClaw and it responds with the same guidance found in these docs, adapted to your current situation.
-Skills cover installation, inference configuration, network policy management, monitoring, deployment, security, workspace management, and the CLI reference.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>If you are a contributor and have cloned the full NemoClaw repository, the full set of skills including contributor and maintainer skills are already available at the project root.
-Open the <code class="docutils literal notranslate"><span class="pre">NemoClaw</span></code> directory in your coding assistant and the skills load automatically.
-This page is for users who installed NemoClaw with the installer and do not have a local clone.</p>
+<section class="tex2jax_ignore mathjax_ignore" id="messaging-channels">
+<h1>Messaging Channels<a class="headerlink" href="#messaging-channels" title="Link to this heading">#</a></h1>
+<p>Telegram, Discord, and Slack reach your agent through OpenShell-managed processes and gateway constructs.
+NemoClaw registers channel tokens with OpenShell providers, bakes the selected channel configuration into the sandbox image, and keeps runtime delivery under OpenShell control.</p>
+<p>You can enable channels during <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span></code> or add them later with host-side <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;sandbox&gt;</span> <span class="pre">channels</span></code> commands.
+Do not run <code class="docutils literal notranslate"><span class="pre">openclaw</span> <span class="pre">channels</span> <span class="pre">add</span></code> or <code class="docutils literal notranslate"><span class="pre">openclaw</span> <span class="pre">channels</span> <span class="pre">remove</span></code> inside the sandbox because <code class="docutils literal notranslate"><span class="pre">/sandbox/.openclaw/openclaw.json</span></code> is generated at image build time and changes inside the running container do not persist across rebuilds.</p>
+<p><code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">tunnel</span> <span class="pre">start</span></code> does not start Telegram, Discord, Slack, or other chat bridges.
+It only starts optional host services such as the cloudflared tunnel when that binary is present. (<code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">start</span></code> is kept as a deprecated alias.)
+For details, refer to <a class="reference internal" href="../reference/commands.html"><span class="std std-doc">Commands</span></a>.</p>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>A machine where you can run <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span></code> (local or remote host that runs the gateway and sandbox).</p></li>
+<li><p>A token for each messaging platform you want to enable.</p></li>
+<li><p>A network policy preset for each enabled channel, or equivalent custom egress rules.</p></li>
+</ul>
+</section>
+<section id="channel-requirements">
+<h2>Channel Requirements<a class="headerlink" href="#channel-requirements" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Channel</p></th>
+<th class="head"><p>Required tokens</p></th>
+<th class="head"><p>Optional settings</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Telegram</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TELEGRAM_BOT_TOKEN</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TELEGRAM_ALLOWED_IDS</span></code> for DM allowlisting, <code class="docutils literal notranslate"><span class="pre">TELEGRAM_REQUIRE_MENTION</span></code> for group-chat replies</p></td>
+</tr>
+<tr class="row-odd"><td><p>Discord</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DISCORD_BOT_TOKEN</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DISCORD_SERVER_ID</span></code>, <code class="docutils literal notranslate"><span class="pre">DISCORD_USER_ID</span></code>, <code class="docutils literal notranslate"><span class="pre">DISCORD_REQUIRE_MENTION</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Slack</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SLACK_BOT_TOKEN</span></code>, <code class="docutils literal notranslate"><span class="pre">SLACK_APP_TOKEN</span></code></p></td>
+<td><p>None</p></td>
+</tr>
+</tbody>
+</table>
 </div>
-<section id="get-the-skills">
-<h2>Get the Skills<a class="headerlink" href="#get-the-skills" title="Link to this heading">#</a></h2>
-<p>Fetch only the skills from the NemoClaw repository without downloading the full source tree.</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>git<span class="w"> </span>clone<span class="w"> </span>--filter<span class="o">=</span>blob:none<span class="w"> </span>--no-checkout<span class="w"> </span>https://github.com/NVIDIA/NemoClaw.git
-<span class="gp">$ </span><span class="nb">cd</span><span class="w"> </span>NemoClaw
-<span class="gp">$ </span>git<span class="w"> </span>sparse-checkout<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--no-cone<span class="w"> </span><span class="s1">&#39;/.agents/skills/nemoclaw-user-*/**&#39;</span><span class="w"> </span><span class="s1">&#39;/.agents/skills/nemoclaw-skills-guide/**&#39;</span><span class="w"> </span><span class="s1">&#39;/.claude/**&#39;</span><span class="w"> </span><span class="s1">&#39;/AGENTS.md&#39;</span><span class="w"> </span><span class="s1">&#39;/CLAUDE.md&#39;</span>
-<span class="gp">$ </span>git<span class="w"> </span>checkout
+<p>Telegram uses a bot token from <a class="reference external" href="https://t.me/BotFather" rel="noreferer noopener" target="_blank">BotFather</a>.
+Open Telegram, send <code class="docutils literal notranslate"><span class="pre">/newbot</span></code> to <a class="reference external" href="https://t.me/BotFather" rel="noreferer noopener" target="_blank">&#64;BotFather</a>, follow the prompts, and copy the token.
+<code class="docutils literal notranslate"><span class="pre">TELEGRAM_ALLOWED_IDS</span></code> is a comma-separated list of Telegram user IDs for DM access.
+Group chats stay open by default so rebuilt sandboxes do not silently drop Telegram group messages because of an empty group allowlist.
+Set <code class="docutils literal notranslate"><span class="pre">TELEGRAM_REQUIRE_MENTION=1</span></code> to make the bot reply in Telegram groups only when users mention it.
+Pairing and <code class="docutils literal notranslate"><span class="pre">TELEGRAM_ALLOWED_IDS</span></code> still govern direct messages.</p>
+<p>Discord uses a bot token from the Discord Developer Portal.
+For server channels, enable Developer Mode in Discord, right-click the server, and copy the Server ID into <code class="docutils literal notranslate"><span class="pre">DISCORD_SERVER_ID</span></code>.
+By default, NemoClaw configures the bot to reply only when mentioned.
+Set <code class="docutils literal notranslate"><span class="pre">DISCORD_REQUIRE_MENTION=0</span></code> if you want it to reply to all messages in the configured server.
+Set <code class="docutils literal notranslate"><span class="pre">DISCORD_USER_ID</span></code> to restrict access to one user; otherwise, any member of the configured server can message the bot.</p>
+<p>Slack uses Socket Mode and requires two tokens.
+Use <code class="docutils literal notranslate"><span class="pre">SLACK_BOT_TOKEN</span></code> for the bot user OAuth token (<code class="docutils literal notranslate"><span class="pre">xoxb-...</span></code>) and <code class="docutils literal notranslate"><span class="pre">SLACK_APP_TOKEN</span></code> for the app-level Socket Mode token (<code class="docutils literal notranslate"><span class="pre">xapp-...</span></code>).</p>
+</section>
+<section id="enable-channels-during-onboarding">
+<h2>Enable Channels During Onboarding<a class="headerlink" href="#enable-channels-during-onboarding" title="Link to this heading">#</a></h2>
+<p>When the wizard reaches <strong>Messaging channels</strong>, it lists Telegram, Discord, and Slack.
+Press a channel number to toggle it on or off, then press <strong>Enter</strong> when done.
+If a token is not already in the environment or credential store, the wizard prompts for it and saves it.</p>
+<p>For scripted setup, export the credentials and optional settings for the channels you want to enable before you run onboarding:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">TELEGRAM_BOT_TOKEN</span><span class="o">=</span>&lt;your-bot-token&gt;
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">TELEGRAM_REQUIRE_MENTION</span><span class="o">=</span><span class="m">1</span>
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">DISCORD_BOT_TOKEN</span><span class="o">=</span>&lt;your-discord-bot-token&gt;
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">DISCORD_SERVER_ID</span><span class="o">=</span>&lt;your-discord-server-id&gt;
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">SLACK_BOT_TOKEN</span><span class="o">=</span>&lt;your-slack-bot-token&gt;
+<span class="gp">$ </span><span class="nb">export</span><span class="w"> </span><span class="nv">SLACK_APP_TOKEN</span><span class="o">=</span>&lt;your-slack-app-token&gt;
 </pre></div>
 </div>
-<p>Open the <code class="docutils literal notranslate"><span class="pre">NemoClaw</span></code> directory in your AI coding assistant.
-The assistant discovers the skills in <code class="docutils literal notranslate"><span class="pre">.agents/skills/</span></code> and uses them to answer NemoClaw questions with project-specific guidance.</p>
-<p>You can keep the skills inside the cloned directory or copy <code class="docutils literal notranslate"><span class="pre">.agents/skills/</span></code> to a global location (such as <code class="docutils literal notranslate"><span class="pre">~/.cursor/skills/</span></code> or <code class="docutils literal notranslate"><span class="pre">~/.claude/skills/</span></code>) so they are available across all your projects.
-The choice depends on whether you want NemoClaw skills scoped to one workspace or accessible everywhere.</p>
+<p>Then run onboarding:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>onboard
+</pre></div>
+</div>
+<p>Complete the rest of the wizard so the blueprint can create OpenShell providers (for example <code class="docutils literal notranslate"><span class="pre">&lt;sandbox&gt;-telegram-bridge</span></code>), bake channel configuration into the image (<code class="docutils literal notranslate"><span class="pre">NEMOCLAW_MESSAGING_CHANNELS_B64</span></code>), and start the sandbox.</p>
 </section>
-<section id="update-the-skills">
-<h2>Update the Skills<a class="headerlink" href="#update-the-skills" title="Link to this heading">#</a></h2>
-<p>The sparse checkout filter is saved, so <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">pull</span></code> fetches only updated skills without downloading the full source tree.
-Run <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">pull</span></code> after each NemoClaw release to pick up new and updated skills.</p>
-</section>
-<section id="available-skills">
-<h2>Available Skills<a class="headerlink" href="#available-skills" title="Link to this heading">#</a></h2>
-<p>The following user skills ship with NemoClaw.</p>
-<div class="pst-scrollable-table-container"><table class="table">
-<thead>
-<tr class="row-odd"><th class="head"><p>Skill</p></th>
-<th class="head"><p>Summary</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-overview</span></code></p></td>
-<td><p>What NemoClaw is, ecosystem placement (OpenClaw + OpenShell + NemoClaw), how it works internally, and release notes.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-get-started</span></code></p></td>
-<td><p>Install NemoClaw, launch a sandbox, and run the first agent prompt.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-configure-inference</span></code></p></td>
-<td><p>Choose inference providers during onboarding, switch models without restarting, and set up local inference servers (Ollama, vLLM, TensorRT-LLM, NIM).</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-manage-policy</span></code></p></td>
-<td><p>Approve or deny blocked egress requests in the TUI and customize the sandbox network policy (add, remove, or modify allowed endpoints).</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-monitor-sandbox</span></code></p></td>
-<td><p>Check sandbox health, read logs, and trace agent behavior to diagnose problems.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-deploy-remote</span></code></p></td>
-<td><p>Deploy NemoClaw to a remote GPU instance, set up the Telegram bridge, and review sandbox container hardening.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-configure-security</span></code></p></td>
-<td><p>Review the risk framework for every configurable security control, understand credential storage, and assess posture trade-offs.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-workspace</span></code></p></td>
-<td><p>Back up and restore OpenClaw workspace files (soul.md, identity.md, memory.md, agents.md) and understand file persistence across sandbox restarts.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-reference</span></code></p></td>
-<td><p>CLI command reference, plugin and blueprint architecture, baseline network policies, and troubleshooting guide.</p></td>
-</tr>
-</tbody>
-</table>
+<section id="add-channels-after-onboarding">
+<h2>Add Channels After Onboarding<a class="headerlink" href="#add-channels-after-onboarding" title="Link to this heading">#</a></h2>
+<p>Run channel commands from the host, not from inside the sandbox.
+Use <code class="docutils literal notranslate"><span class="pre">channels</span> <span class="pre">list</span></code> to see the supported channel names:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>channels<span class="w"> </span>list
+</pre></div>
+</div>
+<p>Add the channel you want:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>channels<span class="w"> </span>add<span class="w"> </span>telegram
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>channels<span class="w"> </span>add<span class="w"> </span>discord
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>channels<span class="w"> </span>add<span class="w"> </span>slack
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">channels</span> <span class="pre">add</span></code> prompts for missing credentials, registers the bridge with the OpenShell gateway, updates the sandbox registry, and asks whether to rebuild immediately.
+Choose the rebuild so the running sandbox image picks up the new channel.
+If you need optional channel settings such as <code class="docutils literal notranslate"><span class="pre">TELEGRAM_ALLOWED_IDS</span></code>, <code class="docutils literal notranslate"><span class="pre">TELEGRAM_REQUIRE_MENTION</span></code>, <code class="docutils literal notranslate"><span class="pre">DISCORD_SERVER_ID</span></code>, <code class="docutils literal notranslate"><span class="pre">DISCORD_USER_ID</span></code>, or <code class="docutils literal notranslate"><span class="pre">DISCORD_REQUIRE_MENTION</span></code>, export them before the rebuild starts.
+If you defer the rebuild, apply the change later:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>rebuild
+</pre></div>
+</div>
+<p>In non-interactive mode, set the required environment variables before running <code class="docutils literal notranslate"><span class="pre">channels</span> <span class="pre">add</span></code>.
+Missing credentials fail fast, and the command queues the change for a manual rebuild:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nv">NEMOCLAW_NON_INTERACTIVE</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">TELEGRAM_BOT_TOKEN</span><span class="o">=</span>&lt;your-bot-token&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>channels<span class="w"> </span>add<span class="w"> </span>telegram
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>rebuild
+</pre></div>
+</div>
+<p>For Discord server access after onboarding, include the server settings when you add the channel and rebuild:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nv">DISCORD_BOT_TOKEN</span><span class="o">=</span>&lt;your-discord-bot-token&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">DISCORD_SERVER_ID</span><span class="o">=</span>&lt;your-discord-server-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">DISCORD_REQUIRE_MENTION</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>channels<span class="w"> </span>add<span class="w"> </span>discord
+</pre></div>
 </div>
 </section>
-<section id="example-questions-and-triggered-skills">
-<h2>Example Questions and Triggered Skills<a class="headerlink" href="#example-questions-and-triggered-skills" title="Link to this heading">#</a></h2>
-<p>After opening the cloned repository in your coding assistant, ask a NemoClaw question in natural language.
-The assistant matches your question to the relevant skill and follows the guidance it contains.</p>
-<p>Examples of questions your assistant can answer with these skills:</p>
-<div class="pst-scrollable-table-container"><table class="table">
-<thead>
-<tr class="row-odd"><th class="head"><p>Question</p></th>
-<th class="head"><p>Skill triggered</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>“How do I install NemoClaw?”</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-get-started</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p>“Switch my inference provider to Ollama.”</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-configure-inference</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p>“A network request was blocked. How do I approve it?”</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-manage-policy</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p>“Show me the sandbox logs.”</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-monitor-sandbox</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p>“How do I deploy NemoClaw to a remote GPU?”</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-deploy-remote</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p>“What security controls can I configure?”</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-configure-security</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p>“Back up my agent workspace files.”</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-workspace</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p>“What CLI commands are available?”</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">nemoclaw-user-reference</span></code></p></td>
-</tr>
-</tbody>
-</table>
+<section id="rotate-or-remove-credentials">
+<h2>Rotate or Remove Credentials<a class="headerlink" href="#rotate-or-remove-credentials" title="Link to this heading">#</a></h2>
+<p>Running <code class="docutils literal notranslate"><span class="pre">channels</span> <span class="pre">add</span></code> for a channel that is already configured overwrites the stored tokens and registers the updated bridge provider.
+Rebuild the sandbox after the update so the image reflects the current channel set.</p>
+<p>To remove a channel and clear its stored credentials, run:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>channels<span class="w"> </span>remove<span class="w"> </span>telegram
+</pre></div>
 </div>
-<p>You can also reference a skill directly by name if you know which one you need.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">channels</span> <span class="pre">stop</span></code> when you want to pause a bridge without deleting credentials:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>channels<span class="w"> </span>stop<span class="w"> </span>telegram
+<span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>channels<span class="w"> </span>start<span class="w"> </span>telegram
+</pre></div>
+</div>
+<p>Telegram, Discord, and Slack each allow only one active consumer per bot token.
+If you enable a messaging channel and another sandbox already uses the same token, onboarding prompts you to confirm before continuing in interactive mode and exits non-zero in non-interactive mode.
+<code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">status</span></code> reports cross-sandbox overlaps so you can resolve duplicates before messages start dropping.</p>
 </section>
-<section id="ai-coding-assistants-that-you-can-use-with-nemoclaw-skills">
-<h2>AI Coding Assistants that You Can Use with NemoClaw Skills<a class="headerlink" href="#ai-coding-assistants-that-you-can-use-with-nemoclaw-skills" title="Link to this heading">#</a></h2>
-<p>The NemoClaw agent skills follow the <a class="reference external" href="https://agentskills.io/skill-creation/best-practices" rel="noreferer noopener" target="_blank">Agent Skills best practices</a> and the <a class="reference external" href="https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices" rel="noreferer noopener" target="_blank">Claude Skills best practices</a>.
-The following table shows how each AI coding assistant can use the NemoClaw skills.</p>
-<div class="pst-scrollable-table-container"><table class="table">
-<thead>
-<tr class="row-odd"><th class="head"><p>Assistant</p></th>
-<th class="head"><p>Skill discovery</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>Cursor</p></td>
-<td><p>Reads <code class="docutils literal notranslate"><span class="pre">AGENTS.md</span></code> at the project root, which references <code class="docutils literal notranslate"><span class="pre">.agents/skills/</span></code>.</p></td>
-</tr>
-<tr class="row-odd"><td><p>Claude Code</p></td>
-<td><p>Follows the <code class="docutils literal notranslate"><span class="pre">.claude/skills/</span></code> symlink, which points to <code class="docutils literal notranslate"><span class="pre">.agents/skills/</span></code>.</p></td>
-</tr>
-<tr class="row-even"><td><p>Other assistants</p></td>
-<td><p>Point the assistant to <code class="docutils literal notranslate"><span class="pre">.agents/skills/</span></code> if it supports project-level skill loading.</p></td>
-</tr>
-</tbody>
-</table>
+<section id="stop-messaging-delivery">
+<h2>Stop Messaging Delivery<a class="headerlink" href="#stop-messaging-delivery" title="Link to this heading">#</a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">channels</span> <span class="pre">stop</span></code> when you want to pause one bridge and keep the sandbox running.
+Use <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">tunnel</span> <span class="pre">stop</span></code> or its deprecated alias <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">stop</span></code> when you want to stop host auxiliary services and also ask NemoClaw to stop the OpenClaw gateway inside the selected sandbox.
+Stopping the in-sandbox gateway stops Telegram, Discord, and Slack polling for that sandbox until you restart the sandbox or gateway.</p>
+</section>
+<section id="confirm-delivery">
+<h2>Confirm Delivery<a class="headerlink" href="#confirm-delivery" title="Link to this heading">#</a></h2>
+<p>After the sandbox is running, send a message to the configured bot or app.
+If delivery fails, use <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">term</span></code> on the host, check gateway logs, and verify network policy allows the channel API.
+Use the matching policy preset (<code class="docutils literal notranslate"><span class="pre">telegram</span></code>, <code class="docutils literal notranslate"><span class="pre">discord</span></code>, or <code class="docutils literal notranslate"><span class="pre">slack</span></code>) or review <a class="reference internal" href="../network-policy/customize-network-policy.html"><span class="std std-doc">Customize the Network Policy</span></a>.</p>
+</section>
+<section id="tunnel-command">
+<h2>Tunnel Command<a class="headerlink" href="#tunnel-command" title="Link to this heading">#</a></h2>
+<p>When the host has <code class="docutils literal notranslate"><span class="pre">cloudflared</span></code>, <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">tunnel</span> <span class="pre">start</span></code> starts a cloudflared tunnel that can expose the dashboard with a public URL.
+<code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">tunnel</span> <span class="pre">stop</span></code> stops the tunnel and asks NemoClaw to stop the in-sandbox gateway for the selected or default sandbox.
+The older <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">start</span></code> still works as a deprecated alias.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>tunnel<span class="w"> </span>start
+</pre></div>
 </div>
+</section>
+<section id="related-topics">
+<h2>Related Topics<a class="headerlink" href="#related-topics" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../deployment/deploy-to-remote-gpu.html"><span class="std std-doc">Deploy NemoClaw to a Remote GPU Instance</span></a> for remote deployment with messaging.</p></li>
+<li><p><a class="reference internal" href="../reference/architecture.html"><span class="std std-doc">Architecture</span></a> for how providers, the gateway, and the sandbox fit together.</p></li>
+<li><p><a class="reference internal" href="../reference/commands.html"><span class="std std-doc">Commands</span></a> for <code class="docutils literal notranslate"><span class="pre">channels</span> <span class="pre">add</span></code>, <code class="docutils literal notranslate"><span class="pre">channels</span> <span class="pre">remove</span></code>, <code class="docutils literal notranslate"><span class="pre">channels</span> <span class="pre">start</span></code>, <code class="docutils literal notranslate"><span class="pre">channels</span> <span class="pre">stop</span></code>, <code class="docutils literal notranslate"><span class="pre">tunnel</span> <span class="pre">start</span></code>, <code class="docutils literal notranslate"><span class="pre">tunnel</span> <span class="pre">stop</span></code>, and <code class="docutils literal notranslate"><span class="pre">status</span></code>.</p></li>
+</ul>
 </section>
 </section>
 
@@ -652,20 +671,20 @@ The following table shows how each AI coding assistant can use the NemoClaw skil
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="../reference/troubleshooting.html"
+       href="lifecycle.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Troubleshooting</p>
+        <p class="prev-next-title">Manage Sandbox Lifecycle</p>
       </div>
     </a>
     <a class="right-next"
-       href="license.html"
+       href="workspace-files.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">License</p>
+        <p class="prev-next-title">Workspace Files</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -690,11 +709,15 @@ The following table shows how each AI coding assistant can use the NemoClaw skil
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#get-the-skills">Get the Skills</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#update-the-skills">Update the Skills</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#available-skills">Available Skills</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#example-questions-and-triggered-skills">Example Questions and Triggered Skills</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#ai-coding-assistants-that-you-can-use-with-nemoclaw-skills">AI Coding Assistants that You Can Use with NemoClaw Skills</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#prerequisites">Prerequisites</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#channel-requirements">Channel Requirements</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#enable-channels-during-onboarding">Enable Channels During Onboarding</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#add-channels-after-onboarding">Add Channels After Onboarding</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#rotate-or-remove-credentials">Rotate or Remove Credentials</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#stop-messaging-delivery">Stop Messaging Delivery</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#confirm-delivery">Confirm Delivery</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#tunnel-command">Tunnel Command</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#related-topics">Related Topics</a></li>
 </ul>
   </nav></div>
 
