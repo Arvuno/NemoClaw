@@ -168,7 +168,7 @@ describe("nemoclaw-start non-root fallback", () => {
       "set -euo pipefail",
       `_read_gateway_token() { printf "${token}\\n"; }`,
       'PUBLIC_PORT="19000"',
-      'CHAT_UI_URL="https://remote.example.test/ui"',
+      `CHAT_UI_URL="https://remote.example.test/ui/#token=${token}"`,
       startScriptLine(src, "echo 'Setting up NemoClaw...'"),
       extractShellFunctionFromSource(src, "print_dashboard_urls"),
       "print_dashboard_urls",

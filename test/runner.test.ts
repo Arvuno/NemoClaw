@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
-import { runCapture } from "../dist/lib/runner";
+import { redact, runCapture } from "../dist/lib/runner";
 
 const runnerPath = path.join(import.meta.dirname, "..", "dist", "lib", "runner.js");
 
@@ -377,7 +377,6 @@ describe("redact", () => {
   });
 
   it("masks dashboard URL hash tokens", () => {
-    const { redact } = require(runnerPath);
     const token = "a".repeat(64);
     const output = redact(`http://127.0.0.1:18789/#token=${token}`);
     expect(output).toBe("http://127.0.0.1:18789/#token=aaaa********************");

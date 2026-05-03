@@ -1159,7 +1159,8 @@ print_dashboard_urls() {
 
   token="$(_read_gateway_token)"
 
-  chat_ui_base="${CHAT_UI_URL%/}"
+  chat_ui_base="${CHAT_UI_URL%%#*}"
+  chat_ui_base="${chat_ui_base%/}"
   local_url="http://127.0.0.1:${PUBLIC_PORT}/"
   remote_url="${chat_ui_base}/"
 
