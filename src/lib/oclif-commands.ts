@@ -109,7 +109,7 @@ export default {
   status: StatusCommand,
   start: DeprecatedStartCommand,
   stop: DeprecatedStopCommand,
-  "sandbox:gateway-token": GatewayTokenCliCommand,
+  "sandbox:gateway:token": GatewayTokenCliCommand,
   "tunnel:start": TunnelStartCommand,
   "tunnel:stop": TunnelStopCommand,
   gc: GarbageCollectImagesCommand,

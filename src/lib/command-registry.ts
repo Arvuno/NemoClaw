@@ -191,7 +191,7 @@ export const COMMANDS: readonly CommandDef[] = [
   },
   {
     usage: "nemoclaw <name> gateway-token",
-    commandId: "sandbox:gateway-token",
+    commandId: "sandbox:gateway:token",
     description: "Print the OpenClaw gateway auth token to stdout",
     flags: "[--quiet|-q]",
     group: "Sandbox Management",

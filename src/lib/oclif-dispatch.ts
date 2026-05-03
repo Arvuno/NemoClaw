@@ -95,7 +95,7 @@ const FLAT_SANDBOX_ROUTES: Readonly<Record<string, FlatSandboxRoute>> = {
   "policy-list": { commandId: "sandbox:policy:list", helpUsage: "policy-list" },
   destroy: { commandId: "sandbox:destroy", helpUsage: "destroy [--yes|-y|--force]" },
   "gateway-token": {
-    commandId: "sandbox:gateway-token",
+    commandId: "sandbox:gateway:token",
     helpUsage: "gateway-token [--quiet|-q]",
   },
   rebuild: {
