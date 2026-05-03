@@ -573,7 +573,8 @@ This does not delete downloaded model files.</p>
 </div>
 <p>If <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_MODEL</span></code> is not set, NemoClaw selects a default model based on available memory.</p>
 <p><code class="docutils literal notranslate"><span class="pre">--yes</span></code> (or <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_YES=1</span></code>) authorises the Ollama model download without an interactive confirmation prompt.
-Omit it for an interactive <code class="docutils literal notranslate"><span class="pre">[y/N]</span></code> prompt that shows the model size before downloading.</p>
+Under <code class="docutils literal notranslate"><span class="pre">--non-interactive</span></code>, <code class="docutils literal notranslate"><span class="pre">--yes</span></code> (or <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_YES=1</span></code>) is required to authorise the download — onboard exits otherwise, since it cannot prompt.
+Run onboard without <code class="docutils literal notranslate"><span class="pre">--non-interactive</span></code> to get the interactive <code class="docutils literal notranslate"><span class="pre">[y/N]</span></code> prompt that shows the model size before downloading.</p>
 <div class="pst-scrollable-table-container"><table class="table">
 <thead>
 <tr class="row-odd"><th class="head"><p>Variable</p></th>
