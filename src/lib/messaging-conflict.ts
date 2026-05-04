@@ -12,7 +12,7 @@
 // added have no record — can optionally backfill the field by probing the live
 // OpenShell gateway for known provider names.
 
-import type { SandboxEntry } from "./registry";
+import type { SandboxEntry } from "./state/registry";
 
 type ProbeResult = "present" | "absent" | "error";
 

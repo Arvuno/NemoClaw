@@ -22,7 +22,7 @@ const { ROOT, validateName } = require("./lib/runner");
 // otherwise the branding module falls back to the OpenClaw defaults.
 // ---------------------------------------------------------------------------
 const { CLI_NAME } = require("./lib/branding");
-const registry = require("./lib/registry");
+const registry = require("./lib/state/registry");
 const nim = require("./lib/nim");
 const shields = require("./lib/shields");
 const { help, version } = require("./lib/actions/root-help");

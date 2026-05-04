@@ -4,7 +4,7 @@
 /* v8 ignore start -- exercised through CLI subprocess status tests. */
 
 import { CLI_DISPLAY_NAME, CLI_NAME } from "../../branding";
-import { parseSandboxPhase } from "../../gateway-state";
+import { parseSandboxPhase } from "../../state/gateway";
 import { getNamedGatewayLifecycleState } from "../../gateway-runtime-action";
 import { probeProviderHealth } from "../../inference-health";
 import { parseGatewayInference } from "../../inference-config";
@@ -15,7 +15,7 @@ import {
   captureOpenshellForStatus,
   isCommandTimeout,
 } from "../../adapters/openshell/runtime";
-import * as registry from "../../registry";
+import * as registry from "../../state/registry";
 import {
   getReconciledSandboxGatewayState,
   getSandboxGatewayStateForStatus,
@@ -26,7 +26,7 @@ import { isSandboxGatewayRunningForStatus } from "./process-recovery";
 import {
   createSystemDeps as createSessionDeps,
   getActiveSandboxSessions,
-} from "../../sandbox-session-state";
+} from "../../state/sandbox-session";
 import * as sandboxVersion from "../../sandbox-version";
 import * as shields from "../../shields";
 import { resolveOpenshell } from "../../adapters/openshell/resolve";
