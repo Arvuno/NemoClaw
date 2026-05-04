@@ -29,6 +29,28 @@ describe("resolveSandboxOclifDispatch", () => {
     });
   });
 
+  it("keeps sandbox logs help public with supported filters", () => {
+    expect(resolveSandboxOclifDispatch("alpha", "logs", ["--help"])).toEqual({
+      kind: "help",
+      usage: "logs [--follow] [--tail <lines>|-n <lines>] [--since <duration>]",
+    });
+  });
+
+  it("routes sandbox recover through oclif", () => {
+    expect(resolveSandboxOclifDispatch("alpha", "recover", [])).toEqual({
+      kind: "oclif",
+      commandId: "sandbox:recover",
+      args: ["alpha"],
+    });
+  });
+
+  it("returns help for sandbox recover", () => {
+    expect(resolveSandboxOclifDispatch("alpha", "recover", ["--help"])).toEqual({
+      kind: "help",
+      usage: "recover",
+    });
+  });
+
   it("routes policy-add missing-value errors through a raw oclif adapter", () => {
     expect(resolveSandboxOclifDispatch("alpha", "policy-add", ["--from-file"])).toEqual({
       kind: "oclif",

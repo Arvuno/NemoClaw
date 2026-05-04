@@ -35,6 +35,7 @@ import {
   PolicyRemoveCommand,
 } from "./policy-mutate-cli-commands";
 import RebuildCliCommand from "./rebuild-cli-command";
+import RecoverCliCommand from "./recover-cli-command";
 import SandboxDoctorCliCommand from "./sandbox-doctor-cli-command";
 import {
   SandboxChannelsListCommand,
@@ -91,6 +92,7 @@ export default {
   "sandbox:policy-list": SandboxPolicyListCommand,
   "sandbox:policy-remove": PolicyRemoveCommand,
   "sandbox:rebuild": RebuildCliCommand,
+  "sandbox:recover": RecoverCliCommand,
   "sandbox:shields:down": ShieldsDownCommand,
   "sandbox:shields:status": ShieldsStatusCommand,
   "sandbox:shields:up": ShieldsUpCommand,
