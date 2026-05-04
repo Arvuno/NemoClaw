@@ -39,7 +39,10 @@ export async function destroySandbox(sandboxName: string, args: string[] = []): 
 }
 
 export async function rebuildSandbox(sandboxName: string, args: string[] = []): Promise<void> {
-  await getNemoClawRuntimeBridge().sandboxRebuild(sandboxName, args);
+  const { rebuildSandbox: rebuildExtractedSandbox } = require("./sandbox-rebuild-action") as {
+    rebuildSandbox: (sandboxName: string, args?: string[]) => Promise<void>;
+  };
+  await rebuildExtractedSandbox(sandboxName, args);
 }
 
 export async function installSandboxSkill(
