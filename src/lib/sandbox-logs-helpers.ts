@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+/* v8 ignore start -- pure helper tests exercise this module; orchestration coverage still runs through dist. */
+
 import os from "node:os";
 
 import type { SandboxLogsOptions } from "./sandbox-logs-options";
@@ -82,3 +84,5 @@ export function buildSandboxLogsArgs(sandboxName: string, options: SandboxLogsOp
   }
   return args;
 }
+
+/* v8 ignore stop */
