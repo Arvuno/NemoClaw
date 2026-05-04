@@ -737,8 +737,11 @@ You no longer need to re-run <code class="docutils literal notranslate"><span cl
 </section>
 <section id="nemoclaw-name-recover">
 <h3><code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">recover</span></code><a class="headerlink" href="#nemoclaw-name-recover" title="Link to this heading">#</a></h3>
-<p>Restart the in-sandbox gateway and re-establish the host-side dashboard port-forward without opening an SSH session. Use this after a sandbox pod restart, a sandbox crash, or whenever <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">status</span></code> reports the gateway is not running but the sandbox is alive.</p>
-<p><code class="docutils literal notranslate"><span class="pre">recover</span></code> runs the same recovery the <code class="docutils literal notranslate"><span class="pre">connect</span></code> command performs as a side-effect, but without dropping into a shell, so it is safe to call from scripts and automation. It is idempotent: if the gateway is already running, the command exits zero with a probe message and makes no changes.</p>
+<p>Restart the in-sandbox gateway and re-establish the host-side dashboard port-forward without opening an SSH session.
+Use this after a sandbox pod restart, a sandbox crash, or whenever <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">status</span></code> reports the gateway is not running but the sandbox is alive.</p>
+<p><code class="docutils literal notranslate"><span class="pre">recover</span></code> runs the same recovery the <code class="docutils literal notranslate"><span class="pre">connect</span></code> command performs as a side effect, but without dropping into a shell, so it is safe to call from scripts and automation.
+It is idempotent.
+If the gateway is already running, the command exits zero with a probe message and makes no changes.</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>my-assistant<span class="w"> </span>recover
 </pre></div>
 </div>

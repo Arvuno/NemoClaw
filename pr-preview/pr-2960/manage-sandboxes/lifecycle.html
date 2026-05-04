@@ -596,11 +596,13 @@ When the default port is already held by another sandbox, <code class="docutils 
 </section>
 <section id="restart-the-gateway-and-port-forward">
 <h3>Restart the Gateway and Port Forward<a class="headerlink" href="#restart-the-gateway-and-port-forward" title="Link to this heading">#</a></h3>
-<p>If <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">status</span></code> reports the sandbox is alive but the gateway is not running, run the recover command instead of opening a shell:</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">status</span></code> reports the sandbox is alive but the gateway is not running, run the recover command instead of opening a shell.</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>&lt;sandbox-name&gt;<span class="w"> </span>recover
 </pre></div>
 </div>
-<p>The command restarts the in-sandbox gateway and re-establishes the dashboard port-forward in one step. It is idempotent and safe to script. Refer to <a class="reference internal" href="../reference/commands.html#nemoclaw-name-recover"><span class="std std-ref"><code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">recover</span></code></span></a> for details.</p>
+<p>The command restarts the in-sandbox gateway and re-establishes the dashboard port-forward in one step.
+It is idempotent and safe to script.
+Refer to <a class="reference internal" href="../reference/commands.html#nemoclaw-name-recover"><span class="std std-ref"><code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">recover</span></code></span></a> for details.</p>
 </section>
 <section id="reset-a-stored-credential">
 <h3>Reset a Stored Credential<a class="headerlink" href="#reset-a-stored-credential" title="Link to this heading">#</a></h3>
