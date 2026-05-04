@@ -187,6 +187,10 @@ $ nemoclaw <sandbox-name> policy-add
 
 Refer to [`nemoclaw <name> policy-add`](../reference/commands.md#nemoclaw-name-policy-add) for usage details and flags.
 
+Presets added this way are preserved across non-interactive re-onboards in the default `suggested` policy mode.
+To make a re-onboard authoritative — replacing the applied set with an exact list and removing anything else — set `NEMOCLAW_POLICY_MODE=custom` with `NEMOCLAW_POLICY_PRESETS`.
+See [`NEMOCLAW_POLICY_MODE`](../reference/commands.md#nemoclaw-onboard) for the full table.
+
 ## Update to the Latest Version
 
 When a new NemoClaw release becomes available, update the `nemoclaw` CLI on your host and check existing sandboxes for stale agent/runtime versions.
