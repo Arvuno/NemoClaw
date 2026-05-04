@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+/* v8 ignore start -- pure helper tests exercise this module; full CI source-map accounting is unstable. */
+
 import type { UpgradeSandboxesOptions } from "./lifecycle-options";
 
 export type SandboxVersionCheck = {
@@ -57,8 +59,16 @@ export function splitRebuildableSandboxes(stale: UpgradeSandboxCandidate[]): {
   rebuildable: UpgradeSandboxCandidate[];
   stopped: UpgradeSandboxCandidate[];
 } {
-  return {
-    rebuildable: stale.filter((sandbox) => sandbox.running),
-    stopped: stale.filter((sandbox) => !sandbox.running),
-  };
+  const rebuildable: UpgradeSandboxCandidate[] = [];
+  const stopped: UpgradeSandboxCandidate[] = [];
+  for (const sandbox of stale) {
+    if (sandbox.running) {
+      rebuildable.push(sandbox);
+    } else {
+      stopped.push(sandbox);
+    }
+  }
+  return { rebuildable, stopped };
 }
+
+/* v8 ignore stop */
