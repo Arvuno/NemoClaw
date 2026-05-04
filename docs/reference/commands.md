@@ -594,8 +594,7 @@ If another terminal has an active SSH session to the sandbox, `rebuild` prints a
 Pass `--yes` or `--force` to skip the prompt in scripted workflows.
 
 The sandbox must be running for the backup step to succeed.
-If some manifest-defined state paths cannot be archived, `rebuild` prints a partial backup warning and continues only when at least one requested directory or file was backed up.
-If nothing can be backed up, it exits before destroying the original sandbox.
+If any manifest-defined state path cannot be archived, `rebuild` reports the failed paths and exits before destroying the original sandbox.
 After restore, the command runs `openclaw doctor --fix` for cross-version structure repair.
 
 ### `nemoclaw upgrade-sandboxes`
