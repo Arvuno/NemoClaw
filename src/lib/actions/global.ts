@@ -1,23 +1,23 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { runDeployAction as executeDeployAction } from "./deploy-action";
+import { runDeployAction as executeDeployAction } from "./deploy";
 import {
   type GarbageCollectImagesOptions,
   type UpgradeSandboxesOptions,
-} from "./domain/lifecycle/options";
+} from "../domain/lifecycle/options";
 import {
   backupAll as executeBackupAllAction,
   garbageCollectImages as executeGarbageCollectImagesAction,
-} from "./maintenance-actions";
+} from "./maintenance";
 import {
   runOnboardAction as executeOnboardAction,
   runSetupAction as executeSetupAction,
   runSetupSparkAction as executeSetupSparkAction,
-} from "./onboard-action";
-import { recoverNamedGatewayRuntime as recoverNamedGatewayRuntimeAction } from "./gateway-runtime-action";
-import { runOpenshell } from "./adapters/openshell/runtime";
-import { help, version } from "./root-help-action";
+} from "./onboard";
+import { recoverNamedGatewayRuntime as recoverNamedGatewayRuntimeAction } from "../gateway-runtime-action";
+import { runOpenshell } from "../adapters/openshell/runtime";
+import { help, version } from "./root-help";
 
 type GatewayRecovery = { recovered: boolean };
 
@@ -62,7 +62,7 @@ export async function runUpgradeSandboxesAction(
     await runtimeHooks.upgradeSandboxes(options);
     return;
   }
-  const { upgradeSandboxes } = require("./upgrade-sandboxes-action") as {
+  const { upgradeSandboxes } = require("./upgrade-sandboxes") as {
     upgradeSandboxes: (options?: string[] | UpgradeSandboxesOptions) => Promise<void>;
   };
   await upgradeSandboxes(options);

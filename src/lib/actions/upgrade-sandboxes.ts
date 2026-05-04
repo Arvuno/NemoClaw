@@ -3,23 +3,23 @@
 
 /* v8 ignore start -- exercised through CLI subprocess upgrade tests. */
 
-import { CLI_NAME } from "./branding";
-import { prompt as askPrompt } from "./credentials";
+import { CLI_NAME } from "../branding";
+import { prompt as askPrompt } from "../credentials";
 import {
   normalizeUpgradeSandboxesOptions,
   type UpgradeSandboxesOptions,
-} from "./domain/lifecycle/options";
-import { captureOpenshell } from "./adapters/openshell/runtime";
-import * as registry from "./registry";
-import { parseLiveSandboxNames } from "./runtime-recovery";
-import { rebuildSandbox } from "./actions/sandbox/rebuild";
-import * as sandboxVersion from "./sandbox-version";
-import { B, D, G, R, YW } from "./terminal-style";
+} from "../domain/lifecycle/options";
+import { captureOpenshell } from "../adapters/openshell/runtime";
+import * as registry from "../registry";
+import { parseLiveSandboxNames } from "../runtime-recovery";
+import { rebuildSandbox } from "./sandbox/rebuild";
+import * as sandboxVersion from "../sandbox-version";
+import { B, D, G, R, YW } from "../terminal-style";
 import {
   classifyUpgradeableSandboxes,
   shouldSkipUpgradeConfirmation,
   splitRebuildableSandboxes,
-} from "./domain/maintenance/upgrade";
+} from "../domain/maintenance/upgrade";
 
 // ── Upgrade sandboxes (#1904) ────────────────────────────────────
 // Detect sandboxes running stale agent versions and offer to rebuild them.

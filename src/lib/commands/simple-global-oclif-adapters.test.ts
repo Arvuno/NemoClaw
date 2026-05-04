@@ -31,7 +31,7 @@ vi.mock("../debug-command", () => ({
 vi.mock("../gateway-token-command", () => ({
   runGatewayTokenCommand: mocks.runGatewayTokenCommand,
 }));
-vi.mock("../global-cli-actions", () => ({
+vi.mock("../actions/global", () => ({
   runDeployAction: mocks.runDeployAction,
   showRootHelp: mocks.showRootHelp,
   showVersion: mocks.showVersion,

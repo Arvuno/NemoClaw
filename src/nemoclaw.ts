@@ -25,7 +25,7 @@ const { CLI_NAME } = require("./lib/branding");
 const registry = require("./lib/registry");
 const nim = require("./lib/nim");
 const shields = require("./lib/shields");
-const { help, version } = require("./lib/root-help-action");
+const { help, version } = require("./lib/actions/root-help");
 const { recoverRegistryEntries } = require("./lib/registry-recovery-action");
 const {
   isSandboxConnectFlag,

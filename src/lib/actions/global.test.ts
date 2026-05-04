@@ -16,21 +16,21 @@ const mocks = vi.hoisted(() => ({
   version: vi.fn(),
 }));
 
-vi.mock("./deploy-action", () => ({ runDeployAction: mocks.runDeployAction }));
-vi.mock("./gateway-runtime-action", () => ({
+vi.mock("./deploy", () => ({ runDeployAction: mocks.runDeployAction }));
+vi.mock("../gateway-runtime-action", () => ({
   recoverNamedGatewayRuntime: mocks.recoverNamedGatewayRuntime,
 }));
-vi.mock("./maintenance-actions", () => ({
+vi.mock("./maintenance", () => ({
   backupAll: mocks.backupAll,
   garbageCollectImages: mocks.garbageCollectImages,
 }));
-vi.mock("./onboard-action", () => ({
+vi.mock("./onboard", () => ({
   runOnboardAction: mocks.runOnboardAction,
   runSetupAction: mocks.runSetupAction,
   runSetupSparkAction: mocks.runSetupSparkAction,
 }));
-vi.mock("./adapters/openshell/runtime", () => ({ runOpenshell: mocks.runOpenshell }));
-vi.mock("./root-help-action", () => ({ help: mocks.help, version: mocks.version }));
+vi.mock("../adapters/openshell/runtime", () => ({ runOpenshell: mocks.runOpenshell }));
+vi.mock("./root-help", () => ({ help: mocks.help, version: mocks.version }));
 
 import {
   recoverNamedGatewayRuntime,
@@ -45,7 +45,7 @@ import {
   setGlobalCliActionRuntimeHooksForTest,
   showRootHelp,
   showVersion,
-} from "./global-cli-actions";
+} from "./global";
 
 describe("global cli action facade", () => {
   beforeEach(() => {

@@ -3,17 +3,17 @@
 
 /* v8 ignore start -- exercised through CLI subprocess maintenance tests. */
 
-import { prompt as askPrompt } from "./credentials";
+import { prompt as askPrompt } from "../credentials";
 import {
   type GarbageCollectImagesOptions,
   normalizeGarbageCollectImagesOptions,
-} from "./domain/lifecycle/options";
-import { dockerListImagesFormat, dockerRmi } from "./docker";
-import { findOrphanedSandboxImages, parseSandboxImageRows } from "./domain/maintenance/images";
-import { captureOpenshell } from "./adapters/openshell/runtime";
-import * as registry from "./registry";
-import { parseLiveSandboxNames } from "./runtime-recovery";
-import * as sandboxState from "./sandbox-state";
+} from "../domain/lifecycle/options";
+import { dockerListImagesFormat, dockerRmi } from "../docker";
+import { findOrphanedSandboxImages, parseSandboxImageRows } from "../domain/maintenance/images";
+import { captureOpenshell } from "../adapters/openshell/runtime";
+import * as registry from "../registry";
+import { parseLiveSandboxNames } from "../runtime-recovery";
+import * as sandboxState from "../sandbox-state";
 
 const useColor = !process.env.NO_COLOR && !!process.stdout.isTTY;
 const trueColor =

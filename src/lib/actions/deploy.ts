@@ -3,9 +3,9 @@
 
 import { execFileSync, spawnSync } from "node:child_process";
 
-import { getCredential } from "./credentials";
-import { executeDeploy } from "./deploy";
-import { ROOT, run, runInteractive, shellQuote, validateName } from "./runner";
+import { getCredential } from "../credentials";
+import { executeDeploy } from "../deploy";
+import { ROOT, run, runInteractive, shellQuote, validateName } from "../runner";
 
 export async function runDeployAction(instanceName?: string): Promise<void> {
   await executeDeploy({

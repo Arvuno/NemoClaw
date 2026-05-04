@@ -14,7 +14,7 @@ import {
 } from "../src/lib/actions/sandbox/destroy";
 import { getSandboxDeleteOutcome } from "../src/lib/domain/sandbox/destroy";
 import { normalizeGarbageCollectImagesOptions } from "../src/lib/domain/lifecycle/options";
-import { help as renderRootHelp } from "../src/lib/root-help-action";
+import { help as renderRootHelp } from "../src/lib/actions/root-help";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 
