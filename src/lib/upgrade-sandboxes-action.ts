@@ -12,7 +12,7 @@ import {
 import { captureOpenshell } from "./adapters/openshell/runtime";
 import * as registry from "./registry";
 import { parseLiveSandboxNames } from "./runtime-recovery";
-import { rebuildSandbox } from "./sandbox-rebuild-action";
+import { rebuildSandbox } from "./actions/sandbox/rebuild";
 import * as sandboxVersion from "./sandbox-version";
 import { B, D, G, R, YW } from "./terminal-style";
 import {

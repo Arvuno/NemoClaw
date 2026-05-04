@@ -31,7 +31,7 @@ const {
   isSandboxConnectFlag,
   parseSandboxConnectArgs,
   printSandboxConnectHelp,
-} = require("./lib/sandbox-connect-action");
+} = require("./lib/actions/sandbox/connect");
 const { runRegisteredOclifCommand } = require("./lib/cli/oclif-runner");
 const {
   canonicalUsageList,

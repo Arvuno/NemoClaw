@@ -3,35 +3,35 @@
 
 /* v8 ignore start -- exercised through CLI subprocess rebuild tests. */
 
-import { CLI_NAME } from "./branding";
-import { prompt as askPrompt } from "./credentials";
+import { CLI_NAME } from "../../branding";
+import { prompt as askPrompt } from "../../credentials";
 import {
   normalizeRebuildSandboxOptions,
   type RebuildSandboxOptions,
-} from "./domain/lifecycle/options";
-const { hydrateCredentialEnv } = require("./onboard") as {
+} from "../../domain/lifecycle/options";
+const { hydrateCredentialEnv } = require("../../onboard") as {
   hydrateCredentialEnv: (name: string) => string | null;
 };
-import * as nim from "./nim";
-import * as onboardSession from "./onboard-session";
-import type { Session } from "./onboard-session";
-import { captureOpenshell, runOpenshell } from "./adapters/openshell/runtime";
-import * as policies from "./policies";
-import * as registry from "./registry";
-import { resolveOpenshell } from "./adapters/openshell/resolve";
-import { parseLiveSandboxNames } from "./runtime-recovery";
-import { getSandboxDeleteOutcome } from "./domain/sandbox/destroy";
-import { removeSandboxRegistryEntry } from "./sandbox-destroy-action";
-import { executeSandboxCommand } from "./sandbox-process-recovery-action";
+import * as nim from "../../nim";
+import * as onboardSession from "../../onboard-session";
+import type { Session } from "../../onboard-session";
+import { captureOpenshell, runOpenshell } from "../../adapters/openshell/runtime";
+import * as policies from "../../policies";
+import * as registry from "../../registry";
+import { resolveOpenshell } from "../../adapters/openshell/resolve";
+import { parseLiveSandboxNames } from "../../runtime-recovery";
+import { getSandboxDeleteOutcome } from "../../domain/sandbox/destroy";
+import { removeSandboxRegistryEntry } from "./destroy";
+import { executeSandboxCommand } from "./process-recovery";
 import {
   createSystemDeps as createSessionDeps,
   getActiveSandboxSessions,
-} from "./sandbox-session-state";
-import * as sandboxState from "./sandbox-state";
-import * as sandboxVersion from "./sandbox-version";
-import { B, D, G, R, RD as _RD, YW } from "./terminal-style";
+} from "../../sandbox-session-state";
+import * as sandboxState from "../../sandbox-state";
+import * as sandboxVersion from "../../sandbox-version";
+import { B, D, G, R, RD as _RD, YW } from "../../terminal-style";
 
-const agentRuntime = require("../../bin/lib/agent-runtime");
+const agentRuntime = require("../../../../bin/lib/agent-runtime");
 
 function _rebuildLog(msg: string) {
   console.error(`  ${D}[rebuild ${new Date().toISOString()}] ${msg}${R}`);
@@ -336,7 +336,7 @@ export async function rebuildSandbox(
   // release, build context cleanup, session failure marking).  We
   // manually release the lock and mark the session failed in the
   // onboardFailed block below.
-  const { onboard } = require("./onboard");
+  const { onboard } = require("../../onboard");
   let onboardFailed = false;
   let onboardExitCode = 1;
   const _savedExit = process.exit;
@@ -463,8 +463,8 @@ export async function rebuildSandbox(
 
   // Step 6: Post-restore agent-specific migration
   const agentDef = agent
-    ? require("./agent-defs").loadAgent(agent.name)
-    : require("./agent-defs").loadAgent("openclaw");
+    ? require("../../agent-defs").loadAgent(agent.name)
+    : require("../../agent-defs").loadAgent("openclaw");
   if (agentDef.name === "openclaw") {
     // openclaw doctor --fix validates and repairs directory structure.
     // Idempotent and safe — catches structural changes between OpenClaw versions

@@ -8,20 +8,20 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { DASHBOARD_PORT } from "./ports";
-import { ROOT, shellQuote } from "./runner";
+import { DASHBOARD_PORT } from "../../ports";
+import { ROOT, shellQuote } from "../../runner";
 import {
   captureOpenshell,
   captureOpenshellForStatus,
   getOpenshellBinary,
   isCommandTimeout,
   runOpenshell,
-} from "./adapters/openshell/runtime";
-import { OPENSHELL_PROBE_TIMEOUT_MS } from "./adapters/openshell/timeouts";
-import { G, R } from "./terminal-style";
-import { sleepSeconds } from "./wait";
+} from "../../adapters/openshell/runtime";
+import { OPENSHELL_PROBE_TIMEOUT_MS } from "../../adapters/openshell/timeouts";
+import { G, R } from "../../terminal-style";
+import { sleepSeconds } from "../../wait";
 
-const agentRuntime = require("../../bin/lib/agent-runtime");
+const agentRuntime = require("../../../../bin/lib/agent-runtime");
 
 export type SandboxCommandResult = {
   status: number;
