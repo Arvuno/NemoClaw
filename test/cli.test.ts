@@ -748,12 +748,12 @@ describe("CLI dispatch", () => {
 
     const upgrade = run("upgrade-sandboxes --help");
     expect(upgrade.code).toBe(0);
-    expect(upgrade.out).toContain("upgrade-sandboxes [--check] [--auto] [--yes]");
+    expect(upgrade.out).toContain("upgrade-sandboxes [--check] [--auto] [--yes|-y]");
     expect(upgrade.out).toContain("Detect and rebuild stale sandboxes");
 
     const gc = run("gc --help");
     expect(gc.code).toBe(0);
-    expect(gc.out).toContain("gc [--dry-run] [--yes|--force]");
+    expect(gc.out).toContain("gc [--dry-run] [--yes|-y|--force]");
     expect(gc.out).toContain("Remove orphaned sandbox Docker images");
   });
 
@@ -1375,12 +1375,12 @@ describe("CLI dispatch", () => {
 
     const destroy = runWithEnv("alpha destroy --help", { HOME: home });
     expect(destroy.code).toBe(0);
-    expect(destroy.out).toContain("<name> destroy [--yes|--force]");
+    expect(destroy.out).toContain("<name> destroy [--yes|-y|--force]");
     expect(destroy.out).not.toContain("sandbox:destroy");
 
     const rebuild = runWithEnv("alpha rebuild --help", { HOME: home });
     expect(rebuild.code).toBe(0);
-    expect(rebuild.out).toContain("<name> rebuild [--yes|--force] [--verbose|-v]");
+    expect(rebuild.out).toContain("<name> rebuild [--yes|-y|--force] [--verbose|-v]");
     expect(rebuild.out).not.toContain("sandbox:rebuild");
 
     for (const action of ["policy-add", "policy-remove", "policy-list"]) {
@@ -2013,7 +2013,7 @@ describe("CLI dispatch", () => {
       { mode: 0o755 },
     );
 
-    const r = runWithEnv("alpha destroy --yes", {
+    const r = runWithEnv("alpha destroy -y", {
       HOME: home,
       PATH: `${localBin}:${process.env.PATH || ""}`,
     });

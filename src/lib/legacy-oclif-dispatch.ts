@@ -123,7 +123,7 @@ export function resolveSandboxOclifDispatch(
       if (hasHelpFlag(actionArgs)) return { kind: "help", usage: "policy-list" };
       return { kind: "oclif", commandId: "sandbox:policy-list", args: [sandboxName, ...actionArgs] };
     case "destroy":
-      if (hasHelpFlag(actionArgs)) return { kind: "help", usage: "destroy [--yes|--force]" };
+      if (hasHelpFlag(actionArgs)) return { kind: "help", usage: "destroy [--yes|-y|--force]" };
       return { kind: "oclif", commandId: "sandbox:destroy", args: [sandboxName, ...actionArgs] };
     case "gateway-token":
       if (hasHelpFlag(actionArgs)) return { kind: "help", usage: "gateway-token [--quiet|-q]" };
@@ -141,7 +141,7 @@ export function resolveSandboxOclifDispatch(
       return { kind: "oclif", commandId: "sandbox:skill", args: [sandboxName, ...actionArgs] };
     }
     case "rebuild":
-      if (hasHelpFlag(actionArgs)) return { kind: "help", usage: "rebuild [--yes|--force] [--verbose|-v]" };
+      if (hasHelpFlag(actionArgs)) return { kind: "help", usage: "rebuild [--yes|-y|--force] [--verbose|-v]" };
       return { kind: "oclif", commandId: "sandbox:rebuild", args: [sandboxName, ...actionArgs] };
     case "recover":
       if (hasHelpFlag(actionArgs)) return { kind: "help", usage: "recover" };
