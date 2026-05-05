@@ -149,16 +149,28 @@ export function resolveSandboxOclifDispatch(
     case "share": {
       const shareSub = actionArgs[0];
       const shareArgs = actionArgs.slice(1);
-      if (!shareSub || shareSub === "--help" || shareSub === "-h") {
+      if (shareSub === "--help" || shareSub === "-h") {
+        return { kind: "help", usage: "share <mount|unmount|status>" };
+      }
+      if (!shareSub) {
         return { kind: "oclif", commandId: "sandbox:share", args: [sandboxName] };
       }
       if (shareSub === "mount") {
+        if (hasHelpFlag(shareArgs)) {
+          return { kind: "help", usage: "share mount [sandbox-path] [local-mount-point]" };
+        }
         return { kind: "oclif", commandId: "sandbox:share:mount", args: [sandboxName, ...shareArgs] };
       }
       if (shareSub === "unmount") {
+        if (hasHelpFlag(shareArgs)) {
+          return { kind: "help", usage: "share unmount [local-mount-point]" };
+        }
         return { kind: "oclif", commandId: "sandbox:share:unmount", args: [sandboxName, ...shareArgs] };
       }
       if (shareSub === "status") {
+        if (hasHelpFlag(shareArgs)) {
+          return { kind: "help", usage: "share status [local-mount-point]" };
+        }
         return { kind: "oclif", commandId: "sandbox:share:status", args: [sandboxName, ...shareArgs] };
       }
       return { kind: "oclif", commandId: "sandbox:share", args: [sandboxName, ...actionArgs] };

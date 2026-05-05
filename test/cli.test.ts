@@ -4944,6 +4944,27 @@ describe("list shows live gateway inference", () => {
     expect(r.out).toContain("status");
   });
 
+  it("share help keeps public sandbox-scoped usage", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-share-help-"));
+    writeSandboxRegistry(home);
+
+    const parent = runWithEnv("alpha share --help", { HOME: home });
+    expect(parent.code).toBe(0);
+    expect(parent.out).toContain("Usage: nemoclaw <name> share <mount|unmount|status>");
+    expect(parent.out).not.toContain("sandbox:share");
+
+    for (const [subcommand, usage] of [
+      ["mount", "share mount [sandbox-path] [local-mount-point]"],
+      ["unmount", "share unmount [local-mount-point]"],
+      ["status", "share status [local-mount-point]"],
+    ]) {
+      const result = runWithEnv(`alpha share ${subcommand} --help`, { HOME: home });
+      expect(result.code).toBe(0);
+      expect(result.out).toContain(`Usage: nemoclaw <name> ${usage}`);
+      expect(result.out).not.toContain("sandbox:share");
+    }
+  });
+
   it("share is recognized as a valid sandbox action (not 'Unknown action')", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-share-action-"));
     writeSandboxRegistry(home);
