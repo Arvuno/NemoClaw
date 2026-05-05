@@ -3876,7 +3876,24 @@ const { setupNim } = require(${onboardPath});
 const credentials = require(${credentialsPath});
 const runner = require(${runnerPath});
 
-credentials.prompt = async () => "7";
+const menuLines = [];
+const originalLog = console.log;
+console.log = (...args) => {
+  const line = args.join(" ");
+  menuLines.push(line);
+  originalLog(...args);
+};
+
+function findInstallOllamaChoice() {
+  const option = menuLines.find((line) => /Install Ollama \((WSL )?Linux\)/.test(line));
+  const match = option && option.match(/^\s*(\d+)\)/);
+  if (!match) {
+    throw new Error("Could not find Linux Ollama install option in menu:\\n" + menuLines.join("\\n"));
+  }
+  return match[1];
+}
+
+credentials.prompt = async () => findInstallOllamaChoice();
 credentials.ensureApiKey = async () => {};
 runner.runCapture = (command) => {
   const cmd = Array.isArray(command) ? command.join(" ") : command;
