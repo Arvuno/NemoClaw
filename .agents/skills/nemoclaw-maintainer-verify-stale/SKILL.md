@@ -38,8 +38,18 @@ In batch mode, work through items one at a time. Present each verification plan 
 
 ## Step 2: Detect the Latest NemoClaw Version
 
+Try GitHub releases first; fall back to the highest semver git tag if no release is published. NemoClaw currently tags but does not publish releases, so the fallback is the load-bearing path today.
+
 ```bash
-LATEST=$(gh release view --repo NVIDIA/NemoClaw --json tagName -q .tagName)
+LATEST=$(gh release view --repo NVIDIA/NemoClaw --json tagName -q .tagName 2>/dev/null)
+
+if [ -z "$LATEST" ]; then
+  LATEST=$(git ls-remote --tags --refs git@github.com:NVIDIA/NemoClaw.git \
+    | awk -F/ '{print $NF}' \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+    | sort -V | tail -1)
+fi
+
 echo "Latest release: $LATEST"
 ```
 
@@ -64,18 +74,22 @@ Apply these rules in order. Drop any issue that fails a rule.
 
 **Candidate rule:** keep the issue if **either**:
 
-- The reported version (parsed from body or labels — see Step 4) is **2 or more minor versions behind** `$LATEST`, **or**
+- The reported version (parsed from body or labels — see Step 4) is **at least 2 versions behind** `$LATEST` in the rightmost-incrementing component, **or**
 - The issue is **older than 7 days** AND a specific version is parseable from its body or labels.
+
+For NemoClaw's current `0.0.x` line, "rightmost-incrementing component" is the patch number — a v0.0.31 report against a v0.0.34 latest is 3 versions behind. Once NemoClaw moves to `0.1.x` or higher, the rule applies to the next-rightmost component instead. Pick whichever component is actively iterating.
 
 ---
 
 ## Step 4: Parse Reported Version
 
-Search the body and labels for `v?0\.0\.\d+`. Sources, in order of trust:
+Sources, in order of trust:
 
-1. A label matching the version regex (e.g. `v0.0.32`).
-2. The first version match in the issue body.
-3. Comments by the original reporter.
+1. A label that exactly matches a released version pattern (e.g. `v0.0.32`). Reject labels that match a version newer than `$LATEST` — those are roadmap/release-target labels, not "reported on".
+2. The body, with a tight regex: first try `\bv0\.0\.(\d+)\b` (require the `v` prefix and word boundaries). Only if nothing matches, fall back to `\b0\.0\.(\d+)\b` **but only on lines containing `nemoclaw` or `version` (case-insensitive)**. The loose form alone is unsafe — without context anchoring, it matches `0.0.0.0:11434` (Ollama bind address), `127.0.0.1`, IPs in log lines, etc., and produces phantom "v0.0.0" or "v0.0.1" candidates.
+3. Comments by the original reporter (same regex as the body).
+
+After parsing, **clamp**: if the parsed version is greater than `$LATEST`, treat it as unparseable. This catches roadmap labels that slipped past step 1.
 
 If no version can be parsed, drop the issue from the candidate set — we cannot establish "previous version".
 
