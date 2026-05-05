@@ -14,6 +14,7 @@ import { execTimeout } from "./helpers/timeouts";
 
 const requireForTest = createRequire(import.meta.url);
 const readline = requireForTest("node:readline") as typeof import("node:readline");
+const YAML = requireForTest("yaml");
 const REPO_ROOT = path.join(import.meta.dirname, "..");
 const CLI_PATH = JSON.stringify(path.join(REPO_ROOT, "dist", "nemoclaw.js"));
 const CREDENTIALS_PATH = JSON.stringify(path.join(REPO_ROOT, "dist", "lib", "credentials.js"));
@@ -190,10 +191,26 @@ describe("policies", () => {
       expect(content).toContain("port: 8000");
     });
 
-    it("local-inference preset includes openclaw, claude, and common tool binaries", () => {
+    it("local-inference preset allowlists private host-gateway IP ranges", () => {
+      const content = requirePresetContent(policies.loadPreset("local-inference"));
+      const parsed = YAML.parse(content);
+      const endpoints = parsed.network_policies.local_inference.endpoints;
+      const expectedRanges = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"];
+
+      for (const port of [11434, 11435, 8000]) {
+        const endpoint = endpoints.find(
+          (item: { host?: string; port?: number; allowed_ips?: string[] }) =>
+            item.host === "host.openshell.internal" && item.port === port,
+        );
+        expect(endpoint, `missing host-gateway endpoint for port ${port}`).toBeDefined();
+        expect(endpoint?.allowed_ips).toEqual(expectedRanges);
+      }
+    });
+
+    it("local-inference preset includes openclaw and common tool binaries", () => {
       const content = requirePresetContent(policies.loadPreset("local-inference"));
       expect(content).toContain("/usr/local/bin/openclaw");
-      expect(content).toContain("/usr/local/bin/claude");
+      expect(content).not.toContain("/usr/local/bin/claude");
       // node, curl, and python3 are needed for direct inference access (#2199)
       expect(content).toContain("/usr/local/bin/node");
       expect(content).toContain("/usr/bin/node");
@@ -614,6 +631,28 @@ describe("policies", () => {
     });
   });
 
+  describe("mergePresetNamesIntoPolicy", () => {
+    it("merges built-in named presets into policy content", () => {
+      const current =
+        "version: 1\n\n" +
+        "network_policies:\n" +
+        "  existing:\n" +
+        "    name: existing\n" +
+        "    endpoints:\n" +
+        "      - host: api.example.com\n" +
+        "        port: 443\n" +
+        "        access: full\n";
+
+      const result = policies.mergePresetNamesIntoPolicy(current, ["slack"]);
+
+      expect(result.appliedPresets).toEqual(["slack"]);
+      expect(result.missingPresets).toEqual([]);
+      expect(result.policy).toContain("existing");
+      expect(result.policy).toContain("slack:");
+      expect(result.policy).toContain("wss-primary.slack.com");
+    });
+  });
+
   describe("preset YAML schema", () => {
     it("no preset has rules at NetworkPolicyRuleDef level", () => {
       // rules must be inside endpoints, not as sibling of endpoints/binaries
@@ -680,12 +719,36 @@ describe("policies", () => {
       }
     });
 
-    it("telegram REST preset uses tls: terminate for L7 proxy", () => {
+    it("REST policy YAML avoids deprecated tls: terminate", () => {
+      const agentsDir = path.join(REPO_ROOT, "agents");
+      const agentPolicyFiles = fs.existsSync(agentsDir)
+        ? fs
+            .readdirSync(agentsDir, { withFileTypes: true })
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => path.join(agentsDir, entry.name, "policy-additions.yaml"))
+            .filter((file) => fs.existsSync(file))
+        : [];
+      const policyFiles = [
+        path.join(REPO_ROOT, "nemoclaw-blueprint/policies/openclaw-sandbox.yaml"),
+        ...policies.listPresets().map((preset) =>
+          path.join(REPO_ROOT, "nemoclaw-blueprint/policies/presets", preset.file),
+        ),
+        ...agentPolicyFiles,
+      ];
+
+      for (const file of policyFiles) {
+        const content = fs.readFileSync(file, "utf8");
+        expect(content).not.toContain("tls: terminate");
+      }
+    });
+
+    it("telegram REST preset relies on automatic TLS handling", () => {
       const content = requirePresetContent(policies.loadPreset("telegram"));
       expect(content).toBeTruthy();
       expect(content).toMatch(
-        /host:\s*api\.telegram\.org[\s\S]*?protocol:\s*rest[\s\S]*?tls:\s*terminate/,
+        /host:\s*api\.telegram\.org[\s\S]*?protocol:\s*rest[\s\S]*?enforcement:\s*enforce/,
       );
+      expect(content).not.toMatch(/host:\s*api\.telegram\.org[\s\S]*?tls:/);
     });
 
     it("pypi preset allows HEAD for pip lazy-wheel metadata checks", () => {
