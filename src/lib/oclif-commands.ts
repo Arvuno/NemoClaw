@@ -50,7 +50,7 @@ import ShareCommand, {
   ShareMountCommand,
   ShareStatusCommand,
   ShareUnmountCommand,
-} from "./share-command";
+} from "./share-cli-commands";
 import SkillInstallCliCommand, { SkillCliCommand } from "./skill-install-cli-command";
 import {
   SnapshotCommand,
@@ -89,9 +89,9 @@ export default {
   "sandbox:destroy": DestroyCliCommand,
   "sandbox:doctor": SandboxDoctorCliCommand,
   "sandbox:logs": SandboxLogsCommand,
-  "sandbox:policy-add": PolicyAddCommand,
-  "sandbox:policy-list": SandboxPolicyListCommand,
-  "sandbox:policy-remove": PolicyRemoveCommand,
+  "sandbox:policy:add": PolicyAddCommand,
+  "sandbox:policy:list": SandboxPolicyListCommand,
+  "sandbox:policy:remove": PolicyRemoveCommand,
   "sandbox:rebuild": RebuildCliCommand,
   "sandbox:recover": RecoverCliCommand,
   "sandbox:share": ShareCommand,
@@ -113,7 +113,7 @@ export default {
   status: StatusCommand,
   start: DeprecatedStartCommand,
   stop: DeprecatedStopCommand,
-  "sandbox:gateway-token": GatewayTokenCliCommand,
+  "sandbox:gateway:token": GatewayTokenCliCommand,
   "tunnel:start": TunnelStartCommand,
   "tunnel:stop": TunnelStopCommand,
   gc: GarbageCollectImagesCommand,
