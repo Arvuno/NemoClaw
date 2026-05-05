@@ -20,6 +20,7 @@ Use it before writing from scratch.
 The skill scans recent commits for user-facing changes and drafts doc updates.
 Run it after landing features, before a release, or to find doc gaps.
 For example, ask your agent to "catch up the docs for the changes I made in this PR".
+During release prep, run the skill first, make doc version bumps, regenerate user skills, then open the docs refresh PR.
 
 The skill lives in `.agents/skills/nemoclaw-contributor-update-docs/` and follows the style guide below automatically.
 
@@ -51,13 +52,17 @@ The current generated skills and their source pages are:
 
 ### Regenerating skills after doc changes
 
-Pull requests that change docs should normally include only the source pages under `docs/`, not the generated `.agents/skills/nemoclaw-user-*` output.
-Local hooks and PR CI run `scripts/docs-to-skills.py --dry-run` to confirm the docs still convert cleanly without writing files.
+Pull requests that change docs must include both the source pages under `docs/` and the generated `.agents/skills/nemoclaw-user-*` output.
+Local hooks regenerate the skills before commit so generated updates stay inside the human-authored PR, where branch protection can verify the commit signature and DCO sign-off.
 
-After a docs change merges to `main`, the `Docs to Skills` workflow regenerates `.agents/skills/nemoclaw-user-*` from `docs/` and publishes the generated update.
-The workflow pushes the generated commit directly when branch protection allows it; otherwise it opens or updates a small sync PR for maintainers to merge.
+For daily release prep, use this sequence:
 
-To regenerate skills manually (for example, when reviewing the sync workflow output), run from the repo root:
+1. Run the `nemoclaw-contributor-update-docs` skill for the day's release prep.
+2. Make doc version bumps.
+3. Run `python scripts/docs-to-skills.py docs/ .agents/skills/ --prefix nemoclaw-user`.
+4. Create the PR with both docs and generated user skills.
+
+To regenerate skills manually before committing a docs PR, run from the repo root:
 
 ```bash
 python scripts/docs-to-skills.py docs/ .agents/skills/ --prefix nemoclaw-user

@@ -86,7 +86,7 @@ All git hooks are managed by [prek](https://prek.j178.dev/), a fast, single-bina
 
 | Hook | What runs |
 |------|-----------|
-| **pre-commit** | File fixers, formatters, linters, doc-to-skills dry run, Vitest (plugin) |
+| **pre-commit** | File fixers, formatters, linters, doc-to-skills regeneration, Vitest (plugin) |
 | **commit-msg** | commitlint (Conventional Commits) |
 | **pre-push** | TypeScript type check (`tsc --noEmit` for plugin, JS, and CLI) |
 
@@ -133,6 +133,7 @@ Shell scripts (`scripts/*.sh`) must pass ShellCheck and use `shfmt` formatting.
 If your change affects user-facing behavior (new commands, changed defaults, new features, bug fixes that contradict existing docs), update the relevant pages under `docs/` in the same PR.
 
 If you use an AI coding agent (Cursor, Claude Code, Codex, etc.), the repo includes the `nemoclaw-contributor-update-docs` skill that drafts doc updates. Use it before writing from scratch and follow the style guide in [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
+During release prep, run that skill first, make any doc version bumps, regenerate user skills, then open the docs refresh PR.
 
 To build and preview docs locally:
 
@@ -150,13 +151,18 @@ The script `scripts/docs-to-skills.py` converts doc pages into agent skills unde
 These generated skills let AI agents answer user questions and walk through procedures without reading raw doc pages.
 
 Always edit pages in `docs/`.
-Never edit generated skill files under `.agents/skills/nemoclaw-user-*/` — your changes will be overwritten on the next run.
+Do not hand-edit generated skill files under `.agents/skills/nemoclaw-user-*/` — regenerate them from the source docs.
 
-Pull requests that change docs should normally include only the source pages under `docs/`, not the generated `.agents/skills/nemoclaw-user-*` output. Local hooks and PR CI run `scripts/docs-to-skills.py --dry-run` to confirm the docs still convert cleanly without writing files.
+Pull requests that change docs must include both the source pages under `docs/` and the generated `.agents/skills/nemoclaw-user-*` output. Local hooks regenerate the skills before commit so generated updates stay inside the human-authored PR, where branch protection can verify the commit signature and DCO sign-off.
 
-After a docs change merges to `main`, the `Docs to Skills` workflow regenerates `.agents/skills/nemoclaw-user-*` from `docs/` and publishes the generated update. The workflow pushes the generated commit directly when branch protection allows it; otherwise it opens or updates a small sync PR for maintainers to merge.
+For daily release prep, use this sequence:
 
-To regenerate skills manually (for example, when reviewing the sync workflow output), run from the repo root:
+1. Run the `nemoclaw-contributor-update-docs` skill for the day's release prep.
+2. Make doc version bumps.
+3. Run `python scripts/docs-to-skills.py docs/ .agents/skills/ --prefix nemoclaw-user`.
+4. Create the PR with both docs and generated user skills.
+
+To regenerate skills manually before committing a docs PR, run from the repo root:
 
 ```bash
 python scripts/docs-to-skills.py docs/ .agents/skills/ --prefix nemoclaw-user

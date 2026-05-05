@@ -1,6 +1,6 @@
 ---
 name: nemoclaw-contributor-update-docs
-description: Scan recent git commits for changes that affect user-facing behavior, then draft or update the corresponding documentation pages. Use when docs have fallen behind code changes, after a batch of features lands, or when preparing a release. Trigger keywords - update docs, draft docs, docs from commits, sync docs, catch up docs, doc debt, docs behind, docs drift.
+description: Scan recent git commits for changes that affect user-facing behavior, then draft or update the corresponding documentation pages and refresh generated user skills for release prep. Use when docs have fallen behind code changes, after a batch of features lands, during daily release prep, or when preparing a release. Trigger keywords - update docs, draft docs, docs from commits, sync docs, catch up docs, doc debt, docs behind, docs drift, release prep docs, refresh user skills.
 ---
 
 # Update Docs from Commits
@@ -16,6 +16,7 @@ Scan recent git history for commits that affect user-facing behavior and draft d
 
 - After a batch of features or fixes has landed and docs may be stale.
 - Before a release, to catch any doc gaps.
+- During daily release prep, before opening the docs refresh PR.
 - When a contributor asks "what docs need updating?"
 
 ## Step 0: Load the Skip List
@@ -154,7 +155,29 @@ After drafting all updates, present a summary to the user:
 - `test: add launch command test` (def5678) — test-only change.
 ```
 
-## Step 7: Build and Verify
+## Step 7: Apply Release Prep Updates
+
+If the user invoked this skill for release prep, finish the release-specific doc work before verification:
+
+1. Make any requested doc version bumps in release notes, install instructions, or command examples.
+2. Re-read changed pages after the version bump and ensure the new version appears consistently.
+3. Do not create a separate "refresh user skills" task. The user-skill refresh is the generated output step for this documentation workflow.
+
+Skip this step when the user only asked for ordinary doc catch-up and no release prep is involved.
+
+## Step 8: Refresh Generated User Skills
+
+After all source docs are updated, regenerate the user-facing agent skills:
+
+```bash
+python3 scripts/docs-to-skills.py docs/ .agents/skills/ --prefix nemoclaw-user
+```
+
+Include the generated `.agents/skills/nemoclaw-user-*` changes in the same PR as the source docs.
+Do not hand-edit generated user skill files.
+If the command changes generated files unexpectedly, inspect the source docs and script output before proceeding.
+
+## Step 9: Build and Verify
 
 After making changes, build the docs locally:
 
@@ -167,10 +190,11 @@ Check for:
 - Build warnings or errors.
 - Broken cross-references.
 - Correct rendering of new content.
+- Generated skill changes that do not correspond to source doc changes.
 
-## Step 8: Label PRs
+## Step 10: Open or Label the PR
 
-When the workflow produces a pull request, apply the `documentation` label so reviewers can identify doc-only changes:
+When the workflow produces a pull request, include both docs and generated user skills, then apply the `documentation` label so reviewers can identify doc-only changes:
 
 ```bash
 gh pr edit <number> --add-label documentation
@@ -193,5 +217,7 @@ User says: "Catch up the docs for everything merged since v0.1.0."
 3. Map each to a doc page.
 4. Read the commit diffs and current doc pages.
 5. Draft updates following the style guide.
-6. Present the summary.
-7. Build with `make docs` to verify.
+6. Apply release-prep version bumps if the user requested release prep.
+7. Run `python3 scripts/docs-to-skills.py docs/ .agents/skills/ --prefix nemoclaw-user`.
+8. Present the summary.
+9. Build with `make docs` to verify.
