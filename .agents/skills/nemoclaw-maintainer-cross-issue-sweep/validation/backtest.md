@@ -16,7 +16,7 @@ Look for PRs whose body lists multiple `closes #N` references — those are the 
 For contradictions, search merged PRs whose body mentions another issue that was later closed as wontfix or alternative:
 
 ```bash
-gh search prs --repo OWNER/REPO --merged "supersedes" "alternative" in:body --limit 30
+gh search prs --repo OWNER/REPO --merged "supersedes OR alternative in:body" --limit 30
 ```
 
 Pick 5-8 cases.

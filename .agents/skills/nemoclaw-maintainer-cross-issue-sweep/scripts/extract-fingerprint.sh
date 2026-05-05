@@ -29,7 +29,7 @@ fi
 files=$(gh pr view "$pr" "${repo_args[@]}" --json files --jq '[.files[].path] | map(select(
     test("/(fixtures|generated|node_modules)/") | not
   )) | map(select(
-    endswith("package-lock.json") or endswith("yarn.lock") or endswith("pnpm-lock.yaml") | not
+    (endswith("package-lock.json") or endswith("yarn.lock") or endswith("pnpm-lock.yaml")) | not
   ))' 2>/dev/null) || files='[]'
 
 # Diff for symbol + error-string extraction.

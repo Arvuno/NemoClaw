@@ -63,9 +63,19 @@ def main() -> int:
         print(f"Invalid JSON spec on stdin: {e}", file=sys.stderr)
         return 64
 
+    if not isinstance(spec, dict):
+        print("Invalid spec: root must be a JSON object", file=sys.stderr)
+        return 64
+    if "pr" not in spec:
+        print("Invalid spec: missing required field 'pr'", file=sys.stderr)
+        return 64
+
     pr = spec["pr"]
     pr_title = spec.get("pr_title", "")
     classifications = spec.get("classifications", [])
+    if not isinstance(classifications, list):
+        print("Invalid spec: 'classifications' must be a list", file=sys.stderr)
+        return 64
     suppressed = spec.get("suppressed", {})
 
     adjacent = sorted(
