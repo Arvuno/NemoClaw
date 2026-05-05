@@ -65,7 +65,7 @@ The wizard creates an OpenShell gateway, registers inference providers, builds t
 Use this command for new installs and for recreating a sandbox after changes to policy or configuration.
 
 ```console
-$ nemoclaw onboard [--non-interactive] [--resume] [--recreate-sandbox] [--from <Dockerfile>] [--name <sandbox>] [--agent <name>] [--control-ui-port <N>] [--yes-i-accept-third-party-software]
+$ nemoclaw onboard [--non-interactive] [--resume | --fresh] [--recreate-sandbox] [--from <Dockerfile>] [--name <sandbox>] [--agent <name>] [--control-ui-port <N>] [--yes-i-accept-third-party-software]
 ```
 
 :::{warning}
@@ -393,7 +393,7 @@ If you want to upgrade the sandbox while preserving state, use `nemoclaw <name> 
 :::
 
 If another terminal has an active SSH session to the sandbox, `destroy` prints an active-session warning and requires a second confirmation before it proceeds.
-Pass `--yes` or `--force` to skip the prompt in scripted workflows.
+Pass `--yes`, `-y`, or `--force` to skip the prompt in scripted workflows.
 
 ```console
 $ nemoclaw my-assistant destroy
@@ -582,16 +582,16 @@ Credentials are stripped from backups before storage.
 Policy presets applied to the old sandbox are reapplied to the new one so your egress rules survive the rebuild.
 
 ```console
-$ nemoclaw my-assistant rebuild [--yes] [--verbose]
+$ nemoclaw my-assistant rebuild [--yes|-y|--force] [--verbose|-v]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--yes`, `--force` | Skip the confirmation prompt |
-| `--verbose` | Log SSH commands, exit codes, and session state (also enabled by `NEMOCLAW_REBUILD_VERBOSE=1`) |
+| `--yes`, `-y`, `--force` | Skip the confirmation prompt |
+| `--verbose`, `-v` | Log SSH commands, exit codes, and session state (also enabled by `NEMOCLAW_REBUILD_VERBOSE=1`) |
 
 If another terminal has an active SSH session to the sandbox, `rebuild` prints an active-session warning and requires confirmation before destroying the sandbox.
-Pass `--yes` or `--force` to skip the prompt in scripted workflows.
+Pass `--yes`, `-y`, or `--force` to skip the prompt in scripted workflows.
 
 The sandbox must be running for the backup step to succeed.
 If any manifest-defined state path cannot be archived, `rebuild` reports the failed paths and exits before destroying the original sandbox.
@@ -830,14 +830,14 @@ Gathers system info, Docker state, gateway logs, and sandbox status into a summa
 Use `--sandbox <name>` to target a specific sandbox, `--quick` for a smaller snapshot, or `--output <path>` to save a tarball that you can attach to an issue.
 
 ```console
-$ nemoclaw debug [--quick] [--sandbox NAME] [--output PATH]
+$ nemoclaw debug [--quick|-q] [--sandbox NAME] [--output PATH|-o PATH]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--quick` | Collect minimal diagnostics only |
+| `--quick`, `-q` | Collect minimal diagnostics only |
 | `--sandbox NAME` | Target a specific sandbox (default: auto-detect) |
-| `--output PATH` | Write diagnostics tarball to the given path |
+| `--output PATH`, `-o PATH` | Write diagnostics tarball to the given path |
 
 If `--output` is set and the tarball cannot be written (for example, the destination directory is missing or read-only), the command exits non-zero so scripts can detect the failure.
 
