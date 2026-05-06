@@ -80,12 +80,12 @@
               "path": {
                 "type": "string",
                 "minLength": 1,
-                "pattern": ".*\\S.*"
+                "pattern": "^openclaw-plugins/(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
               },
               "loadPath": {
                 "type": "string",
                 "minLength": 1,
-                "pattern": ".*\\S.*"
+                "pattern": "^/usr/local/share/nemoclaw/openclaw-plugins/(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
               }
             }
           }

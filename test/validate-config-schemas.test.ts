@@ -332,6 +332,46 @@ describe("model-specific-setup/schema.json", () => {
     expect(validate(bad)).toBe(false);
   });
 
+  it("rejects OpenClaw plugin paths outside the staged plugin trees", () => {
+    for (const [pathValue, loadPathValue] of [
+      ["/etc/passwd", "/usr/local/share/nemoclaw/openclaw-plugins/fixture"],
+      ["../secrets", "/usr/local/share/nemoclaw/openclaw-plugins/fixture"],
+      ["openclaw-plugins/subdir/../escape", "/usr/local/share/nemoclaw/openclaw-plugins/fixture"],
+      ["openclaw-plugins/fixture", "/etc/passwd"],
+      ["openclaw-plugins/fixture", "/usr/local/share/nemoclaw/openclaw-plugins/subdir/../escape"],
+    ]) {
+      const bad = {
+        ...cloneObject(data),
+        effects: {
+          openclawPlugins: [
+            {
+              id: "fixture-plugin",
+              path: pathValue,
+              loadPath: loadPathValue,
+            },
+          ],
+        },
+      };
+      expect(validate(bad)).toBe(false);
+    }
+  });
+
+  it("accepts OpenClaw plugin paths inside the staged plugin trees", () => {
+    const valid = {
+      ...cloneObject(data),
+      effects: {
+        openclawPlugins: [
+          {
+            id: "fixture-plugin",
+            path: "openclaw-plugins/pluginA/main.js",
+            loadPath: "/usr/local/share/nemoclaw/openclaw-plugins/dir/sub_dir/plugin.so",
+          },
+        ],
+      },
+    };
+    expectValid(validate, valid, "fixture plugin paths");
+  });
+
   it("rejects Hermes manifests with OpenClaw effects", () => {
     const bad = {
       id: "fixture-hermes",
