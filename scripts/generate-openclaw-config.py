@@ -39,7 +39,34 @@ import base64
 import json
 import os
 import re
+import sys
 from urllib.parse import urlparse
+
+KIMI_K26_MODEL_ID = "moonshotai/kimi-k2.6"
+KIMI_K26_MANAGED_INFERENCE_COMPAT = {
+    "requiresStringContent": True,
+    "maxTokensField": "max_tokens",
+    "requiresToolResultName": True,
+}
+KIMI_K26_MANAGED_INFERENCE_PLUGIN_ID = "nemoclaw-kimi-inference-compat"
+KIMI_K26_MANAGED_INFERENCE_PLUGIN_PATH = (
+    "/usr/local/share/nemoclaw/openclaw-plugins/kimi-inference-compat"
+)
+
+def _coerce_positive_int(env: dict, name: str, default: int) -> int:
+    raw = env.get(name) or str(default)
+    try:
+        value = int(raw)
+    except ValueError:
+        value = 0
+    if value > 0:
+        return value
+    print(
+        f'[SECURITY] {name} must be a positive integer, got "{raw}" '
+        f"— skipping override, falling back to default ({default})",
+        file=sys.stderr,
+    )
+    return default
 
 
 def is_loopback(hostname: str) -> bool:
@@ -52,6 +79,17 @@ def is_loopback(hostname: str) -> bool:
     if normalized == "localhost" or normalized == "::1":
         return True
     return bool(re.match(r"^127(?:\.\d{1,3}){3}$", normalized))
+
+
+def _is_kimi_k26_managed_inference(
+    model: str, provider_key: str, inference_base_url: str, inference_api: str
+) -> bool:
+    return (
+        model.strip().lower() == KIMI_K26_MODEL_ID
+        and provider_key == "inference"
+        and inference_api == "openai-completions"
+        and inference_base_url.rstrip("/") == "https://inference.local/v1"
+    )
 
 
 def build_config(env: dict | None = None) -> dict:
@@ -78,8 +116,9 @@ def build_config(env: dict | None = None) -> dict:
     primary_model_ref = env["NEMOCLAW_PRIMARY_MODEL_REF"]
     inference_base_url = env["NEMOCLAW_INFERENCE_BASE_URL"]
     inference_api = env["NEMOCLAW_INFERENCE_API"]
-    context_window = int(env.get("NEMOCLAW_CONTEXT_WINDOW", "131072"))
-    max_tokens = int(env.get("NEMOCLAW_MAX_TOKENS", "4096"))
+    context_window = _coerce_positive_int(env, "NEMOCLAW_CONTEXT_WINDOW", 131072)
+    max_tokens = _coerce_positive_int(env, "NEMOCLAW_MAX_TOKENS", 4096)
+
     reasoning = env.get("NEMOCLAW_REASONING", "false") == "true"
     inference_inputs = [
         v.strip()
@@ -92,9 +131,18 @@ def build_config(env: dict | None = None) -> dict:
         raise ValueError("NEMOCLAW_AGENT_TIMEOUT must be a positive integer")
     agent_timeout = int(_raw_agent_timeout)
 
+    kimi_managed_inference = _is_kimi_k26_managed_inference(
+        model, provider_key, inference_base_url, inference_api
+    )
+
     inference_compat = json.loads(
         base64.b64decode(env["NEMOCLAW_INFERENCE_COMPAT_B64"]).decode("utf-8")
     )
+    if kimi_managed_inference:
+        inference_compat = {
+            **inference_compat,
+            **KIMI_K26_MANAGED_INFERENCE_COMPAT,
+        }
 
     msg_channels = json.loads(
         base64.b64decode(
@@ -151,9 +199,7 @@ def build_config(env: dict | None = None) -> dict:
         if ch in ("telegram", "discord"):
             account["proxy"] = proxy_url
         if ch == "telegram":
-            account["groupPolicy"] = (
-                "mentions" if _telegram_config.get("requireMention") else "open"
-            )
+            account["groupPolicy"] = "open"
         if ch in _allowed_ids and _allowed_ids[ch]:
             account["dmPolicy"] = "allowlist"
             account["allowFrom"] = _allowed_ids[ch]
@@ -163,6 +209,9 @@ def build_config(env: dict | None = None) -> dict:
         _ch_cfg["discord"].update(
             {"groupPolicy": "allowlist", "guilds": _discord_guilds}
         )
+
+    if "telegram" in _ch_cfg and _telegram_config.get("requireMention"):
+        _ch_cfg["telegram"]["groups"] = {"*": {"requireMention": True}}
 
     # Normalize schemeless URLs before parsing — urlparse("remote-host:18789")
     # misclassifies hostname as scheme. Mirrors ensureScheme() in dashboard-contract.ts.
@@ -176,7 +225,23 @@ def build_config(env: dict | None = None) -> dict:
         if parsed.scheme and parsed.netloc
         else "http://127.0.0.1:18789"
     )
-    origins = list(dict.fromkeys(["http://127.0.0.1:18789", chat_origin]))
+    # When onboard injects an internal port (e.g. :18789) into a URL that the
+    # user provided without an explicit port, the browser origin from a reverse
+    # proxy (Brev Cloudflare Tunnel, nginx, Caddy, etc.) will not carry that
+    # port.  Include the portless origin so both direct and proxied access work.
+    # Skip for loopback — no reverse proxy in front of localhost.
+    try:
+        _has_explicit_port = parsed.port is not None
+    except ValueError:
+        _has_explicit_port = False
+    if parsed.scheme and parsed.hostname and _has_explicit_port and not is_loopback(parsed.hostname):
+        host_part = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
+        portless_origin = f"{parsed.scheme}://{host_part}"
+    else:
+        portless_origin = None
+    origins = list(dict.fromkeys(
+        filter(None, ["http://127.0.0.1:18789", chat_origin, portless_origin])
+    ))
 
     # Auto-disable device auth when CHAT_UI_URL is non-loopback — terminal-based
     # pairing is impossible when the user only has web access (Brev Launchable,
@@ -240,6 +305,11 @@ def build_config(env: dict | None = None) -> dict:
         if provider_key not in _provider_keys:
             plugin_entries[_plugin_id] = {"enabled": False}
 
+    plugins = {"entries": plugin_entries}
+    if kimi_managed_inference:
+        plugin_entries[KIMI_K26_MANAGED_INFERENCE_PLUGIN_ID] = {"enabled": True}
+        plugins["load"] = {"paths": [KIMI_K26_MANAGED_INFERENCE_PLUGIN_PATH]}
+
     config = {
         "agents": {
             "defaults": {
@@ -283,7 +353,7 @@ def build_config(env: dict | None = None) -> dict:
         # Provider plugins with staged runtime dependencies are disabled above
         # unless they match NEMOCLAW_PROVIDER_KEY. That keeps the baked image
         # limited to the provider selected during onboard.
-        "plugins": {"entries": plugin_entries},
+        "plugins": plugins,
         "gateway": {
             "mode": "local",
             "controlUi": {
