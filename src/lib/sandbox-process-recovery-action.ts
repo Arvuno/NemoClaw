@@ -296,6 +296,7 @@ export function checkAndRecoverSandboxProcesses(
     return { checked: false, wasRunning: null, recovered: false, forwardRecovered: false };
   }
   const recoveryAgent = agentRuntime.getSessionAgent(sandboxName);
+  const recoveryPort = recoveryAgent?.forwardPort ?? DASHBOARD_PORT;
   if (running) {
     // Gateway is alive but the host-side forward can still be dead or
     // owned by another sandbox. Probe and re-establish only when
@@ -340,6 +341,10 @@ export function checkAndRecoverSandboxProcesses(
       if (!quiet) {
         console.error("  Gateway process started but is not responding.");
         console.error("  Check /tmp/gateway.log inside the sandbox for details.");
+        console.error("  Connect to the sandbox and run manually:");
+        console.error(
+          `    ${agentRuntime.buildManualRecoveryCommand(recoveryAgent, recoveryPort)}`,
+        );
       }
       return { checked: true, wasRunning: false, recovered: false, forwardRecovered: false };
     }
@@ -364,7 +369,7 @@ export function checkAndRecoverSandboxProcesses(
       `  Could not restart ${agentRuntime.getAgentDisplayName(recoveryAgent)} gateway automatically.`,
     );
     console.error("  Connect to the sandbox and run manually:");
-    console.error(`    ${agentRuntime.getGatewayCommand(recoveryAgent)}`);
+    console.error(`    ${agentRuntime.buildManualRecoveryCommand(recoveryAgent, recoveryPort)}`);
   }
 
   return { checked: true, wasRunning: false, recovered, forwardRecovered: false };
