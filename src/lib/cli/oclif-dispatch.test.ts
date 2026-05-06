@@ -22,6 +22,11 @@ describe("resolveGlobalOclifDispatch", () => {
       commandId: "root:version",
       args: [],
     });
+    expect(resolveGlobalOclifDispatch("version", [])).toEqual({
+      kind: "oclif",
+      commandId: "root:version",
+      args: [],
+    });
   });
 
   it("returns usage and unknown-subcommand dispatches for unsupported global forms", () => {

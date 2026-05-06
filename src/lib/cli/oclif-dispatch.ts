@@ -206,7 +206,7 @@ export function resolveGlobalOclifDispatch(cmd: string, args: string[]): Dispatc
     return { kind: "unknownSubcommand", command: "credentials", subcommand: sub };
   }
 
-  if (cmd === "--version" || cmd === "-v") {
+  if (cmd === "version" || cmd === "--version" || cmd === "-v") {
     return oclif("root:version", []);
   }
 
