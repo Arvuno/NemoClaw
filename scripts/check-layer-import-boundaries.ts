@@ -303,6 +303,6 @@ function main(): void {
   console.log("Layer import boundaries passed.");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (fileURLToPath(import.meta.url) === path.resolve(process.argv[1] || "")) {
   main();
 }
