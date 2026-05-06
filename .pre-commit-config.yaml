@@ -232,6 +232,7 @@ repos:
         language: system
         pass_filenames: false
         files: ^(bin|scripts|src|test|nemoclaw-blueprint/scripts)/.*\.(ts|tsx)$|^tsconfig\.cli\.json$
+        always_run: true
         stages: [pre-push]
         priority: 10
 
