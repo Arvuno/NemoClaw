@@ -247,7 +247,18 @@ export async function rebuildSandbox(
   // the existing sandbox intact. This is what applies local Hermes version edits.
   if (rebuildAgent) {
     const agentDef = loadAgent(rebuildAgent);
-    ensureAgentBaseImage(agentDef, { forceBaseImageRebuild: true });
+    try {
+      ensureAgentBaseImage(agentDef, { forceBaseImageRebuild: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("");
+      console.error(`  ${_RD}Rebuild preflight failed:${R} agent base image could not be built.`);
+      console.error(`  ${message}`);
+      console.error("");
+      console.error("  Sandbox is untouched — no data was lost.");
+      bail(message);
+      return;
+    }
   }
 
   // Step 2: Backup

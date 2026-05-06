@@ -76,9 +76,16 @@ export function ensureAgentBaseImage(
       ? `  Rebuilding ${agent.displayName} base image...`
       : `  Building ${agent.displayName} base image (first time only)...`;
     console.log(message);
-    dockerBuild(baseDockerfile, baseImageTag, ROOT, {
+    const buildResult = dockerBuild(baseDockerfile, baseImageTag, ROOT, {
+      ignoreError: true,
       stdio: ["ignore", "inherit", "inherit"],
     });
+    if (buildResult.error || buildResult.status !== 0) {
+      const detail = buildResult.error
+        ? `: ${buildResult.error.message}`
+        : ` (exit ${buildResult.status ?? "unknown"})`;
+      throw new Error(`Failed to build ${agent.displayName} base image${detail}`);
+    }
     console.log(`  \u2713 Base image built: ${baseImageTag}`);
     return { imageTag: baseImageTag, built: true };
   }

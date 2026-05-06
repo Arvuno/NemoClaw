@@ -66,7 +66,7 @@ function withMockedDocker<T>(
   const agentOnboardModulePath = require.resolve("../../dist/lib/agent-onboard");
   delete require.cache[agentOnboardModulePath];
 
-  const dockerBuildMock = vi.fn();
+  const dockerBuildMock = vi.fn().mockReturnValue({ status: 0 });
   const dockerImageInspectMock = vi.fn();
   dockerImageModule.dockerBuild = dockerBuildMock as DockerImageModule["dockerBuild"];
   dockerInspectModule.dockerImageInspect =
@@ -129,7 +129,17 @@ describe("agent base image provisioning", () => {
         "/test/root/agents/hermes/Dockerfile.base",
         "ghcr.io/nvidia/nemoclaw/hermes-sandbox-base:latest",
         root,
-        { stdio: ["ignore", "inherit", "inherit"] },
+        { ignoreError: true, stdio: ["ignore", "inherit", "inherit"] },
+      );
+    });
+  });
+
+  it("throws when a forced agent base image rebuild fails", () => {
+    withMockedDocker(({ ensureAgentBaseImage, dockerBuildMock }) => {
+      dockerBuildMock.mockReturnValue({ status: 23 });
+
+      expect(() => ensureAgentBaseImage(makeAgent(), { forceBaseImageRebuild: true })).toThrow(
+        "Failed to build Hermes Agent base image (exit 23)",
       );
     });
   });
