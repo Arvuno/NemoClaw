@@ -5036,7 +5036,7 @@ async function createSandbox(
   const openshellBin = getOpenshellBinary();
   for (let i = 0; i < 15; i++) {
     const readyOutput = runCaptureOpenshell(
-      ["sandbox", "exec", sandboxName, "curl", "-so", "/dev/null", "-w", "%{http_code}",
+      ["sandbox", "exec", "-n", sandboxName, "--", "curl", "-so", "/dev/null", "-w", "%{http_code}",
         "--max-time", "3", `http://localhost:${effectiveDashboardPort}/health`],
       { ignoreError: true },
     );

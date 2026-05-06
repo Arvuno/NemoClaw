@@ -4015,7 +4015,7 @@ runner.run = (command, opts = {}) => {
 runner.runCapture = (command) => {
   if (_n(command).includes("sandbox get my-assistant")) return "";
   if (_n(command).includes("sandbox list")) return "my-assistant Ready";
-  if (_n(command).includes("sandbox exec -n my-assistant -- curl -sf http://localhost:18789/")) return "ok";
+  if (_n(command).includes("sandbox exec") && _n(command).includes("http://localhost:18789/health")) return "200";
   if (_n(command).includes("forward list")) return "my-assistant 127.0.0.1 18789 12345 running";
   return "";
 };
