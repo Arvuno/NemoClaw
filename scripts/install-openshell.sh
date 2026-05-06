@@ -16,6 +16,30 @@ fail() {
   exit 1
 }
 
+# Retry a command with exponential backoff.
+# The OpenShell "dev" release is a rolling pre-release whose assets are
+# periodically deleted and re-uploaded by CI.  A download attempt that
+# lands in that transition window gets a transient HTTP 404.  Retrying
+# a handful of times with backoff is enough to ride it out.
+#
+# Usage: with_retry <max_attempts> <initial_delay_secs> <command...>
+with_retry() {
+  local max_attempts=$1 delay=$2; shift 2
+  local attempt=1
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+    if ((attempt >= max_attempts)); then
+      return 1
+    fi
+    warn "Attempt $attempt/$max_attempts failed — retrying in ${delay}s…"
+    sleep "$delay"
+    ((attempt++))
+    ((delay *= 2))
+  done
+}
+
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 
@@ -142,8 +166,10 @@ trap 'rm -rf "$tmpdir"' EXIT
 download_with_curl() {
   local name
   for name in "${ASSETS[@]}" "${CHECKSUM_FILES[@]}"; do
-    curl -fsSL "https://github.com/NVIDIA/OpenShell/releases/download/${RELEASE_TAG}/$name" \
-      -o "$tmpdir/$name"
+    with_retry 4 5 curl -fsSL \
+      "https://github.com/NVIDIA/OpenShell/releases/download/${RELEASE_TAG}/$name" \
+      -o "$tmpdir/$name" \
+    || fail "Failed to download $name from release '$RELEASE_TAG' after retries"
   done
 }
 
