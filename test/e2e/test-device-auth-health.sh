@@ -206,8 +206,9 @@ fi
 info "Probing /health endpoint inside sandbox..."
 HEALTH_CODE=""
 for attempt in $(seq 1 10); do
-  HEALTH_CODE=$(sandbox_exec \
-    "curl -so /dev/null -w '%{http_code}' --max-time 3 http://localhost:${DASHBOARD_PORT}/health" \
+  HEALTH_CODE=$(
+    sandbox_exec \
+      "curl -so /dev/null -w '%{http_code}' --max-time 3 http://localhost:${DASHBOARD_PORT}/health"
   ) || true
   if [[ "$HEALTH_CODE" == "200" ]]; then
     break
@@ -227,8 +228,9 @@ fi
 
 # 2b: / should return 401 (proves device auth is active)
 info "Probing / endpoint inside sandbox (expect 401 = device auth active)..."
-ROOT_CODE=$(sandbox_exec \
-  "curl -so /dev/null -w '%{http_code}' --max-time 3 http://localhost:${DASHBOARD_PORT}/" \
+ROOT_CODE=$(
+  sandbox_exec \
+    "curl -so /dev/null -w '%{http_code}' --max-time 3 http://localhost:${DASHBOARD_PORT}/"
 ) || true
 
 if [[ "$ROOT_CODE" == "401" ]]; then
@@ -321,8 +323,9 @@ fi
 info "Waiting for gateway to recover..."
 RECOVERED=false
 for attempt in $(seq 1 30); do
-  RECOVER_HEALTH=$(sandbox_exec \
-    "curl -so /dev/null -w '%{http_code}' --max-time 3 http://localhost:${DASHBOARD_PORT}/health" \
+  RECOVER_HEALTH=$(
+    sandbox_exec \
+      "curl -so /dev/null -w '%{http_code}' --max-time 3 http://localhost:${DASHBOARD_PORT}/health"
   ) || true
   if [[ "$RECOVER_HEALTH" == "200" ]] || [[ "$RECOVER_HEALTH" == "401" ]]; then
     RECOVERED=true
