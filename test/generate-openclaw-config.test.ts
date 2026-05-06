@@ -356,7 +356,7 @@ describe("generate-openclaw-config.py: config generation", () => {
       {
         id: "missing-agent",
         description: "Invalid manifest",
-        match: {},
+        match: { modelIds: ["test-model"] },
         effects: { openclawCompat: {} },
       },
     );
@@ -375,7 +375,7 @@ describe("generate-openclaw-config.py: config generation", () => {
         id: "unknown-agent",
         agent: "sidecar",
         description: "Invalid manifest",
-        match: {},
+        match: { modelIds: ["test-model"] },
         effects: { openclawCompat: {} },
       },
     );
@@ -389,6 +389,38 @@ describe("generate-openclaw-config.py: config generation", () => {
     expect(unknownResult.stderr).toContain("unknown agent 'sidecar'");
   });
 
+  it("rejects empty match objects and invalid explicit registry overrides", () => {
+    const missingRegistry = path.join(tmpDir, "missing-registry");
+    const missingRegistryResult = runConfigScriptRaw({
+      NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR: missingRegistry,
+    });
+
+    expect(missingRegistryResult.status).not.toBe(0);
+    expect(missingRegistryResult.stderr).toContain(
+      "NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR must point to an existing directory",
+    );
+
+    const blueprintDir = path.join(tmpDir, "fixture-blueprint");
+    const registryDir = writeRegistryManifest(
+      blueprintDir,
+      "openclaw/empty-match.json",
+      {
+        id: "empty-match",
+        agent: "openclaw",
+        description: "Invalid match",
+        match: {},
+        effects: { openclawCompat: {} },
+      },
+    );
+
+    const emptyMatchResult = runConfigScriptRaw({
+      NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR: registryDir,
+    });
+
+    expect(emptyMatchResult.status).not.toBe(0);
+    expect(emptyMatchResult.stderr).toContain("field 'match' must be a non-empty object");
+  });
+
   it("rejects unknown OpenClaw effect keys and missing plugin source paths", () => {
     const blueprintDir = path.join(tmpDir, "fixture-blueprint");
     const registryDir = writeRegistryManifest(
@@ -398,7 +430,7 @@ describe("generate-openclaw-config.py: config generation", () => {
         id: "bad-effect",
         agent: "openclaw",
         description: "Invalid OpenClaw effect",
-        match: {},
+        match: { modelIds: ["test-model"] },
         effects: { hermesCompat: {} },
       },
     );
@@ -418,7 +450,7 @@ describe("generate-openclaw-config.py: config generation", () => {
         id: "missing-plugin",
         agent: "openclaw",
         description: "Invalid plugin path",
-        match: {},
+        match: { modelIds: ["test-model"] },
         effects: {
           openclawPlugins: [
             {
@@ -447,7 +479,7 @@ describe("generate-openclaw-config.py: config generation", () => {
         id: "bad-load-path",
         agent: "openclaw",
         description: "Invalid plugin load path",
-        match: {},
+        match: { modelIds: ["test-model"] },
         effects: {
           openclawPlugins: [
             {
@@ -481,7 +513,7 @@ describe("generate-openclaw-config.py: config generation", () => {
         id: "conflicting-compat",
         agent: "openclaw",
         description: "Conflicting compat",
-        match: {},
+        match: { modelIds: ["test-model"] },
         effects: {
           openclawCompat: {
             supportsStore: true,
@@ -509,7 +541,7 @@ describe("generate-openclaw-config.py: config generation", () => {
       id: "plugin-a",
       agent: "openclaw",
       description: "First plugin",
-      match: {},
+      match: { modelIds: ["test-model"] },
       effects: {
         openclawPlugins: [
           {
@@ -524,7 +556,7 @@ describe("generate-openclaw-config.py: config generation", () => {
       id: "plugin-b",
       agent: "openclaw",
       description: "Duplicate plugin",
-      match: {},
+      match: { modelIds: ["test-model"] },
       effects: {
         openclawPlugins: [
           {

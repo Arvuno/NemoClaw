@@ -105,6 +105,16 @@ def _registry_roots(env: dict) -> list[Path]:
 
 
 def _find_registry_root(env: dict) -> Path | None:
+    explicit = env.get("NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR")
+    if explicit:
+        explicit_path = Path(explicit)
+        if not explicit_path.is_dir():
+            raise ValueError(
+                "NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR must point to an existing directory: "
+                f"{explicit}"
+            )
+        return explicit_path
+
     for root in _registry_roots(env):
         if root.is_dir():
             return root
@@ -132,6 +142,8 @@ def _validate_manifest_payload(payload: object, manifest_path: Path) -> dict:
     match = payload.get("match")
     if not isinstance(match, dict):
         raise ValueError(f"{manifest_path}: field 'match' must be an object")
+    if not match:
+        raise ValueError(f"{manifest_path}: field 'match' must be a non-empty object")
     allowed_match_keys = {"modelIds", "providerKey", "inferenceApi", "baseUrl"}
     unknown_match_keys = sorted(set(match) - allowed_match_keys)
     if unknown_match_keys:

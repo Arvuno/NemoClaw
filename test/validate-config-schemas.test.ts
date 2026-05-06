@@ -313,12 +313,22 @@ describe("model-specific-setup/schema.json", () => {
     expect(validate(bad)).toBe(false);
   });
 
+  it("rejects manifests with empty match objects", () => {
+    const bad = {
+      ...cloneObject(data),
+      match: {},
+    };
+    expect(validate(bad)).toBe(false);
+  });
+
   it("rejects Hermes manifests with OpenClaw effects", () => {
     const bad = {
       id: "fixture-hermes",
       agent: "hermes",
       description: "Fixture Hermes setup",
-      match: {},
+      match: {
+        modelIds: ["fixture/hermes"],
+      },
       effects: {
         openclawCompat: {},
       },

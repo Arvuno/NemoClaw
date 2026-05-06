@@ -197,8 +197,17 @@ function discoverModelSpecificSetups(
 }
 
 function findRegistryRoot(): string | null {
+  const explicit = process.env.NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR;
+  if (explicit) {
+    if (!existsSync(explicit) || !statSync(explicit).isDirectory()) {
+      throw new Error(
+        `NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR must point to an existing directory: ${explicit}`,
+      );
+    }
+    return explicit;
+  }
+
   const roots = [
-    process.env.NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR,
     "/opt/nemoclaw-blueprint/model-specific-setup",
     "/sandbox/.nemoclaw/blueprints/0.1.0/model-specific-setup",
     join(import.meta.dirname, "..", "..", "nemoclaw-blueprint", "model-specific-setup"),
@@ -251,6 +260,10 @@ function validateManifestPayload(payload: unknown, manifestPath: string): ModelS
 }
 
 function validateMatch(match: Record<string, unknown>, manifestPath: string): void {
+  if (Object.keys(match).length === 0) {
+    throw new Error(`${manifestPath}: field 'match' must be a non-empty object`);
+  }
+
   const allowedKeys = new Set(["modelIds", "providerKey", "inferenceApi", "baseUrl"]);
   const unknownKeys = Object.keys(match).filter((key) => !allowedKeys.has(key));
   if (unknownKeys.length > 0) {

@@ -292,7 +292,7 @@ describe("agents/hermes/generate-config.ts", () => {
         id: "bad-hermes-effect",
         agent: "hermes",
         description: "Invalid Hermes effect",
-        match: {},
+        match: { modelIds: ["test-model"] },
         effects: {
           openclawCompat: {},
         },
@@ -305,5 +305,39 @@ describe("agents/hermes/generate-config.ts", () => {
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("unknown effects for agent 'hermes': openclawCompat");
+  });
+
+  it("rejects empty match objects and invalid explicit registry overrides", () => {
+    const missingRegistry = path.join(tmpDir, "missing-registry");
+    const missingRegistryResult = runConfigScriptRaw({
+      NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR: missingRegistry,
+    });
+
+    expect(missingRegistryResult.status).not.toBe(0);
+    expect(missingRegistryResult.stderr).toContain(
+      "NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR must point to an existing directory",
+    );
+
+    const blueprintDir = path.join(tmpDir, "fixture-blueprint");
+    const registryDir = writeRegistryManifest(
+      blueprintDir,
+      "hermes/empty-match.json",
+      {
+        id: "empty-hermes-match",
+        agent: "hermes",
+        description: "Invalid Hermes match",
+        match: {},
+        effects: {
+          hermesCompat: {},
+        },
+      },
+    );
+
+    const emptyMatchResult = runConfigScriptRaw({
+      NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR: registryDir,
+    });
+
+    expect(emptyMatchResult.status).not.toBe(0);
+    expect(emptyMatchResult.stderr).toContain("field 'match' must be a non-empty object");
   });
 });
