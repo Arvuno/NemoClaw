@@ -43,6 +43,8 @@ describe("uninstall CLI flags", () => {
           ...process.env,
           HOME: tmp,
           PATH: `${fakeBin}:/usr/bin:/bin`,
+          // The wrapper needs Node even when the test constrains PATH to fake system tools.
+          NEMOCLAW_NODE: process.execPath,
           // Keep helper-service glob cleanup isolated from concurrently running tests.
           TMPDIR: tmp,
         },
