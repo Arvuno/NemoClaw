@@ -375,6 +375,12 @@ describe("CLI dispatch", () => {
     expect(run("--help").code).toBe(0);
   });
 
+  it("version exits 0", () => {
+    const r = run("version");
+    expect(r.code).toBe(0);
+    expect(r.out.trim()).toMatch(/^nemoclaw v/);
+  });
+
   it("-h exits 0", () => {
     expect(run("-h").code).toBe(0);
   });
