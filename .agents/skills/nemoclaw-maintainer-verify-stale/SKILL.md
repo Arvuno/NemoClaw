@@ -1,6 +1,6 @@
 ---
 name: nemoclaw-maintainer-verify-stale
-description: Verify whether old NVIDIA/NemoClaw bug reports still reproduce against the latest release. Picks candidate issues opened against older versions, runs the reproducer locally first when possible, otherwise reuses or provisions a Brev Linux box (CPU or GPU), detects behavior that was intentionally changed, scores confidence, and posts an evidence-backed comment with a label (fixed-on-latest, wontfix-by-design, or verify-inconclusive). Tag-only — never auto-closes. Linux-only in v1; Windows, macOS, and integration-token-dependent issues are skipped. Trigger keywords - verify stale, verify fixed, reproduce on latest, stale issue, old bug, fixed-on-latest, wontfix-by-design, verify-inconclusive, drain backlog, brev verify.
+description: Verify whether old NVIDIA/NemoClaw bug reports still reproduce against the latest tag. Picks candidate issues opened against older versions, runs the reproducer locally first when possible (Linux or macOS), otherwise reuses or provisions a Brev Linux box (CPU or GPU), detects behavior that was intentionally changed, scores confidence, and posts an evidence-backed comment with a label (fixed-on-latest, wontfix-by-design, or verify-inconclusive). Tag-only — never auto-closes. Brev verification is Linux-only in v1; Windows and integration-token-dependent issues are skipped. Trigger keywords - verify stale, verify fixed, reproduce on latest, stale issue, old bug, fixed-on-latest, wontfix-by-design, verify-inconclusive, drain backlog, brev verify.
 user_invocable: true
 ---
 
@@ -38,19 +38,18 @@ In batch mode, work through items one at a time. Present each verification plan 
 
 ## Step 2: Detect the Latest NemoClaw Version
 
-Try GitHub releases first; fall back to the highest semver git tag if no release is published. NemoClaw currently tags but does not publish releases, so the fallback is the load-bearing path today.
+Try GitHub releases first; fall back to the highest semver tag from the GitHub API if no release is published. NemoClaw currently tags but does not publish releases, so the fallback is the load-bearing path today. Use `gh api` rather than `git ls-remote` so the skill works regardless of SSH key setup, and reuses the auth `gh` already has.
 
 ```bash
 LATEST=$(gh release view --repo NVIDIA/NemoClaw --json tagName -q .tagName 2>/dev/null)
 
 if [ -z "$LATEST" ]; then
-  LATEST=$(git ls-remote --tags --refs git@github.com:NVIDIA/NemoClaw.git \
-    | awk -F/ '{print $NF}' \
+  LATEST=$(gh api repos/NVIDIA/NemoClaw/tags --paginate --jq '.[].name' \
     | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
     | sort -V | tail -1)
 fi
 
-echo "Latest release: $LATEST"
+echo "Latest tag: $LATEST"
 ```
 
 This is the version the skill will verify against. Record it — every comment must cite it.
@@ -104,8 +103,7 @@ Collect every match from sources 2 and 3 (a single body may mention multiple ver
 - Versions parsed from prose that happen to look semver-ish but aren't releases.
 
 ```bash
-git ls-remote --tags --refs git@github.com:NVIDIA/NemoClaw.git \
-  | awk -F/ '{print $NF}' > /tmp/nemoclaw-tags.txt
+gh api repos/NVIDIA/NemoClaw/tags --paginate --jq '.[].name' > /tmp/nemoclaw-tags.txt
 
 # For each candidate version V:
 grep -Fxq "$V" /tmp/nemoclaw-tags.txt || drop_version "$V"
@@ -119,7 +117,7 @@ If no version survives, drop the issue from the candidate set — we cannot esta
 
 ### Implementer note: regex-pipeline pitfalls
 
-Two real failure modes surfaced during the v1 dry-run. Test both before trusting your implementation:
+Three real failure modes surfaced during the v1 dry-run. Test each before trusting your implementation:
 
 1. **Empty-match handling.** A naive pipeline like `[scan(regex)] | first | .[0] | tonumber // fallback` silently dropped 9 real candidates (e.g. #2861 with `NemoClaw 0.0.32`, #2604 with `NemoClaw: 0.0.28`). When `scan` returns no matches, `[]` flows in, `first` returns null, `null | .[0]` errors, and `//` does not propagate cleanly through the error. Bind each pass to a named variable, coalesce at the end:
 
@@ -181,9 +179,14 @@ The "give up immediately" path is gone. Synthesis happens at validation time so 
 
 ## Step 6.5: Verify Preconditions
 
-Confirm `brev` is authenticated and the install URL resolves before paying any cost. Credentials live in `~/.brev/credentials.json` and are reused across shells under the same OS user, so once authenticated the auth check is a no-op until the token expires.
+Confirm CLI dependencies are available, `brev` is authenticated, and the install URL resolves before paying any cost. Credentials live in `~/.brev/credentials.json` and are reused across shells under the same OS user, so once authenticated the auth check is a no-op until the token expires.
 
 ```bash
+# CLI deps — fail fast if anything later in the skill needs them but they're missing.
+for cmd in gh brev jq python3 curl; do
+  command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: missing required dependency: $cmd"; exit 1; }
+done
+
 # Brev auth — short-circuit only after the auth check, not before.
 brev ls --json >/dev/null 2>&1 || {
   echo "Brev not authenticated. Choose one:"
@@ -319,11 +322,16 @@ NemoClaw spawns OpenShell sandboxes (containers), runtime services, and listenin
 ```bash
 RESET=$(cat <<'SCRIPT'
 nemoclaw destroy --all --force 2>/dev/null || true
-pkill -9 -f nemoclaw 2>/dev/null || true
-pkill -9 -f openshell 2>/dev/null || true
+# Anchor pkill patterns to "/nemoclaw" / "/openshell" path components so the kill doesn't
+# match unrelated processes that happen to mention these strings (including the agent
+# harness running this skill if its working dir contains the word).
+pkill -9 -f '/nemoclaw([[:space:]]|$)' 2>/dev/null || true
+pkill -9 -f '/openshell([[:space:]]|$)' 2>/dev/null || true
 docker ps -a --filter "name=openshell-" -q 2>/dev/null | xargs -r docker rm -f 2>/dev/null || true
 docker ps -a --filter "name=nemoclaw-" -q 2>/dev/null | xargs -r docker rm -f 2>/dev/null || true
-rm -rf ~/.nemoclaw 2>/dev/null
+# Sandbox state lives in ~/.openclaw (default-writable since #2227); ~/.nemoclaw holds CLI state.
+# Wipe both so the latest install starts clean.
+rm -rf ~/.nemoclaw ~/.openclaw 2>/dev/null
 sudo -n rm -f /usr/local/bin/nemoclaw 2>/dev/null || true
 sudo -n rm -rf /usr/local/lib/nemoclaw 2>/dev/null || true
 for port in 8080 18789 9119; do fuser -k -n tcp $port 2>/dev/null || true; done
@@ -483,14 +491,14 @@ The skill needs to know *which* path to `git log v<reported>..$LATEST -- <path>`
    - `/usr/local/bin/nemoclaw*` → `bin/`
    - `~/.nemoclaw/<rel>` → most often runtime state, drop unless the bug is config-related → `src/lib/config/`
    - In-repo paths (e.g., `bin/lib/policies.js` mentioned literally) → use as-is
-2. **Component-label-to-directory map.** Pick the first match:
-   - `NemoClaw CLI` → `bin/`, `src/`
-   - `Sandbox` → `src/lib/sandbox/`, `nemoclaw/sandbox/`
-   - `OpenShell` → `nemoclaw/openshell/`, `src/lib/openshell/`
-   - `Docker` → `Dockerfile`, `scripts/install-openshell.sh`
-   - `Getting Started` → `docs/`, `install.sh`
-   - `Integration: <X>` (when not in skip list) → `src/lib/integrations/<x>/`
-3. **Title keywords.** "TUI" → `src/tui/`, "policy" → `src/lib/policy/`, "inference" → `src/lib/inference/`.
+2. **Component-label-to-directory map.** Pick the first match. Paths verified against the current repo layout — drop any path that doesn't exist on the tag at `$LATEST` rather than passing it to `git log`.
+   - `NemoClaw CLI` → `bin/`, `src/lib/`, `nemoclaw/src/commands/`
+   - `Sandbox` → `nemoclaw/src/blueprint/`, `nemoclaw-blueprint/`
+   - `OpenShell` → cross-repo (lives at `github.com/NVIDIA/OpenShell`, not in this repo). Skip the +25 signal for OpenShell-only issues; cross-repo `git log` is out of v1 scope.
+   - `Docker` → `Dockerfile`, `Dockerfile.base`, `scripts/install-openshell.sh`, `scripts/install.sh`
+   - `Getting Started` → `docs/`, `scripts/install.sh`
+   - `Integration: <X>` — no `src/lib/integrations/` exists in this repo. Skip the +25 signal for integration-component issues unless source 1 (file paths in body) yielded a path.
+3. **Title keywords.** "policy" → `nemoclaw-blueprint/policies/`, `nemoclaw/src/blueprint/`. "inference" → `docs/inference/` is docs-only; skip the +25 signal unless source 1 surfaces actual code paths.
 
 If none of the above produces a path, **skip the +25 signal entirely** rather than guessing. Floating the +25 on every issue would inflate scores meaninglessly.
 
@@ -559,23 +567,23 @@ print(html.unescape(b))
 
 Transcripts and synth-repro scripts are already plain text and skip the pre-pass.
 
-| Pattern | Targets |
-|---|---|
-| `(?i)(token\|secret\|password\|api[_-]?key\|bearer)[^\n]*[:=][^\n]*` | Inline credentials in env/config/log output |
-| `(?i)authorization:\s*\S+` | HTTP auth headers (often Bearer + JWT) |
-| `eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}` | JWT tokens |
-| `gh[pousr]_[A-Za-z0-9]{36,}` | GitHub PATs / install tokens |
-| `AKIA[0-9A-Z]{16}` | AWS access key IDs |
-| `(?i)aws_secret_access_key\s*=\s*\S+` | AWS secret keys |
-| `(?i)nvapi-[A-Za-z0-9_-]{20,}` | NVIDIA API keys (NIM / build.nvidia.com) |
-| URLs containing `@` before the host (e.g., `https://user:pw@host/...`) | Basic-auth credentials in URLs |
-| `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}` | Email addresses (PII) |
-| `\b[A-Za-z0-9+/]{60,}={0,2}\b` | Long base64 blobs (likely keys/sessions; tune length to taste — too short hits legit data) |
-| `\b\w+\.(nvidia\.internal\|nv-internal\.com\|nvidia\.dev)\b` | Internal hostnames (extend list per team) |
+**Order matters and the table below is in execution order.** Longest, most-specific patterns first; generic catchalls last. Otherwise the catchall masks specific matches and you lose track of what was actually redacted (JWT vs session blob vs random base64).
 
-**File paths under the reporter's home directory** (`/Users/<name>/`, `/home/<name>/`) → replace with `~/`. Catches incidental username PII.
+| # | Pattern | Targets |
+|---|---|---|
+| 1 | `eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}` | JWT tokens |
+| 2 | `gh[pousr]_[A-Za-z0-9]{36,}` | GitHub PATs / install tokens |
+| 3 | `(?i)nvapi-[A-Za-z0-9_-]{20,}` | NVIDIA API keys (NIM / build.nvidia.com) |
+| 4 | `AKIA[0-9A-Z]{16}` | AWS access key IDs |
+| 5 | `(?i)aws_secret_access_key\s*=\s*\S+` | AWS secret keys |
+| 6 | `(?i)authorization:\s*\S+` | HTTP auth headers (often Bearer + JWT) |
+| 7 | URLs containing `@` before the host (e.g., `https://user:pw@host/...`) | Basic-auth credentials in URLs |
+| 8 | `(?i)(token\|secret\|password\|api[_-]?key\|bearer)[^\n]*[:=][^\n]*` | Inline credentials in env/config/log output |
+| 9 | `\b\w+\.(nvidia\.internal\|nv-internal\.com\|nvidia\.dev)\b` | Internal hostnames (extend list per team) |
+| 10 | `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}` | Email addresses (PII) |
+| 11 | `\b[A-Za-z0-9+/]{60,}={0,2}\b` | Long base64 blobs (likely keys/sessions; tune length to taste — too short hits legit data) |
 
-**Order matters.** Run the longest, most-specific patterns first (JWT, AWS, NVIDIA-API) before the generic base64 catchall, otherwise the catchall masks the specific match and you lose the fact that *what* was redacted was a JWT vs a session blob.
+**File paths under the reporter's home directory** (`/Users/<name>/`, `/home/<name>/`) → replace with `~/`. Run last; catches incidental username PII.
 
 **Comment template (fixed / inconclusive — bug not reproduced on latest):**
 
@@ -695,7 +703,7 @@ The next weekly run retries naturally.
 
 This degradation is expected — old releases rot. We still want to extract whatever signal we can from the latest run plus PR/commit evidence, just at a more conservative confidence ceiling.
 
-**Keep-box-on-inconclusive.** When `verify-inconclusive` lands (Step 8c gave up, or Step 9 score < 60), **delay the cleanup `brev delete` by 30 minutes** if the box was provisioned by this run. Print the `brev shell "$INSTANCE_NAME"` command in the run output so a maintainer can hop in and triage. Reused boxes stay regardless. Ship-failed verifications are the exact case where having an inspectable artifact pays for itself.
+**Keep-box-on-inconclusive.** When `verify-inconclusive` lands (Step 8c gave up, or Step 9 score < 60), **skip the cleanup trap** for this run if the box was provisioned by this run — set `PROVISIONED_NEW=0` before the trap fires so the EXIT handler is a no-op. Print the `brev shell "$INSTANCE_NAME"` command and an explicit `brev delete "$INSTANCE_NAME"` reminder in the run output so the maintainer can triage and clean up manually. Reused boxes stay regardless. Ship-failed verifications are the exact case where having an inspectable artifact pays for itself; an unbounded sleep-and-delete in the background isn't reliable across session ends, so we leave deletion explicit.
 
 ---
 
@@ -709,7 +717,7 @@ After each issue (verified, inconclusive, by-design, or infra-failed), append to
 **Reported on:** v0.0.31
 **Verified on:** v0.0.34
 **Environment:** CPU | GPU (<instance type>)
-**Box:** reused <name> | provisioned <name>
+**Box:** reused <name> | provisioned <name> | local (no Brev — Step 6.7 short-circuit)
 **Baseline install:** succeeded | failed (degraded mode)
 **Baseline match:** validated (verbatim) | validated (synth) | failed (verify-inconclusive) | skipped
 **Latest install:** succeeded | failed (infra error)
@@ -762,7 +770,7 @@ Never stage or commit the log to the NemoClaw repo.
 ## Out of Scope (v1)
 
 - Auto-closing issues. Always tag-only; a human pulls the trigger.
-- macOS verification. Brev offers no macOS instances and local-laptop runs are not unattended.
+- macOS verification *via the Brev path*. Brev offers no macOS instances. The Step 6.7 local-first short-circuit *does* run on a maintainer's macOS laptop — so manual single-issue runs against pure-CLI bugs work on macOS. The weekly batch cron is Linux-only because that path always uses Brev.
 - Issues requiring third-party integration credentials (Slack, Discord, Telegram, Hermes, OpenClaw, WeChat).
 - Service-account bot identity. v1 runs under each maintainer's own GitHub credentials.
 - Versioned labels. A single `fixed-on-latest` label is swept on each release cut.
