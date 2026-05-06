@@ -82,22 +82,8 @@ function loadPatternDiscoveredCommands(): Record<string, OclifCommandMetadata> |
   return Object.keys(commands).length > 0 ? commands : null;
 }
 
-function loadCompatibilityCommandIndex(): Record<string, OclifCommandMetadata> | null {
-  for (const modulePath of ["../commands", "../commands/index.js"]) {
-    try {
-      const registry = require(modulePath) as {
-        default?: Record<string, OclifCommandMetadata>;
-      };
-      if (registry.default) return registry.default;
-    } catch {
-      /* try the next runtime shape */
-    }
-  }
-  return null;
-}
-
 function loadOclifCommands(): Record<string, OclifCommandMetadata> | null {
-  return loadPatternDiscoveredCommands() ?? loadCompatibilityCommandIndex();
+  return loadPatternDiscoveredCommands();
 }
 
 export function getRegisteredOclifCommandsMetadata(): Record<string, OclifCommandMetadata> {
