@@ -20,9 +20,21 @@ PER_FILE_TOP=5
 PER_ERROR_TOP=5
 MAX_TOTAL=30
 
+repo=""
+if [ "${1:-}" = "--repo" ]; then
+  if [ -z "${2:-}" ]; then
+    echo "Usage: $0 [--repo OWNER/REPO] < fingerprint.json" >&2
+    exit 64
+  fi
+  repo="$2"
+  shift 2
+fi
+
 fingerprint=$(cat)
 
-repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || echo "")
+if [ -z "$repo" ]; then
+  repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || echo "")
+fi
 if [ -z "$repo" ]; then
   echo "Cannot determine repo. Run inside a repo or pass --repo OWNER/REPO." >&2
   exit 64

@@ -19,6 +19,11 @@ if [ $# -lt 1 ]; then
 fi
 
 pr="$1"
+if ! [[ "$pr" =~ ^[0-9]+$ ]]; then
+  echo "Usage: $0 <pr-number> [--repo OWNER/REPO]" >&2
+  echo "Error: <pr-number> must be numeric (got '$pr')." >&2
+  exit 64
+fi
 shift || true
 repo_args=()
 if [ "${1:-}" = "--repo" ]; then
@@ -29,15 +34,24 @@ if [ "${1:-}" = "--repo" ]; then
   repo_args=(--repo "$2")
 fi
 
-# Touched files (drop test fixtures, lockfiles, generated outputs).
+# Touched files (drop test fixtures, lockfiles, generated outputs). Fail
+# fast if `gh pr view` errors — auth/repo/PR-not-found should not silently
+# produce an empty fingerprint that downstream consumers treat as "valid
+# but no candidates."
 files=$(gh pr view "$pr" "${repo_args[@]+"${repo_args[@]}"}" --json files --jq '[.files[].path] | map(select(
     test("/(fixtures|generated|node_modules)/") | not
   )) | map(select(
     (endswith("package-lock.json") or endswith("yarn.lock") or endswith("pnpm-lock.yaml")) | not
-  ))' 2>/dev/null) || files='[]'
+  ))' 2>/dev/null) || {
+  echo "Failed to fetch PR files for #$pr (auth, repo, or PR number)" >&2
+  exit 65
+}
 
 # Diff for symbol + error-string extraction.
-diff=$(gh pr diff "$pr" "${repo_args[@]+"${repo_args[@]}"}" 2>/dev/null) || diff=""
+diff=$(gh pr diff "$pr" "${repo_args[@]+"${repo_args[@]}"}" 2>/dev/null) || {
+  echo "Failed to fetch PR diff for #$pr" >&2
+  exit 65
+}
 
 # Touched symbols. Extract from added/modified lines (start with `+`, not `+++`).
 # Per-language regex; defaults match TypeScript/JavaScript/Python/Go/shell.
@@ -84,7 +98,10 @@ error_strings=$(extract_error_strings "$added_lines" \
   | jq -Rn '[inputs | select(length > 0)]')
 
 # Primary linked issue — first match in body for closes/fixes/resolves #N.
-body=$(gh pr view "$pr" "${repo_args[@]+"${repo_args[@]}"}" --json body --jq .body 2>/dev/null || echo "")
+body=$(gh pr view "$pr" "${repo_args[@]+"${repo_args[@]}"}" --json body --jq .body 2>/dev/null) || {
+  echo "Failed to fetch PR body for #$pr" >&2
+  exit 65
+}
 primary_issue=$(printf '%s' "$body" \
   | { grep -oiE '(closes|fixes|resolves|fix)\s+#[0-9]+' || true; } \
   | { grep -oE '[0-9]+' || true; } \
