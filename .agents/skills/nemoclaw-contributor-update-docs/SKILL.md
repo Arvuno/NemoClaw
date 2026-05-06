@@ -157,24 +157,16 @@ After drafting all updates, present a summary to the user:
 
 ## Step 7: Apply Release Prep Updates
 
+Skip this step when the user only asked for ordinary doc catch-up and no release prep is involved.
+
 If the user invoked this skill for release prep, finish the release-specific doc work before verification:
 
 1. Make any requested doc version bumps in `versions1.json` and `project.json` in the `docs/` directory.
-2. Re-read changed pages after the version bump and ensure the new version appears consistently.
+2. Refresh the NemoClaw user skills:
 
-Skip this step when the user only asked for ordinary doc catch-up and no release prep is involved.
-
-## Step 8: Refresh Generated User Skills
-
-After all source docs are updated, regenerate the user-facing agent skills:
-
-```bash
-python3 scripts/docs-to-skills.py docs/ .agents/skills/ --prefix nemoclaw-user
-```
-
-Include the generated `.agents/skills/nemoclaw-user-*` changes in the same PR as the source docs.
-Do not hand-edit generated user skill files.
-If the command changes generated files unexpectedly, inspect the source docs and script output before proceeding.
+   ```bash
+   python3 scripts/docs-to-skills.py docs/ .agents/skills/ --prefix nemoclaw-user
+   ```
 
 ## Step 9: Build and Verify
 
@@ -191,13 +183,17 @@ Check for:
 - Correct rendering of new content.
 - Generated skill changes that do not correspond to source doc changes.
 
-## Step 10: Open or Label the PR
+## Step 10: Open the Docs PR
 
-When the workflow produces a pull request, include both docs and generated user skills, then apply the `documentation` label so reviewers can identify doc-only changes:
+When the workflow produces a pull request, compose the PR description with a concise summary of the doc updates and a source summary that links each identified commit to its matching PR when a PR is available. Include the commit subject, affected doc page, links, and description of the doc change in this shape:
 
-```bash
-gh pr edit <number> --add-label documentation
+```markdown
+- `<short-sha>` <commit subject> ([commit](https://github.com/NVIDIA/NemoClaw/commit/<sha>), [PR #<number>](https://github.com/NVIDIA/NemoClaw/pull/<number>)) -> `docs/path.md`: Description of the doc change reflecting the commit message and diff.
 ```
+
+For release-prep docs refresh PRs, include both docs and generated user skills. For ordinary docs catch-up PRs, include only the source docs under `docs/`.
+
+Apply the `documentation` label so reviewers can identify doc-only changes.
 
 ## Tips
 
