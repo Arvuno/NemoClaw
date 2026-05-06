@@ -54,6 +54,31 @@ function runConfigScript(envOverrides: Record<string, string> = {}): {
   };
 }
 
+function runConfigScriptRaw(envOverrides: Record<string, string> = {}) {
+  fs.mkdirSync(path.join(tmpDir, ".hermes"), { recursive: true });
+  return spawnSync(process.execPath, ["--experimental-strip-types", SCRIPT_PATH], {
+    encoding: "utf-8",
+    env: {
+      PATH: process.env.PATH || "/usr/bin:/bin",
+      ...BASE_ENV,
+      ...envOverrides,
+      HOME: tmpDir,
+    },
+    timeout: 10_000,
+  });
+}
+
+function writeRegistryManifest(
+  blueprintDir: string,
+  relativeManifestPath: string,
+  manifest: Record<string, unknown>,
+): string {
+  const manifestPath = path.join(blueprintDir, "model-specific-setup", relativeManifestPath);
+  fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  return path.join(blueprintDir, "model-specific-setup");
+}
+
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-hermes-config-test-"));
 });
@@ -152,5 +177,80 @@ describe("agents/hermes/generate-config.ts", () => {
     expect(config.telegram).toBeUndefined();
     expect(config.platforms.telegram).toBeUndefined();
     expect(envFile).toContain("TELEGRAM_BOT_TOKEN=openshell:resolve:env:TELEGRAM_BOT_TOKEN\n");
+  });
+
+  it("ignores the OpenClaw Kimi model-specific setup for Hermes output", () => {
+    const { config, envFile } = runConfigScript({
+      NEMOCLAW_MODEL: "moonshotai/kimi-k2.6",
+      NEMOCLAW_PROVIDER_KEY: "inference",
+      NEMOCLAW_INFERENCE_BASE_URL: "https://inference.local/v1",
+      NEMOCLAW_INFERENCE_API: "openai-completions",
+    });
+
+    expect(config.model).toEqual({
+      default: "moonshotai/kimi-k2.6",
+      provider: "custom",
+      base_url: "https://inference.local/v1",
+    });
+    expect(config.kimi).toBeUndefined();
+    expect(config.openclawPlugins).toBeUndefined();
+    expect(envFile).toContain("API_SERVER_PORT=18642\n");
+  });
+
+  it("discovers and validates Hermes manifests without changing runtime output", () => {
+    const blueprintDir = path.join(tmpDir, "fixture-blueprint");
+    const registryDir = writeRegistryManifest(
+      blueprintDir,
+      "hermes/fixture.json",
+      {
+        id: "fixture-hermes",
+        agent: "hermes",
+        description: "Fixture Hermes setup",
+        match: {
+          modelIds: ["fixture/hermes-model"],
+          providerKey: "custom",
+          baseUrl: "https://inference.local/v1",
+        },
+        effects: {
+          hermesCompat: {
+            future: true,
+          },
+        },
+      },
+    );
+
+    const { config } = runConfigScript({
+      NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR: registryDir,
+      NEMOCLAW_MODEL: "fixture/hermes-model",
+      NEMOCLAW_PROVIDER_KEY: "custom",
+    });
+
+    expect(config.model.default).toBe("fixture/hermes-model");
+    expect(config.hermesCompat).toBeUndefined();
+    expect(JSON.stringify(config)).not.toContain("future");
+  });
+
+  it("rejects unknown Hermes model-specific effect keys", () => {
+    const blueprintDir = path.join(tmpDir, "fixture-blueprint");
+    const registryDir = writeRegistryManifest(
+      blueprintDir,
+      "hermes/bad-effect.json",
+      {
+        id: "bad-hermes-effect",
+        agent: "hermes",
+        description: "Invalid Hermes effect",
+        match: {},
+        effects: {
+          openclawCompat: {},
+        },
+      },
+    );
+
+    const result = runConfigScriptRaw({
+      NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR: registryDir,
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("unknown effects for agent 'hermes': openclawCompat");
   });
 });

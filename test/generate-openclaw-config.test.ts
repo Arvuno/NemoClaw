@@ -33,7 +33,7 @@ const BASE_ENV: Record<string, string> = {
 
 let tmpDir: string;
 
-function runConfigScript(envOverrides: Record<string, string> = {}): any {
+function runConfigScriptRaw(envOverrides: Record<string, string> = {}) {
   const env: Record<string, string> = {
     PATH: process.env.PATH || "/usr/bin:/bin",
     ...BASE_ENV,
@@ -46,7 +46,11 @@ function runConfigScript(envOverrides: Record<string, string> = {}): any {
     env,
     timeout: 10_000,
   });
+  return result;
+}
 
+function runConfigScript(envOverrides: Record<string, string> = {}): any {
+  const result = runConfigScriptRaw(envOverrides);
   if (result.status !== 0) {
     throw new Error(
       `Script failed (exit ${result.status}):\nstdout: ${result.stdout}\nstderr: ${result.stderr}`,
@@ -55,6 +59,17 @@ function runConfigScript(envOverrides: Record<string, string> = {}): any {
 
   const configPath = path.join(tmpDir, ".openclaw", "openclaw.json");
   return JSON.parse(fs.readFileSync(configPath, "utf-8"));
+}
+
+function writeRegistryManifest(
+  blueprintDir: string,
+  relativeManifestPath: string,
+  manifest: Record<string, unknown>,
+): string {
+  const manifestPath = path.join(blueprintDir, "model-specific-setup", relativeManifestPath);
+  fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  return path.join(blueprintDir, "model-specific-setup");
 }
 
 beforeEach(() => {
@@ -286,6 +301,125 @@ describe("generate-openclaw-config.py: config generation", () => {
     expect(config.plugins.load.paths).toEqual([
       "/usr/local/share/nemoclaw/openclaw-plugins/kimi-inference-compat",
     ]);
+  });
+
+  it("does not activate the OpenClaw Kimi setup for non-matching routes", () => {
+    const cases = [
+      { NEMOCLAW_MODEL: "deepseek-ai/DeepSeek-V4-Flash" },
+      { NEMOCLAW_PROVIDER_KEY: "openai" },
+      { NEMOCLAW_INFERENCE_API: "responses" },
+      { NEMOCLAW_INFERENCE_BASE_URL: "https://integrate.api.nvidia.com/v1" },
+    ];
+
+    for (const envCase of cases) {
+      const config = runConfigScript({
+        NEMOCLAW_MODEL: "moonshotai/kimi-k2.6",
+        NEMOCLAW_PROVIDER_KEY: "inference",
+        NEMOCLAW_PRIMARY_MODEL_REF: "inference/moonshotai/kimi-k2.6",
+        NEMOCLAW_INFERENCE_BASE_URL: "https://inference.local/v1",
+        NEMOCLAW_INFERENCE_API: "openai-completions",
+        NEMOCLAW_INFERENCE_COMPAT_B64: Buffer.from(
+          JSON.stringify({ supportsStore: false }),
+        ).toString("base64"),
+        ...envCase,
+      });
+
+      const providerConfig = Object.values(config.models.providers)[0] as any;
+      expect(providerConfig.models[0].compat).toEqual({ supportsStore: false });
+      expect(config.plugins.entries["nemoclaw-kimi-inference-compat"]).toBeUndefined();
+      expect(config.plugins.load).toBeUndefined();
+    }
+  });
+
+  it("rejects model-specific setup manifests without a known agent", () => {
+    const blueprintDir = path.join(tmpDir, "fixture-blueprint");
+    const registryDir = writeRegistryManifest(
+      blueprintDir,
+      "openclaw/missing-agent.json",
+      {
+        id: "missing-agent",
+        description: "Invalid manifest",
+        match: {},
+        effects: { openclawCompat: {} },
+      },
+    );
+
+    const result = runConfigScriptRaw({
+      NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR: registryDir,
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("field 'agent' is required");
+
+    const unknownRegistryDir = writeRegistryManifest(
+      blueprintDir,
+      "openclaw/unknown-agent.json",
+      {
+        id: "unknown-agent",
+        agent: "sidecar",
+        description: "Invalid manifest",
+        match: {},
+        effects: { openclawCompat: {} },
+      },
+    );
+    fs.rmSync(path.join(blueprintDir, "model-specific-setup", "openclaw", "missing-agent.json"));
+
+    const unknownResult = runConfigScriptRaw({
+      NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR: unknownRegistryDir,
+    });
+
+    expect(unknownResult.status).not.toBe(0);
+    expect(unknownResult.stderr).toContain("unknown agent 'sidecar'");
+  });
+
+  it("rejects unknown OpenClaw effect keys and missing plugin source paths", () => {
+    const blueprintDir = path.join(tmpDir, "fixture-blueprint");
+    const registryDir = writeRegistryManifest(
+      blueprintDir,
+      "openclaw/bad-effect.json",
+      {
+        id: "bad-effect",
+        agent: "openclaw",
+        description: "Invalid OpenClaw effect",
+        match: {},
+        effects: { hermesCompat: {} },
+      },
+    );
+
+    const result = runConfigScriptRaw({
+      NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR: registryDir,
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("unknown effects for agent 'openclaw': hermesCompat");
+
+    fs.rmSync(path.join(blueprintDir, "model-specific-setup", "openclaw", "bad-effect.json"));
+    const missingPluginRegistryDir = writeRegistryManifest(
+      blueprintDir,
+      "openclaw/missing-plugin.json",
+      {
+        id: "missing-plugin",
+        agent: "openclaw",
+        description: "Invalid plugin path",
+        match: {},
+        effects: {
+          openclawPlugins: [
+            {
+              id: "missing-openclaw-plugin",
+              path: "openclaw-plugins/missing",
+              loadPath: "/usr/local/share/nemoclaw/openclaw-plugins/missing",
+            },
+          ],
+        },
+      },
+    );
+
+    const missingPluginResult = runConfigScriptRaw({
+      NEMOCLAW_MODEL_SPECIFIC_SETUP_DIR: missingPluginRegistryDir,
+    });
+
+    expect(missingPluginResult.status).not.toBe(0);
+    expect(missingPluginResult.stderr).toContain("path does not exist");
   });
 
   it("sets gateway auth token to empty string", () => {

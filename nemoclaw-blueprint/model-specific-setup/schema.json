@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NVIDIA/NemoClaw/nemoclaw-blueprint/model-specific-setup/schema.json",
+  "title": "NemoClaw Model-Specific Setup Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "agent", "description", "match", "effects"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+    },
+    "agent": {
+      "type": "string",
+      "enum": ["openclaw", "hermes"]
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modelIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "providerKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inferenceApi": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseUrl": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "effects": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "openclawCompat": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "openclawPlugins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "path", "loadPath"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "loadPath": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "hermesCompat": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}
