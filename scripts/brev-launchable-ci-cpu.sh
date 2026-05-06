@@ -82,19 +82,19 @@ fail() {
 # Fixes #1242 — public Brev launchable should default to a stable version.
 resolve_stable_ref() {
   case "$NEMOCLAW_REF" in
-    stable|latest)
-      local tag
-      tag=$(git ls-remote --tags --sort=-v:refname \
-        "https://github.com/NVIDIA/NemoClaw.git" 'refs/tags/v*' 2>/dev/null \
-        | head -1 | sed 's|.*refs/tags/||')
-      if [[ -n "$tag" ]]; then
-        NEMOCLAW_REF="$tag"
-        info "Resolved stable ref to latest release: $NEMOCLAW_REF"
-      else
-        warn "Could not resolve latest release tag — falling back to main"
-        NEMOCLAW_REF="main"
-      fi
-      ;;
+  stable | latest)
+    local tag
+    tag=$(git ls-remote --tags --sort=-v:refname \
+      "https://github.com/NVIDIA/NemoClaw.git" 'refs/tags/v*' 2>/dev/null |
+      head -1 | sed 's|.*refs/tags/||')
+    if [[ -n "$tag" ]]; then
+      NEMOCLAW_REF="$tag"
+      info "Resolved stable ref to latest release: $NEMOCLAW_REF"
+    else
+      warn "Could not resolve latest release tag — falling back to main"
+      NEMOCLAW_REF="main"
+    fi
+    ;;
   esac
 }
 resolve_stable_ref
@@ -123,8 +123,8 @@ retry() {
 # Brev VMs sometimes have unattended-upgrades running at boot.
 wait_for_apt_lock() {
   local max_wait=120 elapsed=0
-  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
-    || fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 ||
+    fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
     if ((elapsed >= max_wait)); then
       warn "apt lock not released after ${max_wait}s — proceeding anyway"
       return 0
@@ -188,8 +188,8 @@ else
   NODESOURCE_URL="https://deb.nodesource.com/setup_22.x"
   NODESOURCE_SHA256="575583bbac2fccc0b5edd0dbc03e222d9f9dc8d724da996d22754d6411104fd1"
   ns_tmp="$(mktemp)"
-  curl -fsSL "$NODESOURCE_URL" -o "$ns_tmp" \
-    || {
+  curl -fsSL "$NODESOURCE_URL" -o "$ns_tmp" ||
+    {
       rm -f "$ns_tmp"
       fail "Failed to download NodeSource installer"
     }
@@ -225,9 +225,9 @@ if command -v openshell >/dev/null 2>&1; then
     info "OpenShell CLI $_installed_ver does not match pinned ${_pinned_ver} — reinstalling..."
     ARCH="$(uname -m)"
     case "$ARCH" in
-      x86_64 | amd64) ASSET="openshell-x86_64-unknown-linux-musl.tar.gz" ;;
-      aarch64 | arm64) ASSET="openshell-aarch64-unknown-linux-musl.tar.gz" ;;
-      *) fail "Unsupported architecture: $ARCH" ;;
+    x86_64 | amd64) ASSET="openshell-x86_64-unknown-linux-musl.tar.gz" ;;
+    aarch64 | arm64) ASSET="openshell-aarch64-unknown-linux-musl.tar.gz" ;;
+    *) fail "Unsupported architecture: $ARCH" ;;
     esac
     tmpdir="$(mktemp -d)"
     retry 3 10 "download openshell" \
@@ -242,9 +242,9 @@ else
   info "Installing OpenShell CLI ${OPENSHELL_VERSION}..."
   ARCH="$(uname -m)"
   case "$ARCH" in
-    x86_64 | amd64) ASSET="openshell-x86_64-unknown-linux-musl.tar.gz" ;;
-    aarch64 | arm64) ASSET="openshell-aarch64-unknown-linux-musl.tar.gz" ;;
-    *) fail "Unsupported architecture: $ARCH" ;;
+  x86_64 | amd64) ASSET="openshell-x86_64-unknown-linux-musl.tar.gz" ;;
+  aarch64 | arm64) ASSET="openshell-aarch64-unknown-linux-musl.tar.gz" ;;
+  *) fail "Unsupported architecture: $ARCH" ;;
   esac
   tmpdir="$(mktemp -d)"
   retry 3 10 "download openshell" \
@@ -289,8 +289,8 @@ if [[ "${SKIP_DOCKER_PULL:-0}" != "1" ]]; then
     # If pinned cluster tag failed, try :latest
     if ! sg docker -c "docker image inspect $CLUSTER_IMAGE" >/dev/null 2>&1; then
       warn "  Could not pull $CLUSTER_IMAGE — trying :latest"
-      sg docker -c "docker pull ghcr.io/nvidia/openshell/cluster:latest" 2>&1 | tail -1 \
-        || warn "  Failed to pull openshell/cluster (will be pulled at test time)"
+      sg docker -c "docker pull ghcr.io/nvidia/openshell/cluster:latest" 2>&1 | tail -1 ||
+        warn "  Failed to pull openshell/cluster (will be pulled at test time)"
     fi
   ) &
   DOCKER_PULL_PID=$!
