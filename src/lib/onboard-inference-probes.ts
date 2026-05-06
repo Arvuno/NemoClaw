@@ -99,6 +99,13 @@ function getDeepSeekV4ProValidationProbeCurlArgs(opts) {
   return ["--connect-timeout", "20", "--max-time", "120"];
 }
 
+function getKimiK26ValidationProbeCurlArgs(opts) {
+  if (isWsl(opts)) {
+    return ["--connect-timeout", "20", "--max-time", "90"];
+  }
+  return ["--connect-timeout", "10", "--max-time", "60"];
+}
+
 function getCurlMaxTimeSeconds(args) {
   const maxTimeIndex = args.indexOf("--max-time");
   if (maxTimeIndex === -1) return 30;
@@ -215,6 +222,10 @@ function isDeepSeekV4ProModel(model) {
   return String(model || "").toLowerCase() === "deepseek-ai/deepseek-v4-pro";
 }
 
+function isKimiK26Model(model) {
+  return String(model || "").toLowerCase() === "moonshotai/kimi-k2.6";
+}
+
 function getChatCompletionsProbePayload(model) {
   const payload = {
     model,
@@ -232,15 +243,24 @@ function getChatCompletionsProbePayload(model) {
     };
   }
 
+  if (isKimiK26Model(model)) {
+    return {
+      ...payload,
+      max_tokens: 8,
+    };
+  }
+
   return payload;
 }
 
 function getChatCompletionsProbeCurlArgs({ authHeader, model, url, isWsl: isWslOverride }) {
   const platformOptions =
     typeof isWslOverride === "boolean" ? { isWsl: isWslOverride } : undefined;
-  const timingArgs = isDeepSeekV4ProModel(model)
-    ? getDeepSeekV4ProValidationProbeCurlArgs(platformOptions)
-    : getValidationProbeCurlArgs(platformOptions);
+  const timingArgs = (() => {
+    if (isDeepSeekV4ProModel(model)) return getDeepSeekV4ProValidationProbeCurlArgs(platformOptions);
+    if (isKimiK26Model(model)) return getKimiK26ValidationProbeCurlArgs(platformOptions);
+    return getValidationProbeCurlArgs(platformOptions);
+  })();
   return [
     "-sS",
     ...timingArgs,
@@ -541,6 +561,7 @@ module.exports = {
   getProbeAuthMode,
   getValidationProbeCurlArgs,
   getDeepSeekV4ProValidationProbeCurlArgs,
+  getKimiK26ValidationProbeCurlArgs,
   getChatCompletionsProbePayload,
   getChatCompletionsProbeCurlArgs,
   probeResponsesToolCalling,

@@ -90,6 +90,14 @@ const REMOTE_PROVIDER_CONFIG = {
 // Providers that run on the host and need the local-inference policy preset.
 const LOCAL_INFERENCE_PROVIDERS = ["ollama-local", "vllm-local"];
 
+type SandboxInferenceConfig = {
+  providerKey: string;
+  primaryModelRef: string;
+  inferenceBaseUrl: string;
+  inferenceApi: string;
+  inferenceCompat: Record<string, unknown> | null;
+};
+
 // Re-exported alias matching the existing onboard.ts call sites. The canonical
 // definitions live in inference-config.ts so that getProviderSelectionConfig
 // (which writes the sandbox-side config) and the gateway-registration path
@@ -295,7 +303,11 @@ function upsertMessagingProviders(tokenDefs, _runOpenshell) {
 
 // ── Sandbox inference config ─────────────────────────────────────
 
-function getSandboxInferenceConfig(model, provider = null, preferredInferenceApi = null) {
+function getSandboxInferenceConfig(
+  model: string,
+  provider: string | null = null,
+  preferredInferenceApi: string | null = null,
+): SandboxInferenceConfig {
   let providerKey;
   let primaryModelRef;
   let inferenceBaseUrl = "https://inference.local/v1";
