@@ -173,6 +173,7 @@ All hooks managed by [prek](https://prek.j178.dev/) (installed via `npm install`
 - Use one exact `agent` per manifest (`openclaw`, `hermes`, etc.); do not make shared multi-agent manifests
 - Put OpenClaw executable wrappers under `nemoclaw-blueprint/openclaw-plugins/`
 - Put Hermes executable wrappers under `agents/hermes/`
+- Keep `agents/hermes/generate-config.ts` as a thin build-time entrypoint; add Hermes env parsing, config construction, registry handling, and serialization under `agents/hermes/config/`
 - Do not add Hermes behavior for an OpenClaw issue without a Hermes-specific repro or acceptance test
 
 ### Gotchas

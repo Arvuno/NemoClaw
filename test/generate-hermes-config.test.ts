@@ -9,6 +9,7 @@ import YAML from "yaml";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const SCRIPT_PATH = path.join(import.meta.dirname, "..", "agents", "hermes", "generate-config.ts");
+const CONFIG_MODULE_DIR = path.join(import.meta.dirname, "..", "agents", "hermes", "config");
 
 const BASE_ENV: Record<string, string> = {
   NEMOCLAW_MODEL: "test-model",
@@ -76,6 +77,15 @@ function writeRegistryManifest(
   fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   return path.join(blueprintDir, "model-specific-setup");
+}
+
+function copyConfigGeneratorFixture(fixtureRoot: string): string {
+  const fixtureScriptPath = path.join(fixtureRoot, "agents", "hermes", "generate-config.ts");
+  const fixtureConfigDir = path.join(fixtureRoot, "agents", "hermes", "config");
+  fs.mkdirSync(path.dirname(fixtureScriptPath), { recursive: true });
+  fs.copyFileSync(SCRIPT_PATH, fixtureScriptPath);
+  fs.cpSync(CONFIG_MODULE_DIR, fixtureConfigDir, { recursive: true });
+  return fixtureScriptPath;
 }
 
 beforeEach(() => {
@@ -237,7 +247,7 @@ describe("agents/hermes/generate-config.ts", () => {
       "model-specific-setup",
     );
     const fixtureRoot = path.join(tmpDir, "script-relative-fixture");
-    const fixtureScriptPath = path.join(fixtureRoot, "agents", "hermes", "generate-config.ts");
+    const fixtureScriptPath = copyConfigGeneratorFixture(fixtureRoot);
     const registryDir = path.join(fixtureRoot, "nemoclaw-blueprint", "model-specific-setup");
     const manifestPath = path.join(
       registryDir,
@@ -246,8 +256,6 @@ describe("agents/hermes/generate-config.ts", () => {
     );
 
     try {
-      fs.mkdirSync(path.dirname(fixtureScriptPath), { recursive: true });
-      fs.copyFileSync(SCRIPT_PATH, fixtureScriptPath);
       fs.cpSync(sourceRegistryDir, registryDir, { recursive: true });
       fs.writeFileSync(
         manifestPath,
