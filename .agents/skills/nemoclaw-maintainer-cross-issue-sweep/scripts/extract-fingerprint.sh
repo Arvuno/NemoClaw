@@ -21,7 +21,11 @@ fi
 pr="$1"
 shift || true
 repo_args=()
-if [ "${1:-}" = "--repo" ] && [ -n "${2:-}" ]; then
+if [ "${1:-}" = "--repo" ]; then
+  if [ -z "${2:-}" ]; then
+    echo "Usage: $0 <pr-number> [--repo OWNER/REPO]" >&2
+    exit 64
+  fi
   repo_args=(--repo "$2")
 fi
 
@@ -37,21 +41,27 @@ diff=$(gh pr diff "$pr" "${repo_args[@]}" 2>/dev/null) || diff=""
 
 # Touched symbols. Extract from added/modified lines (start with `+`, not `+++`).
 # Per-language regex; defaults match TypeScript/JavaScript/Python/Go/shell.
-added_lines=$(printf '%s' "$diff" | grep -E '^\+[^+]' | sed 's/^+//')
+# Use `sed -n` instead of `grep | sed` so deletion-only diffs don't trip pipefail.
+added_lines=$(printf '%s\n' "$diff" | sed -n '/^\+[^+]/s/^+//p')
 
+# Each `grep` is followed by `|| true` so PRs touching only docs/comments
+# (no symbols, no error strings) don't abort the script under pipefail.
+# Two `export` patterns instead of one keep `export default function foo`
+# resolving to `foo` rather than the `function` keyword.
 extract_symbols() {
-  printf '%s' "$1" | grep -oE 'function [A-Za-z_$][A-Za-z0-9_$]*' | awk '{print $2}'
-  printf '%s' "$1" | grep -oE 'class [A-Za-z_$][A-Za-z0-9_$]*' | awk '{print $2}'
-  printf '%s' "$1" | grep -oE 'def [A-Za-z_][A-Za-z0-9_]*' | awk '{print $2}'
-  printf '%s' "$1" | grep -oE 'func [A-Z][A-Za-z0-9_]*' | awk '{print $2}'
-  printf '%s' "$1" | grep -oE 'const [A-Za-z_$][A-Za-z0-9_$]*' | awk '{print $2}'
-  printf '%s' "$1" | grep -oE 'export (function|class|const|let|var|default)? *[A-Za-z_$][A-Za-z0-9_$]*' | awk '{print $NF}'
+  printf '%s' "$1" | grep -oE 'function [A-Za-z_$][A-Za-z0-9_$]*' | awk '{print $2}' || true
+  printf '%s' "$1" | grep -oE 'class [A-Za-z_$][A-Za-z0-9_$]*' | awk '{print $2}' || true
+  printf '%s' "$1" | grep -oE 'def [A-Za-z_][A-Za-z0-9_]*' | awk '{print $2}' || true
+  printf '%s' "$1" | grep -oE 'func [A-Z][A-Za-z0-9_]*' | awk '{print $2}' || true
+  printf '%s' "$1" | grep -oE 'const [A-Za-z_$][A-Za-z0-9_$]*' | awk '{print $2}' || true
+  printf '%s' "$1" | grep -oE 'export default (function|class) [A-Za-z_$][A-Za-z0-9_$]*' | awk '{print $4}' || true
+  printf '%s' "$1" | grep -oE 'export (function|class|const|let|var) [A-Za-z_$][A-Za-z0-9_$]*' | awk '{print $3}' || true
 }
 
 # Drop common short / language-keyword names. Keep symbols >= 4 chars.
+# Use awk for both filters so empty input doesn't trigger grep's exit-1.
 symbols=$(extract_symbols "$added_lines" \
-  | grep -vE '^(if|for|let|var|const|new|do|of|as|in|is|to|on|at|by|or|and|the|set|get|map|run|all|any)$' \
-  | awk 'length($0) >= 4' \
+  | awk 'length($0) >= 4 && $0 !~ /^(if|for|let|var|const|new|do|of|as|in|is|to|on|at|by|or|and|the|set|get|map|run|all|any)$/' \
   | sort -u \
   | head -n 50 \
   | jq -Rn '[inputs | select(length > 0)]')
@@ -59,9 +69,9 @@ symbols=$(extract_symbols "$added_lines" \
 # Error-string tokens. Look for content inside throw new Error("..."), console.error("..."),
 # distinctive error-shaped strings starting with capital + 'Error'/'Failed'/etc.
 extract_error_strings() {
-  printf '%s' "$1" | grep -oE 'throw new Error\("[^"]+"\)' | sed -E 's/throw new Error\("([^"]+)"\)/\1/'
-  printf '%s' "$1" | grep -oE 'console\.error\("[^"]+"\)' | sed -E 's/console\.error\("([^"]+)"\)/\1/'
-  printf '%s' "$1" | grep -oE '"[A-Z][^"]*\b(Error|Failed|Cannot|Unable|Invalid|Missing|Unsupported)\b[^"]*"' | tr -d '"'
+  printf '%s' "$1" | grep -oE 'throw new Error\("[^"]+"\)' | sed -E 's/throw new Error\("([^"]+)"\)/\1/' || true
+  printf '%s' "$1" | grep -oE 'console\.error\("[^"]+"\)' | sed -E 's/console\.error\("([^"]+)"\)/\1/' || true
+  printf '%s' "$1" | grep -oE '"[A-Z][^"]*\b(Error|Failed|Cannot|Unable|Invalid|Missing|Unsupported)\b[^"]*"' | tr -d '"' || true
 }
 
 error_strings=$(extract_error_strings "$added_lines" \

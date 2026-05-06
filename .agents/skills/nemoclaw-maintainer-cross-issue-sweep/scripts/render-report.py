@@ -77,6 +77,9 @@ def main() -> int:
         print("Invalid spec: 'classifications' must be a list", file=sys.stderr)
         return 64
     suppressed = spec.get("suppressed", {})
+    if not isinstance(suppressed, dict):
+        print("Invalid spec: 'suppressed' must be a JSON object", file=sys.stderr)
+        return 64
 
     adjacent = sorted(
         [c for c in classifications if c.get("class") == "ADJACENT_FIX"],
