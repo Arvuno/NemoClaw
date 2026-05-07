@@ -651,6 +651,27 @@ describe("assessHost — CDI device-spec gap (#3152)", () => {
     expect(result.cdiNvidiaGpuSpecMissing).toBe(true);
   });
 
+  it("does not accept a sibling device class in JSON form either", () => {
+    const result = assessHost({
+      platform: "linux",
+      env: {},
+      release: "6.8.0-58-generic",
+      readFileImpl: (filePath: string) =>
+        filePath.endsWith("nvidia-extra.json")
+          ? '{"cdiVersion":"0.5.0","kind":"nvidia.com/gpu-extra","devices":[]}'
+          : "Linux version 6.8.0-58-generic",
+      readdirImpl: (dir: string) => (dir === "/etc/cdi" ? ["nvidia-extra.json"] : []),
+      dockerInfoOutput: JSON.stringify({
+        ServerVersion: "27.0",
+        CDISpecDirs: ["/etc/cdi"],
+      }),
+      commandExistsImpl: (name: string) => name === "docker",
+      gpuProbeImpl: () => true,
+    });
+
+    expect(result.cdiNvidiaGpuSpecMissing).toBe(true);
+  });
+
   it("ignores spec files whose `kind` only mentions nvidia.com/gpu in a comment", () => {
     const result = assessHost({
       platform: "linux",
