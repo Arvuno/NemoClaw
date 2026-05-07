@@ -65,7 +65,9 @@ Apply these rules in order. Drop any issue that fails a rule.
 **Issue-type allowlist:** must have `bug` label.
 **Issue-type skip:** drop if any of `enhancement`, `documentation`, `status: wont-fix`, `status: needs-info`, `security`. Use the canonical repo label names — bare `wontfix` / `needs-info` are NOT the repo's labels (verified via `gh label list`); the actual labels carry a `status:` prefix and a hyphen.
 
-**Platform skip (Linux-only in v1):** drop if any of `Platform: Windows/WSL`, `Platform: MacOS`, `Platform: macOS`. Keep `Platform: Ubuntu`, `Platform: DGX Spark`, `Platform: GB10`, `Platform: All`, or no platform label.
+**Platform skip (Brev-reproducible only in v1):** drop if any of `Platform: Windows/WSL`, `Platform: MacOS`, `Platform: macOS`, `Platform: Jetson AGX Thor/Orin`. Brev has no equivalent hardware for Jetson (embedded/edge ARM with integrated GPU is not in the Brev SKU catalog), so any Brev verification of a Jetson-only bug would produce a misleading "fixed-on-x86" verdict. Keep `Platform: Ubuntu`, `Platform: DGX Spark`, `Platform: GB10`, `Platform: All`, or no platform label. `Platform: DGX Spark` and `Platform: GB10` stay in scope but Step 10 requires a "Hardware substitution" caveat in the comment naming the Brev SKU we used as a substitute (Brev x86 GPU SKUs are not faithful to GB10 / Grace Hopper silicon for performance-shape or memory-architecture-shape bugs).
+
+**TUI / interactive-UI skip:** drop if the issue title contains `TUI`, `dashboard UI`, `chat UI`, `keystroke`, or `key press`, OR if the body describes interactive UI behavior (key sequences, mouse interactions, browser-side UI state) without a non-interactive reproducer (no `NEMOCLAW_NON_INTERACTIVE=1` or equivalent env var pattern). `brev exec` does not allocate a real TTY by default, so TUI reproducers hang or silently fail at the first prompt; v1 documents this as out-of-scope rather than emitting a wrong verdict. v1.1 may add a `script(1)` / `expect` / `tmux send-keys` harness to lift this skip.
 
 **Integration skip (deferred to v2):** drop if any of `Integration: Slack`, `Integration: Discord`, `Integration: Telegram`, `Integration: Hermes`, `Integration: OpenClaw`, `Integration: WeChat`. These need third-party credentials a fresh Brev box cannot provide.
 
@@ -192,6 +194,17 @@ Three real failure modes surfaced during the v1 dry-run. Test each before trusti
 - Body keywords (whole-word, case-insensitive): `nvidia-smi`, `cuda`, `H100`, `A100`, `L40S`, `L4`, `T4`, `GB10`, `DGX`, `vllm`, `tensorrt`. Match as whole words — `inference` and `model serving` are too noisy (e.g. `models.providers.inference.baseUrl` is a config path on CPU bugs, not a GPU need) and intentionally excluded.
 
 CPU default keeps cost low. Only escalate to GPU when the reproducer needs one.
+
+**Bug class classification.** In addition to CPU/GPU, classify the bug's verification shape so Step 8 routes to the right rubric. Classes are mutually exclusive — pick the first that matches:
+
+| Class | Detection heuristic | Routes to |
+|---|---|---|
+| `performance` | Body or title mentions latency thresholds (`P50`, `P90`, `ms`, `seconds`, `slow`, `hangs`, `timeout` with a numeric value), or mentions `memory leak` / `over time` / `eventually` | Step 8e (multi-run distribution rubric) |
+| `rebuild-cycle` | Body mentions `rebuild`, `recreate`, `restart`, `pod recreate`, `across rebuilds`, `after restart`, `survives a destroy` | Step 8f (run-rebuild-rerun harness) |
+| `log-only` | Body's symptom is logs-not-stdout: `see lots of error in <X> log`, `os.networkInterfaces guard errors`, anything pointing at a specific log file rather than the reproducer's stdout/stderr | Step 8b's match rubric extended with log-scraping |
+| `functional` (default) | Everything else — exit code + stdout/stderr matching | Step 8b standard rubric |
+
+Most bugs are `functional`. The other three classes need verification harnesses that the standard rubric can't produce honestly — e.g., one clean run of a perf reproducer doesn't tell you the p50 budget was met; one onboard run doesn't tell you a config survives a rebuild. Set `BUG_CLASS=<class>` so downstream steps can branch.
 
 ---
 
@@ -545,6 +558,29 @@ brev copy ./reproducer.sh "$INSTANCE_NAME":~/reproducer.sh
 brev exec "$INSTANCE_NAME" "bash ~/reproducer.sh" 2>&1 | tee ./baseline-transcript.log
 ```
 
+**Log-scraping (when `BUG_CLASS=log-only`).** Some bugs describe symptoms that show up in internal log files, not the reproducer's stdout/stderr — e.g., #1642 "see lots of error in openclaw log," #2611 "os.networkInterfaces guard errors." After running the reproducer, also pull the relevant logs from inside the sandbox and search them for the issue's symptom phrase:
+
+```bash
+# Common NemoClaw / OpenClaw / OpenShell log paths inside the sandbox.
+brev exec "$INSTANCE_NAME" "sg docker -c 'cat ~/.openclaw/logs/*.log /var/log/nemoclaw/*.log 2>/dev/null'" \
+  | tee ./baseline-logs.log
+
+# Search the log capture for the issue's symptom phrase too, not just the transcript.
+grep -F "<symptom phrase from issue body>" ./baseline-logs.log
+```
+
+For functional bugs the reproducer's stdout is sufficient; for log-only bugs the transcript may be clean but the log capture has the symptom. Both halves feed into the match rubric below.
+
+**Flake-detection retry.** Even for `functional` bugs, race-prone reproducers (TUI rendering, network policy negotiation, concurrent sandbox state) can produce inconsistent results. Run baseline three times if the first run shows the symptom inconsistently — same script, same env, just three back-to-back invocations. If the three runs disagree, that's signal:
+
+| 3-run baseline result | Verdict |
+|---|---|
+| All three reproduce the symptom | Strong baseline match → continue to 8d |
+| All three are clean (no symptom) | Reproducer doesn't expose the bug on baseline → Step 8c synth-repro |
+| Mixed (1 or 2 of 3 show the symptom) | Flake-prone reproducer. Note "flake suspected" in the comment; apply −25 to Step 9 score; downgrade `+50 latest clean` to `+25` because a clean latest run could just be the lucky path of an intermittent bug |
+
+Skip flake retry for `performance` and `rebuild-cycle` classes — those have their own multi-run rubrics in Steps 8e and 8f.
+
 **Match rubric.** LLM compares `baseline-transcript.log` to the issue's "Actual result" / error description. Match criteria, in order:
 
 1. **Exit code agrees** with what the issue describes (non-zero if issue describes a failure, zero if issue describes a wrong-output bug). Necessary but not sufficient.
@@ -634,6 +670,56 @@ Adapt the axes to the bug class. For filesystem bugs: `find`, `lsattr`, `stat`. 
 - If any axis still shows the buggy state, the bug is NOT fixed even if the reproducer's surface is clean. Escalate to "still reproduces" (Step 9 special case).
 
 **When drift is NOT suspected** (the reproducer's tool is unchanged in the version range): the reproducer's expected output is sufficient, no multi-axis verification needed.
+
+---
+
+## Step 8e: Performance-Bug Verification (when `BUG_CLASS=performance`)
+
+Performance bugs (#2598 "10s P50", #2600 "hangs ~2 min", #2733 Ollama tool-call leak over time) can't be answered by the standard exit-code + symptom-phrase rubric — one clean reproducer run doesn't tell you the p50 budget is met; one slow run doesn't tell you the bug still reproduces. Replace Step 8b's match with a measurement-and-distribution rubric:
+
+1. **Parse the SLA from the issue body.** Extract numeric latency thresholds: `10s P50`, `200ms`, `under 5 seconds`, `~2 min`. Save as `SLA_P50_MS`, `SLA_P90_MS`, etc. If no numeric SLA is in the body, route to Step 8c synth-repro to ask the reporter (via comment) for one — without a target, the verdict is undefined.
+2. **Run the reproducer N=10 times** on each side (baseline + latest), capturing per-run latency:
+
+   ```bash
+   for i in $(seq 1 10); do
+     /usr/bin/time -f '%e' bash ~/reproducer.sh >/dev/null 2>>./latest-perf.log
+   done
+   ```
+
+3. **Compute p50 and p90** for both sides. `sort -n ./latest-perf.log | awk 'NR==5'` for p50 of 10 runs.
+4. **Match rubric:**
+   - Latest's p50 within the SLA AND baseline's p50 outside the SLA → bug fixed; same Step 9 scoring (subject to baseline-validation gate).
+   - Latest's p50 outside the SLA → bug still reproduces (Step 9 special case).
+   - Latest p50 within SLA AND baseline p50 also within SLA → reproducer doesn't actually exercise the bug; route to Step 8c synth-repro.
+
+**Hardware-substitution caveat.** Performance numbers are silicon-dependent. When the issue is `Platform: DGX Spark` or `Platform: GB10` and we're measuring on a Brev x86 GPU SKU, the comment must say so explicitly: a Brev p50 of 1.5s on a `H100` does not prove the DGX Spark p50 is fixed. Cap the score at 60 unless the bug is clearly silicon-independent (e.g. an algorithmic regression in user-space JS that would manifest the same on any silicon).
+
+---
+
+## Step 8f: Rebuild-Cycle Verification (when `BUG_CLASS=rebuild-cycle`)
+
+Rebuild-cycle bugs (#2701 "Pod recreate wipes `/tmp/nemoclaw-proxy-env.sh`," issues describing "configuration is not persisted across rebuilds") only manifest when sandbox state crosses a destroy/recreate boundary. A single onboard run can't trigger the symptom. Replace Step 8b's match with a run-rebuild-rerun harness:
+
+1. **First onboard.** Run the reproducer once to establish initial state. Capture relevant artifacts (config files, env vars, sandbox metadata) — the issue body usually names what should persist:
+
+   ```bash
+   brev exec "$INSTANCE_NAME" "sg docker -c 'cat <files-mentioned-in-issue> 2>&1'" | tee ./pre-rebuild.log
+   ```
+
+2. **Trigger the rebuild.** Use `nemoclaw destroy --all --force` followed by `nemoclaw onboard` with the same env vars. Do NOT comprehensive-reset between (the point is to test the destroy/recreate, not start from scratch).
+
+3. **Re-capture the same artifacts** post-rebuild:
+
+   ```bash
+   brev exec "$INSTANCE_NAME" "sg docker -c 'cat <same-files> 2>&1'" | tee ./post-rebuild.log
+   ```
+
+4. **Diff and match.** The bug is "X gets wiped / changes / regresses across rebuild." Compare pre-rebuild vs post-rebuild captures to the issue's expected behavior:
+   - Pre and post agree (artifact preserved) AND issue says it should be preserved → bug fixed
+   - Pre and post differ (artifact wiped) AND issue says it gets wiped → bug still reproduces
+   - Pre and post agree AND issue says it gets wiped → reproducer doesn't exercise the bug; Step 8c synth-repro
+
+The harness still uses Step 9's scoring framework — `+50 latest clean (artifact preserved)`, etc. — but the "what gets compared" axis is the diff, not the symptom phrase.
 
 ---
 
@@ -918,6 +1004,8 @@ Transcripts and synth-repro scripts are already plain text and skip the pre-pass
 **Length target.** Default rendered comment to **400–500 words**. The evidence table (or by-design "What's structurally fixed" + "Vestigial references" sections) is the hero. Strip architectural prose "for QA reference," PR-attribution caveats beyond one sentence, and closing reopen-instructions boilerplate. If a comment runs past 500 words, cut everything that doesn't directly support the verdict — every section needs to either change a reader's mind about the verdict or be deleted.
 
 **Mandatory cap caveat.** When the score is capped (Step 9 baseline-validation gating, or any Step 11 degraded-mode path), the rendered Verdict section must include a one-line caveat naming the cap and the reason. Example: `Capped at 84 because Step 9's baseline-validation gate did not run (sandbox-build rot on v0.0.18: Dockerfile symlink layer removed by #2227).` Don't make readers reverse-engineer why the score didn't go higher — name it.
+
+**Mandatory hardware-substitution caveat.** When the issue carries `Platform: DGX Spark` or `Platform: GB10` and Step 7 provisioned a Brev SKU that is not the same silicon (Brev's stoppable GPU catalog is x86 + discrete H100/A100/L40S/T4 — not Grace Hopper / GB10 unified-memory ARM64), the rendered comment must include a one-line "Hardware substitution" note. Example: `Hardware substitution: verified on Brev n1-standard-4:nvidia-tesla-t4 (x86_64 + T4) as a substitute for the reporter's DGX Spark (ARM64 + GB10). For silicon-shape bugs (perf, memory architecture, drivers) this is not a faithful repro — please confirm on actual DGX Spark.` This goes in the metadata block right after `Verification mode:` so it's visible at the top, not buried in the analysis.
 
 **Mandatory `Verification mode` header line.** All three templates below include a `**Verification mode:**` line in the metadata block, naming what we did and didn't actually run (e.g., "runtime reproduction on Brev <SKU>; baseline + latest both installed and run" for the standard template; "static analysis at the verified-on tag — no runtime reproduction" for the by-design template; "runtime reproduction on Brev <SKU>; bug confirmed live on latest" for still-reproduces). Reader should never have to guess whether the verdict came from real install logs or from static analysis.
 
