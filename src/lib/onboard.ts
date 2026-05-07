@@ -8406,7 +8406,44 @@ async function setupOpenclaw(sandboxName: string, model: string, provider: strin
     }
   }
 
+  // The gateway may rewrite openclaw.json after the sync script, resetting
+  // permissions to its default umask (600/700). Wait for the gateway to
+  // finish initializing, then re-normalize so the mutable-default state
+  // (660/2770) is what downstream tests and shields-up/down observe.
+  normalizeOpenclawConfigPerms(sandboxName);
+
   console.log(`  ✓ ${agentProductName()} gateway launched inside sandbox`);
+}
+
+/**
+ * Poll for gateway readiness, then re-apply the mutable-default permission
+ * set on /sandbox/.openclaw. This closes the race where the gateway's own
+ * config write lands after {@link buildSandboxConfigSyncScript} has already
+ * set 660/2770, reverting the directory to 600/700.
+ */
+function normalizeOpenclawConfigPerms(sandboxName: string): void {
+  // Give the gateway up to ~30 s to finish its initial config write.
+  for (let i = 0; i < 15; i += 1) {
+    if (isOpenclawReady(sandboxName)) break;
+    sleep(2);
+  }
+  const permsScript = `
+set -euo pipefail
+config_dir=/sandbox/.openclaw
+if [ -d "$config_dir" ]; then
+  config_dir_owner="$(stat -c '%U' "$config_dir" 2>/dev/null || echo unknown)"
+  if [ "$config_dir_owner" != "root" ]; then
+    chmod -R g+rwX,o-rwx "$config_dir" 2>/dev/null || true
+    find "$config_dir" -type d -exec chmod g+s {} + 2>/dev/null || true
+    chmod 2770 "$config_dir" 2>/dev/null || true
+    chmod 660 "$config_dir/openclaw.json" "$config_dir/.config-hash" 2>/dev/null || true
+  fi
+fi
+exit`.trim();
+  run(openshellArgv(["sandbox", "connect", sandboxName]), {
+    stdio: ["pipe", "ignore", "inherit"],
+    input: permsScript,
+  });
 }
 
 // ── Step 7: Policy presets ───────────────────────────────────────
