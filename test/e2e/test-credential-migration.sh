@@ -103,6 +103,14 @@ if ! command -v openshell >/dev/null 2>&1; then
     fail "install.sh failed; see /tmp/nemoclaw-e2e-install.log"
     exit 1
   }
+  # Refresh PATH so install.sh-managed binaries are visible
+  if [ -f "$HOME/.bashrc" ]; then
+    # shellcheck source=/dev/null
+    source "$HOME/.bashrc" 2>/dev/null || true
+  fi
+  if [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+  fi
 fi
 
 command -v openshell >/dev/null 2>&1 || {
