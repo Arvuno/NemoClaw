@@ -106,6 +106,10 @@ install_nemoclaw() {
     # shellcheck source=/dev/null
     source "$HOME/.bashrc" 2>/dev/null || true
   fi
+  # Re-add ~/.local/bin after .bashrc — nvm.sh may rebuild PATH, dropping it
+  if [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+  fi
   if ! command -v nemoclaw >/dev/null 2>&1; then
     log "ERROR: install.sh failed — nemoclaw not found"
     exit 1
