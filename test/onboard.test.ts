@@ -2508,9 +2508,26 @@ fs.readFileSync = (filePath, ...args) => {
 const commands = [];
 runner.run = (command, opts = {}) => {
   const cmd = _n(command);
+  if (cmd.startsWith("python3 -m venv") || cmd.includes("/bin/python -m pip")) {
+    throw new Error("unexpected managed-router reinstall in reuse test: " + cmd);
+  }
+  if (/(^|[\/\s])pip3(?:\s|$)/.test(cmd)) {
+    throw new Error("unexpected pip3 invocation in test harness: " + cmd);
+  }
+  if (cmd.includes("git -C") || /^git(?:\s|$)/.test(cmd)) {
+    throw new Error("unexpected git invocation in test harness: " + cmd);
+  }
   commands.push({ command: cmd, env: opts.env || null });
   if (cmd.includes("provider get")) return { status: 1, stdout: "", stderr: "" };
-  return { status: 0, stdout: "", stderr: "" };
+  if (
+    cmd.includes("gateway select") ||
+    cmd.includes("provider create") ||
+    cmd.includes("provider update") ||
+    cmd.includes("inference set")
+  ) {
+    return { status: 0, stdout: "", stderr: "" };
+  }
+  throw new Error("unexpected command in managed-router reuse test: " + cmd);
 };
 runner.runCapture = (command) => {
   const cmd = _n(command);
@@ -2914,9 +2931,26 @@ fs.readFileSync = (filePath, ...args) => {
 const commands = [];
 runner.run = (command, opts = {}) => {
   const cmd = _n(command);
+  if (cmd.startsWith("python3 -m venv") || cmd.includes("/bin/python -m pip")) {
+    throw new Error("unexpected managed-router reinstall in reuse test: " + cmd);
+  }
+  if (/(^|[\/\s])pip3(?:\s|$)/.test(cmd)) {
+    throw new Error("unexpected pip3 invocation in test harness: " + cmd);
+  }
+  if (cmd.includes("git -C") || /^git(?:\s|$)/.test(cmd)) {
+    throw new Error("unexpected git invocation in test harness: " + cmd);
+  }
   commands.push({ command: cmd, env: opts.env || null });
   if (cmd.includes("provider get")) return { status: 1, stdout: "", stderr: "" };
-  return { status: 0, stdout: "", stderr: "" };
+  if (
+    cmd.includes("gateway select") ||
+    cmd.includes("provider create") ||
+    cmd.includes("provider update") ||
+    cmd.includes("inference set")
+  ) {
+    return { status: 0, stdout: "", stderr: "" };
+  }
+  throw new Error("unexpected command in managed-router reuse test: " + cmd);
 };
 runner.runCapture = (command) => {
   const cmd = _n(command);
