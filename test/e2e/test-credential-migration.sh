@@ -85,6 +85,9 @@ SANDBOX_NAME="${NEMOCLAW_SANDBOX_NAME:-e2e-cred-migration}"
 . "$(dirname "${BASH_SOURCE[0]}")/lib/sandbox-teardown.sh"
 register_sandbox_for_teardown "$SANDBOX_NAME"
 
+# shellcheck source=test/e2e/lib/install-path-refresh.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/install-path-refresh.sh"
+
 # ══════════════════════════════════════════════════════════════════
 # Phase 0: Prerequisites
 # ══════════════════════════════════════════════════════════════════
@@ -104,13 +107,7 @@ if ! command -v openshell >/dev/null 2>&1; then
     exit 1
   }
   # Refresh PATH so install.sh-managed binaries are visible
-  if [ -f "$HOME/.bashrc" ]; then
-    # shellcheck source=/dev/null
-    source "$HOME/.bashrc" 2>/dev/null || true
-  fi
-  if [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-    export PATH="$HOME/.local/bin:$PATH"
-  fi
+  nemoclaw_refresh_install_env
 fi
 
 command -v openshell >/dev/null 2>&1 || {
