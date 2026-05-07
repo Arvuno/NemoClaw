@@ -26,7 +26,7 @@ const RUNTIME_MOVES: Record<string, string> = moveMap.runtimeMoves;
 const REMOVED_SHIM_MOVES: Record<string, string> = {
   "bin/lib/chat-filter.js": "src/lib/chat-filter.ts",
   "bin/lib/config-io.js": "src/lib/state/config-io.ts",
-  "bin/lib/debug.js": "src/lib/debug.ts",
+  "bin/lib/debug.js": "src/lib/diagnostics/debug.ts",
   "bin/lib/inference-config.js": "src/lib/inference-config.ts",
   "bin/lib/local-inference.js": "src/lib/local-inference.ts",
   "bin/lib/nim.js": "src/lib/nim.ts",

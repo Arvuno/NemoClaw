@@ -293,15 +293,15 @@ const {
   planHostRemediation,
   probeContainerDns,
 } = preflightUtils;
-const agentOnboard = require("./agent-onboard");
-const agentDefs = require("./agent-defs");
+const agentOnboard = require("./agent/onboard");
+const agentDefs = require("./agent/defs");
 
 const gatewayState: typeof import("./state/gateway") = require("./state/gateway");
 const sandboxState: typeof import("./state/sandbox") = require("./state/sandbox");
 const validation: typeof import("./validation") = require("./validation");
 const urlUtils: typeof import("./url-utils") = require("./url-utils");
 const buildContext = require("./build-context");
-const dashboardContract: typeof import("./dashboard-contract") = require("./dashboard-contract");
+const dashboardContract: typeof import("./dashboard/contract") = require("./dashboard/contract");
 const httpProbe: typeof import("./http-probe") = require("./http-probe");
 const modelPrompts: typeof import("./model-prompts") = require("./model-prompts");
 const providerModels: typeof import("./provider-models") = require("./provider-models");
@@ -309,7 +309,7 @@ const sandboxCreateStream: typeof import("./sandbox-create-stream") = require(".
 const validationRecovery: typeof import("./validation-recovery") = require("./validation-recovery");
 const webSearch: typeof import("./web-search") = require("./web-search");
 
-import type { AgentDefinition } from "./agent-defs";
+import type { AgentDefinition } from "./agent/defs";
 import type { CurlProbeResult } from "./http-probe";
 import type { GatewayInference, ProviderSelectionConfig } from "./inference-config";
 import type { GpuInfo, ValidationResult } from "./local-inference";
@@ -8447,7 +8447,7 @@ function syncPresetSelection(
 
 const CONTROL_UI_PORT = DASHBOARD_PORT;
 
-// Dashboard helpers — delegated to src/lib/dashboard-contract.ts
+// Dashboard helpers — delegated to src/lib/dashboard/contract.ts
 const { buildChain, buildControlUiUrls } = dashboardContract;
 
 // Parses `openshell forward list` output and returns the sandbox currently

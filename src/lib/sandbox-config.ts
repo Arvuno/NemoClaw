@@ -22,7 +22,7 @@ const { validateName } = require("./runner");
 const { dockerExecFileSync } = require("./adapters/docker/exec");
 const credentialFilter: typeof import("./credential-filter") = require("./credential-filter");
 const { stripCredentials, isConfigObject, isConfigValue, isCredentialField } = credentialFilter;
-const { appendAuditEntry } = require("./shields-audit");
+const { appendAuditEntry } = require("./shields/audit");
 const { isPrivateHostname, isPrivateIp } = require("./private-networks");
 
 type ConfigObject = import("./credential-filter").ConfigObject;
@@ -98,7 +98,7 @@ function resolveAgentConfig(sandboxName: string): AgentConfigTarget {
     const entry = registry.getSandbox(sandboxName);
     if (!entry || !entry.agent) return DEFAULT_AGENT_CONFIG;
 
-    const agentDefs = require("./agent-defs");
+    const agentDefs = require("./agent/defs");
     const agent = agentDefs.loadAgent(entry.agent);
     const cfg = agent.configPaths;
 
