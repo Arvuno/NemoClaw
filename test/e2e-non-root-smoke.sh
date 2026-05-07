@@ -77,9 +77,9 @@ info() { echo -e "${YELLOW}TEST${NC}: $1"; }
 # Temporary verbose logging (#2571 review phase) — surfaces the actual
 # command that ran, the raw result of each test, and an explanation of why
 # it passed/failed.
-cmd()    { echo -e "  ${YELLOW}[cmd]${NC}    $1"; }
+cmd() { echo -e "  ${YELLOW}[cmd]${NC}    $1"; }
 result() { echo -e "  ${YELLOW}[result]${NC} $1"; }
-why()    { echo -e "  ${YELLOW}[why]${NC}    $1"; }
+why() { echo -e "  ${YELLOW}[why]${NC}    $1"; }
 output() {
   echo -e "  ${YELLOW}[output]${NC} $1"
   echo "$2" | tail -20 | sed 's/^/    /'
@@ -124,8 +124,8 @@ fi
 
 info "2. Kernel confirms NoNewPrivs=1 inside container (defends against silent flag typos)"
 NNP=$(docker run --rm --security-opt no-new-privileges --entrypoint "" "$IMAGE" \
-        sh -c 'grep ^NoNewPrivs /proc/self/status' 2>/dev/null \
-      | awk '{print $2}' || echo "")
+  sh -c 'grep ^NoNewPrivs /proc/self/status' 2>/dev/null \
+  | awk '{print $2}' || echo "")
 if [ "$NNP" = "1" ]; then
   pass "kernel confirms NoNewPrivs=1"
   cmd "docker run --rm --security-opt no-new-privileges --entrypoint '' $IMAGE sh -c 'grep ^NoNewPrivs /proc/self/status' | awk '{print \$2}'"
