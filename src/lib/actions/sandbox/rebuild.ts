@@ -364,6 +364,10 @@ export async function rebuildSandbox(
         )
       : null;
   const rebuildMessagingChannels = registryMessagingChannels ?? sessionMessagingChannels ?? [];
+  const sessionMessagingChannelConfig =
+    sessionMatchesSandbox ? sessionBefore?.messagingChannelConfig ?? null : null;
+  const rebuildMessagingChannelConfig =
+    sb.messagingChannelConfig ?? sessionMessagingChannelConfig ?? null;
   const hasRebuildMessagingChannels =
     registryMessagingChannels !== null || sessionMessagingChannels !== null;
   log(
@@ -380,6 +384,7 @@ export async function rebuildSandbox(
     s.status = "in_progress";
     s.agent = rebuildAgent;
     s.messagingChannels = rebuildMessagingChannels;
+    s.messagingChannelConfig = rebuildMessagingChannelConfig;
     // Persist inference selection from the about-to-be-removed registry entry
     // so onboard --resume can recreate with the same provider/model in
     // non-interactive mode. Without this the registry is gone by the time
