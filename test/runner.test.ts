@@ -674,8 +674,8 @@ describe("regression guards", () => {
           return 0
         }
         export -f curl
-        shasum() { cat >/dev/null; echo "checksum OK"; return 0; }
-        export -f shasum
+        sha256sum() { cat >/dev/null; echo "checksum OK"; return 0; }
+        export -f sha256sum
         tar() { return 0; }; export -f tar
         install() { return 0; }; export -f install
         source "${scriptPath}"
@@ -709,8 +709,8 @@ describe("regression guards", () => {
         export PATH="${tmpBin}:/usr/bin:/bin"
         curl() { echo "CURL_FALLBACK $*"; return 0; }
         export -f curl
-        shasum() { echo "SHASUM $*" >> ${JSON.stringify(checksumLog)}; echo "checksum OK"; return 0; }
-        export -f shasum
+        sha256sum() { echo "SHA256SUM $*" >> ${JSON.stringify(checksumLog)}; echo "checksum OK"; return 0; }
+        export -f sha256sum
         tar() { return 0; }; export -f tar
         install() { return 0; }; export -f install
         source "${scriptPath}"
@@ -723,7 +723,7 @@ describe("regression guards", () => {
         const out = (result.stdout || "") + (result.stderr || "");
         expect(out).toContain("falling back to curl");
         expect(out).toContain("CURL_FALLBACK");
-        expect(fs.readFileSync(checksumLog, "utf-8")).toContain("SHASUM -a 256 -c -");
+        expect(fs.readFileSync(checksumLog, "utf-8")).toContain("SHA256SUM -c -");
       } finally {
         fs.rmSync(tmpBin, { recursive: true, force: true });
       }
