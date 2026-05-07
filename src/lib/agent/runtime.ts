@@ -7,11 +7,11 @@
 // When the session agent is openclaw (or absent), all functions return
 // defaults that match the hardcoded OpenClaw values on main.
 
-import * as registry from "./state/registry";
-import { DASHBOARD_PORT } from "./ports";
-import * as onboardSession from "./onboard-session";
-import { loadAgent, type AgentDefinition } from "./agent-defs";
-import { shellQuote } from "./runner";
+import { DASHBOARD_PORT } from "../ports";
+import { shellQuote } from "../runner";
+import * as onboardSession from "../onboard-session";
+import * as registry from "../state/registry";
+import { loadAgent, type AgentDefinition } from "./defs";
 
 /**
  * Resolve the agent for a sandbox. Checks the per-sandbox registry first

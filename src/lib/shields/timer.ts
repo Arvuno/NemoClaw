@@ -11,10 +11,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { buildPolicySetCommand } from "./policies";
-import { run } from "./runner";
-import { DEFAULT_AGENT_CONFIG, resolveAgentConfig } from "./sandbox-config";
-import { lockAgentConfig } from "./shields";
+import { buildPolicySetCommand } from "../policies";
+import { run } from "../runner";
+import { DEFAULT_AGENT_CONFIG, resolveAgentConfig } from "../sandbox-config";
+import { lockAgentConfig } from "./index";
 
 type UnknownRecord = { [key: string]: unknown };
 

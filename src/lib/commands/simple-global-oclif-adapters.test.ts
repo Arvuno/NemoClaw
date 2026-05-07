@@ -24,8 +24,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("node:child_process", () => ({ spawnSync: mocks.spawnSync }));
-vi.mock("../debug", () => ({ runDebug: vi.fn() }));
-vi.mock("../debug-command", () => ({
+vi.mock("../diagnostics/debug", () => ({ runDebug: vi.fn() }));
+vi.mock("../diagnostics/debug-command", () => ({
   runDebugCommandWithOptions: mocks.runDebugCommandWithOptions,
 }));
 vi.mock("../gateway-token-command", () => ({

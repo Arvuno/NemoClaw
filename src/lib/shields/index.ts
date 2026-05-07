@@ -13,17 +13,17 @@
 const fs = require("fs");
 const path = require("path");
 const { fork } = require("child_process");
-const { run, runCapture, validateName, shellQuote } = require("./runner");
-const { dockerExecFileSync } = require("./adapters/docker/exec");
+const { run, runCapture, validateName, shellQuote } = require("../runner");
+const { dockerExecFileSync } = require("../adapters/docker/exec");
 const {
   buildPolicyGetCommand,
   buildPolicySetCommand,
   parseCurrentPolicy,
   PERMISSIVE_POLICY_PATH,
-} = require("./policies");
-const { parseDuration, MAX_SECONDS, DEFAULT_SECONDS } = require("./domain/duration");
-const { appendAuditEntry } = require("./shields-audit");
-const { resolveAgentConfig } = require("./sandbox-config");
+} = require("../policies");
+const { parseDuration, MAX_SECONDS, DEFAULT_SECONDS } = require("../domain/duration");
+const { appendAuditEntry } = require("./audit");
+const { resolveAgentConfig } = require("../sandbox-config");
 
 const STATE_DIR = path.join(process.env.HOME ?? "/tmp", ".nemoclaw", "state");
 
@@ -691,7 +691,7 @@ function shieldsDown(sandboxName: string, opts: ShieldsDownOpts = {}): void {
   //    can take minutes (policy apply + kubectl chmod), so a relative timeout
   //    passed at fork time would fire too early.
   const restoreAt = new Date(Date.now() + timeoutSeconds * 1000);
-  const timerScript = path.join(__dirname, "shields-timer.ts");
+  const timerScript = path.join(__dirname, "timer.ts");
   const timerScriptJs = timerScript.replace(/\.ts$/, ".js");
   const actualScript = fs.existsSync(timerScriptJs) ? timerScriptJs : timerScript;
 

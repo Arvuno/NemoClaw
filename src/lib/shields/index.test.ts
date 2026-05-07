@@ -9,7 +9,7 @@ import os from "node:os";
 // The shields module uses CJS require("./runner") etc., which vitest resolves
 // relative to src/lib/. We mock the absolute paths that vitest will resolve.
 
-vi.mock("../../src/lib/runner", () => ({
+vi.mock("../runner", () => ({
   run: vi.fn(() => ({ status: 0 })),
   runCapture: vi.fn(() => "version: 1\nnetwork_policies:\n  test: {}"),
   validateName: vi.fn((name) => name),
@@ -18,7 +18,7 @@ vi.mock("../../src/lib/runner", () => ({
   ROOT: "/mock/root",
 }));
 
-vi.mock("../../src/lib/policies", () => ({
+vi.mock("../policies", () => ({
   buildPolicyGetCommand: vi.fn((name) => ["openshell", "policy", "get", "--full", name]),
   buildPolicySetCommand: vi.fn((file, name) => [
     "openshell",
@@ -33,7 +33,7 @@ vi.mock("../../src/lib/policies", () => ({
   PERMISSIVE_POLICY_PATH: "/mock/permissive.yaml",
 }));
 
-vi.mock("../../src/lib/sandbox-config", () => ({
+vi.mock("../sandbox-config", () => ({
   resolveAgentConfig: vi.fn(() => ({
     agentName: "openclaw",
     configPath: "/sandbox/.openclaw/openclaw.json",
@@ -43,7 +43,7 @@ vi.mock("../../src/lib/sandbox-config", () => ({
   })),
 }));
 
-vi.mock("../../src/lib/shields-audit", () => ({
+vi.mock("./audit", () => ({
   appendAuditEntry: vi.fn(),
 }));
 
@@ -76,29 +76,29 @@ describe("shields — unit logic", () => {
     // Since the CJS require resolution issue makes direct import flaky,
     // test the TypeScript duration module instead.
     it("parses minutes", async () => {
-      const { parseDuration } = await import("../src/lib/domain/duration.js");
+      const { parseDuration } = await import("../domain/duration.js");
       expect(parseDuration("5m")).toBe(300);
       expect(parseDuration("30m")).toBe(1800);
     });
 
     it("parses seconds", async () => {
-      const { parseDuration } = await import("../src/lib/domain/duration.js");
+      const { parseDuration } = await import("../domain/duration.js");
       expect(parseDuration("90s")).toBe(90);
     });
 
     it("treats bare numbers as seconds", async () => {
-      const { parseDuration } = await import("../src/lib/domain/duration.js");
+      const { parseDuration } = await import("../domain/duration.js");
       expect(parseDuration("300")).toBe(300);
     });
 
     it("rejects durations exceeding 30 minutes", async () => {
-      const { parseDuration } = await import("../src/lib/domain/duration.js");
+      const { parseDuration } = await import("../domain/duration.js");
       expect(() => parseDuration("31m")).toThrow("exceeds maximum");
       expect(() => parseDuration("1h")).toThrow("exceeds maximum");
     });
 
     it("rejects invalid input", async () => {
-      const { parseDuration } = await import("../src/lib/domain/duration.js");
+      const { parseDuration } = await import("../domain/duration.js");
       expect(() => parseDuration("abc")).toThrow("Invalid duration");
     });
   });
@@ -266,7 +266,7 @@ describe("shields — unit logic", () => {
   // -------------------------------------------------------------------
   describe("NC-2227-02: three-state shields model", () => {
     it("deriveShieldsMode encodes the fresh, locked, unlocked, and legacy-state cases", async () => {
-      const { deriveShieldsMode } = await import("../dist/lib/shields.js");
+      const { deriveShieldsMode } = await import("../../../dist/lib/shields/index.js");
 
       expect(deriveShieldsMode({}, false)).toBe("mutable_default");
       expect(deriveShieldsMode({ shieldsDown: true }, true)).toBe("temporarily_unlocked");
@@ -281,10 +281,7 @@ describe("shields — unit logic", () => {
 // -------------------------------------------------------------------
 describe("NC-2227-04: sandbox-state.ts tar commands do not follow symlinks", () => {
   function getSourceCode(): string {
-    return fs.readFileSync(
-      path.join(import.meta.dirname, "..", "src", "lib", "state", "sandbox.ts"),
-      "utf-8",
-    );
+    return fs.readFileSync(path.join(import.meta.dirname, "..", "state", "sandbox.ts"), "utf-8");
   }
 
   it("backup tar command does not use -h flag (no symlink following)", () => {
@@ -386,10 +383,7 @@ describe("NC-2227-04: sandbox-state.ts tar commands do not follow symlinks", () 
 // -------------------------------------------------------------------
 describe("NC-2227-05: shields.ts locks state directories", () => {
   function getSourceCode(): string {
-    return fs.readFileSync(
-      path.join(import.meta.dirname, "..", "src", "lib", "shields.ts"),
-      "utf-8",
-    );
+    return fs.readFileSync(path.join(import.meta.dirname, "index.ts"), "utf-8");
   }
 
   it("HIGH_RISK_STATE_DIRS constant includes executable state and workspace entry points", () => {

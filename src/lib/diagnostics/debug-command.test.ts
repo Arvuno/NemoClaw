@@ -9,7 +9,7 @@ import {
   printDebugHelp,
   runDebugCommand,
   runDebugCommandWithOptions,
-} from "../../dist/lib/debug-command";
+} from "../../../dist/lib/diagnostics/debug-command";
 
 function exitWithCode(code: number): never {
   throw new Error(`exit:${code}`);

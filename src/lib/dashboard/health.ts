@@ -6,7 +6,7 @@
  * chain and produces a per-link diagnosis. All deps injected.
  */
 
-import type { DashboardDeliveryChain } from "./dashboard-contract";
+import type { DashboardDeliveryChain } from "./contract";
 
 export interface DashboardHealthDeps {
   executeSandboxCommand: (name: string, script: string) => { status: number; stdout: string } | null;

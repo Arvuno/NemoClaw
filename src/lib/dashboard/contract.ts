@@ -6,8 +6,8 @@
  * Pure functions — no I/O, no process.env reads.
  */
 
-import { DASHBOARD_PORT } from "./ports";
-import { isLoopbackHostname } from "./url-utils";
+import { DASHBOARD_PORT } from "../ports";
+import { isLoopbackHostname } from "../url-utils";
 
 export interface PlatformHints {
   chatUiUrl?: string;

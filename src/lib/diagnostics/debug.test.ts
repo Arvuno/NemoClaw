@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // Import from compiled dist/ so coverage is attributed correctly.
-import { createTarball, getDebugCompletionMessages, redact } from "../../dist/lib/debug";
+import { createTarball, getDebugCompletionMessages, redact } from "../../../dist/lib/diagnostics/debug";
 
 describe("redact", () => {
   it("redacts NVIDIA_API_KEY=value patterns", () => {

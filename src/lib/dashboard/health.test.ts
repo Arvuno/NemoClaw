@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect } from "vitest";
-import { verifyDashboardChain } from "../../dist/lib/dashboard-health.js";
-import { buildChain } from "../../dist/lib/dashboard-contract.js";
+import { verifyDashboardChain } from "../../../dist/lib/dashboard/health.js";
+import { buildChain } from "../../../dist/lib/dashboard/contract.js";
 
 const chain = buildChain();
 

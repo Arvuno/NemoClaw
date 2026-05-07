@@ -11,7 +11,7 @@ import {
   getAgentChoices,
   loadAgent,
   resolveAgentName,
-} from "../../dist/lib/agent-defs";
+} from "../../../dist/lib/agent/defs";
 
 const tempAgentDirs: string[] = [];
 

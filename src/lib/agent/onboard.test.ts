@@ -5,8 +5,8 @@ import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vites
 import fs from "node:fs";
 import path from "node:path";
 // Import from compiled dist/ so coverage is attributed correctly.
-import { printDashboardUi, verifyAgentBinaryAvailable } from "../../dist/lib/agent-onboard";
-import type { AgentDefinition } from "./agent-defs";
+import { printDashboardUi, verifyAgentBinaryAvailable } from "../../../dist/lib/agent/onboard";
+import type { AgentDefinition } from "./defs";
 
 function makeAgent(overrides: Partial<AgentDefinition> = {}): AgentDefinition {
   return {
@@ -128,7 +128,7 @@ describe("printDashboardUi — regression for #2078 (port 8642 is not a chat UI)
 
 describe("handleAgentSetup guards", () => {
   it("fails onboarding instead of completing when the agent binary or health probe is missing", () => {
-    const source = fs.readFileSync(path.join(import.meta.dirname, "agent-onboard.ts"), "utf-8");
+    const source = fs.readFileSync(path.join(import.meta.dirname, "onboard.ts"), "utf-8");
 
     expect(source).toContain("verifyAgentBinaryAvailable");
     expect(source).toContain("AGENT_BINARY_CHECK_PREFIX");
@@ -146,7 +146,7 @@ describe("handleAgentSetup guards", () => {
   });
 
   it("accepts Hermes JSON health responses without substring false positives", () => {
-    const source = fs.readFileSync(path.join(import.meta.dirname, "agent-onboard.ts"), "utf-8");
+    const source = fs.readFileSync(path.join(import.meta.dirname, "onboard.ts"), "utf-8");
 
     expect(source).toContain("function isHealthProbeOk");
     expect(source).toContain("JSON.parse(body)");

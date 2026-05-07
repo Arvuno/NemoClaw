@@ -9,9 +9,9 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import type { AgentDefinition } from "../dist/lib/agent-defs.js";
-import { loadAgent } from "../dist/lib/agent-defs.js";
-import { buildChain, buildControlUiUrls } from "../dist/lib/dashboard-contract.js";
+import type { AgentDefinition } from "../dist/lib/agent/defs.js";
+import { loadAgent } from "../dist/lib/agent/defs.js";
+import { buildChain, buildControlUiUrls } from "../dist/lib/dashboard/contract.js";
 import { NAME_ALLOWED_FORMAT } from "../dist/lib/name-validation.js";
 import { stageOptimizedSandboxBuildContext } from "../dist/lib/sandbox-build-context.js";
 
@@ -1441,7 +1441,7 @@ describe("onboard helpers", () => {
     const scriptPath = path.join(tmpDir, "web-search-prompt-check.cjs");
     const onboardPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "onboard.js"));
     const credentialsPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "credentials.js"));
-    const agentDefsPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "agent-defs.js"));
+    const agentDefsPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "agent", "defs.js"));
 
     const script = `
 let promptCalls = 0;

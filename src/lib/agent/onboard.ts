@@ -9,14 +9,14 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { dockerBuild, dockerImageInspect } from "./adapters/docker";
-import { type AgentDefinition, loadAgent, resolveAgentName } from "./agent-defs";
-import { getAgentBranding } from "./branding";
-import { getProviderSelectionConfig } from "./inference-config";
-import type { JsonObject as LooseObject, JsonValue as LooseValue } from "./json-types";
-import * as onboardSession from "./onboard-session";
-import { ROOT, redact, run, shellQuote } from "./runner";
-import { sleepSeconds } from "./wait";
+import { dockerBuild, dockerImageInspect } from "../adapters/docker";
+import { getAgentBranding } from "../branding";
+import { getProviderSelectionConfig } from "../inference-config";
+import type { JsonObject as LooseObject, JsonValue as LooseValue } from "../json-types";
+import * as onboardSession from "../onboard-session";
+import { ROOT, redact, run, shellQuote } from "../runner";
+import { sleepSeconds } from "../wait";
+import { type AgentDefinition, loadAgent, resolveAgentName } from "./defs";
 
 export interface OnboardContext {
   step: (current: number, total: number, message: string) => void;

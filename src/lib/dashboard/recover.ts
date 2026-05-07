@@ -5,9 +5,9 @@
  * Dashboard chain recovery — link-aware, idempotent. All deps injected.
  */
 
-import type { DashboardDeliveryChain } from "./dashboard-contract";
-import type { DashboardHealthDeps, ChainStatus } from "./dashboard-health";
-import { verifyDashboardChain } from "./dashboard-health";
+import type { DashboardDeliveryChain } from "./contract";
+import type { DashboardHealthDeps, ChainStatus } from "./health";
+import { verifyDashboardChain } from "./health";
 
 export interface DashboardRecoverDeps extends DashboardHealthDeps {
   restartGateway: (name: string, port: number, agent: unknown) => boolean;

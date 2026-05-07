@@ -3,12 +3,12 @@
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
-import { dockerExecFileSync } from "./adapters/docker/exec";
 import { platform, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
-import { DASHBOARD_PORT } from "./ports";
-import { listSandboxes } from "./state/registry";
+import { dockerExecFileSync } from "../adapters/docker/exec";
+import { DASHBOARD_PORT } from "../ports";
+import { listSandboxes } from "../state/registry";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,7 +54,7 @@ function section(title: string): void {
 // Secret redaction — delegates to unified redact module (#2381).
 // ---------------------------------------------------------------------------
 
-import { redactFull as redact } from "./redact";
+import { redactFull as redact } from "../redact";
 export { redact };
 
 // ---------------------------------------------------------------------------
@@ -485,8 +485,8 @@ export function getDebugCompletionMessages(output?: string): string[] {
 export function runDebug(opts: DebugOptions = {}): void {
   const quick = opts.quick ?? false;
   const output = opts.output ?? "";
-  // Compiled location: dist/lib/debug.js → repo root is 2 levels up
-  const repoDir = join(__dirname, "..", "..");
+  // Compiled location: dist/lib/diagnostics/debug.js → repo root is 3 levels up
+  const repoDir = join(__dirname, "..", "..", "..");
 
   // Resolve sandbox name
   let sandboxName =

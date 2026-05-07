@@ -7,8 +7,8 @@ import {
   buildManualRecoveryCommand,
   buildOpenClawRecoveryScript,
   buildRecoveryScript,
-} from "../../dist/lib/agent-runtime";
-import type { AgentDefinition } from "./agent-defs";
+} from "../../../dist/lib/agent/runtime";
+import type { AgentDefinition } from "./defs";
 
 function makeAgent(overrides: Partial<AgentDefinition> = {}): AgentDefinition {
   return {

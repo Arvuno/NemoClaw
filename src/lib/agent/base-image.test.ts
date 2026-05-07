@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentDefinition } from "./agent-defs";
+import type { AgentDefinition } from "./defs";
 
-type AgentOnboardModule = typeof import("../../dist/lib/agent-onboard");
-type DockerImageModule = typeof import("../../dist/lib/adapters/docker/image");
-type DockerInspectModule = typeof import("../../dist/lib/adapters/docker/inspect");
+type AgentOnboardModule = typeof import("../../../dist/lib/agent/onboard");
+type DockerImageModule = typeof import("../../../dist/lib/adapters/docker/image");
+type DockerInspectModule = typeof import("../../../dist/lib/adapters/docker/inspect");
 
 /**
  * Build a minimal Hermes agent manifest for base-image provisioning tests.
@@ -56,14 +56,14 @@ function withMockedDocker<T>(
   }) => T,
 ): T {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const dockerImageModule = require("../../dist/lib/adapters/docker/image") as DockerImageModule;
+  const dockerImageModule = require("../../../dist/lib/adapters/docker/image") as DockerImageModule;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const dockerInspectModule = require("../../dist/lib/adapters/docker/inspect") as DockerInspectModule;
+  const dockerInspectModule = require("../../../dist/lib/adapters/docker/inspect") as DockerInspectModule;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const runnerModule = require("../../dist/lib/runner") as { ROOT: string };
+  const runnerModule = require("../../../dist/lib/runner") as { ROOT: string };
   const originalDockerBuild = dockerImageModule.dockerBuild;
   const originalDockerImageInspect = dockerInspectModule.dockerImageInspect;
-  const agentOnboardModulePath = require.resolve("../../dist/lib/agent-onboard");
+  const agentOnboardModulePath = require.resolve("../../../dist/lib/agent/onboard");
   delete require.cache[agentOnboardModulePath];
 
   const dockerBuildMock = vi.fn().mockReturnValue({ status: 0 });
@@ -74,7 +74,7 @@ function withMockedDocker<T>(
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const agentOnboardModule = require("../../dist/lib/agent-onboard") as AgentOnboardModule;
+    const agentOnboardModule = require("../../../dist/lib/agent/onboard") as AgentOnboardModule;
     return run({
       ensureAgentBaseImage: agentOnboardModule.ensureAgentBaseImage,
       dockerBuildMock,

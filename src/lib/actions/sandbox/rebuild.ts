@@ -18,8 +18,8 @@ const { LOCAL_INFERENCE_PROVIDERS, REMOTE_PROVIDER_CONFIG } = require("../../onb
   REMOTE_PROVIDER_CONFIG: Record<string, { providerName: string; credentialEnv: string | null }>;
 };
 
-import { loadAgent } from "../../agent-defs";
-import { ensureAgentBaseImage } from "../../agent-onboard";
+import { loadAgent } from "../../agent/defs";
+import { ensureAgentBaseImage } from "../../agent/onboard";
 import { getSandboxDeleteOutcome } from "../../domain/sandbox/destroy";
 import * as nim from "../../nim";
 import type { Session } from "../../onboard-session";
