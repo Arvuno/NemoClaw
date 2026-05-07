@@ -196,11 +196,27 @@ for cmd in gh brev jq python3 curl; do
 done
 
 # Brev auth — short-circuit only after the auth check, not before.
+# When auth fails, give the user a directive recipe (the browser-flow path is
+# what works from non-TTY harnesses like Claude Code, not the headless options).
 brev ls --json >/dev/null 2>&1 || {
-  echo "Brev not authenticated. Choose one:"
-  echo "  1) brev login --skip-browser     # prints a URL, works from any shell"
-  echo "  2) brev login                    # opens browser, run in a separate terminal if your shell lacks a TTY"
-  echo "  3) brev login --token \"\$BREV_API_TOKEN\"  # non-interactive, same env var used by test/e2e/brev-e2e.test.ts"
+  cat <<'MSG'
+
+ERROR: Brev not authenticated. ~/.brev/credentials.json is missing or the token expired.
+
+What to do (works from any harness, including non-TTY agent contexts):
+
+  1. Open a separate Terminal on your laptop.
+  2. Run:   brev login
+     A browser opens; complete the auth flow; the CLI exits on success.
+  3. Come back here and re-run this skill. Credentials persist to
+     ~/.brev/credentials.json and every subsequent `brev` call picks them up.
+
+Headless / no-browser alternatives (when option 1 isn't available):
+  - brev login --skip-browser            # prints a URL, paste into any browser
+  - brev login --token "$BREV_API_TOKEN" # non-interactive; same env var used
+                                         # by test/e2e/brev-e2e.test.ts
+
+MSG
   exit 1
 }
 
@@ -224,7 +240,9 @@ done
 INSTALL_URL=${NEMOCLAW_INSTALL_URL:-https://www.nvidia.com/nemoclaw.sh}
 curl -fsI "$INSTALL_URL" >/dev/null 2>&1 || {
   echo "ERROR: install URL not reachable: $INSTALL_URL"
-  echo "Set NEMOCLAW_INSTALL_URL or check https://nemoclaw.nvidia.com is up."
+  echo "  - Check https://www.nvidia.com/nemoclaw.sh is up (the default Akamai-hosted entry)."
+  echo "  - Override with NEMOCLAW_INSTALL_URL=<alternate-url> if your team mirrors the installer."
+  echo "  - Then re-run this skill."
   exit 1
 }
 ```
