@@ -828,6 +828,7 @@ const ROUTER_HEALTH_INTERVAL_MS = 2000;
 const ROUTER_HEALTH_TIMEOUT_MS = 3000;
 const MODEL_ROUTER_RELATIVE_DIR = path.join("nemoclaw-blueprint", "router", "llm-router");
 const MODEL_ROUTER_VENV_DIR = path.join(os.homedir(), ".nemoclaw", "model-router-venv");
+const DEFAULT_MODEL_ROUTER_CREDENTIAL_ENV = "NVIDIA_API_KEY";
 
 async function isRouterHealthy(port: number, timeoutMs = ROUTER_HEALTH_TIMEOUT_MS): Promise<boolean> {
   const http = require("http");
@@ -953,6 +954,14 @@ function installModelRouterCommand(routerDir = modelRouterPackageDir()): string 
 }
 
 function ensureModelRouterCommand(): string {
+  const venvDir = process.env.NEMOCLAW_MODEL_ROUTER_VENV || MODEL_ROUTER_VENV_DIR;
+  const managedCommand = path.join(venvDir, "bin", "model-router");
+  try {
+    fs.accessSync(managedCommand, fs.constants.X_OK);
+    return managedCommand;
+  } catch {
+    // Fall through to PATH or install.
+  }
   return resolveHostCommandPath("model-router") || installModelRouterCommand();
 }
 
@@ -987,7 +996,7 @@ async function startModelRouter(routerCfg: BlueprintRouterConfig): Promise<numbe
 
   const { buildSubprocessEnv } = require("./subprocess-env");
   const credEnvVars: Record<string, string> = {};
-  const credName = routerCfg.credential_env || "NVIDIA_API_KEY";
+  const credName = routerCfg.credential_env || DEFAULT_MODEL_ROUTER_CREDENTIAL_ENV;
   const routedCredential = resolveProviderCredential(credName);
   const openAiCredential = resolveProviderCredential("OPENAI_API_KEY");
   if (routedCredential) {
@@ -1091,7 +1100,8 @@ function isRoutedInferenceProvider(provider: string | null | undefined): boolean
 async function reconcileModelRouter(): Promise<void> {
   const bp = getRoutedProfile();
   const routerPort = bp.router.port || 4000;
-  const routerCredentialEnv = bp.router.credential_env || bp.credential_env || "NVIDIA_API_KEY";
+  const routerCredentialEnv =
+    bp.router.credential_env || bp.credential_env || DEFAULT_MODEL_ROUTER_CREDENTIAL_ENV;
   const routerCredential =
     hydrateCredentialEnv(routerCredentialEnv) ||
     normalizeCredentialValue(bp.credential_default || "");
@@ -6886,7 +6896,8 @@ async function setupNim(
           if (isNonInteractive()) process.exit(1);
           continue selectionLoop;
         }
-        const routerCredentialEnv = bp.router?.credential_env || bp.credential_env || "OPENAI_API_KEY";
+        const routerCredentialEnv =
+          bp.router?.credential_env || bp.credential_env || DEFAULT_MODEL_ROUTER_CREDENTIAL_ENV;
         credentialEnv = routerCredentialEnv;
         const routedCredential =
           hydrateCredentialEnv(routerCredentialEnv) ||
@@ -7179,7 +7190,7 @@ async function setupInference(
       console.error(`  ✗ Failed to start model router: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);
     }
-    const resolvedCredentialEnv = credentialEnv || "NVIDIA_API_KEY";
+    const resolvedCredentialEnv = credentialEnv || DEFAULT_MODEL_ROUTER_CREDENTIAL_ENV;
     const credentialValue = hydrateCredentialEnv(resolvedCredentialEnv);
     const env = credentialValue ? { [resolvedCredentialEnv]: credentialValue } : {};
     const providerResult = upsertProvider(
