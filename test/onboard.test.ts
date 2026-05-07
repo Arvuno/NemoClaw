@@ -2488,7 +2488,13 @@ const _n = (c) => (Array.isArray(c) ? c.join(" ") : String(c)).replace(/'/g, "")
 const registry = require(${registryPath});
 const routerPort = ${routerPort};
 const blueprintPath = path.join(${JSON.stringify(repoRoot)}, "nemoclaw-blueprint", "blueprint.yaml");
+const routerPyproject = path.join(${JSON.stringify(repoRoot)}, "nemoclaw-blueprint", "router", "llm-router", "pyproject.toml");
 const originalReadFileSync = fs.readFileSync;
+const originalExistsSync = fs.existsSync;
+fs.existsSync = (filePath) => {
+  if (filePath === routerPyproject || String(filePath) === routerPyproject) return true;
+  return originalExistsSync(filePath);
+};
 fs.readFileSync = (filePath, ...args) => {
   const raw = originalReadFileSync(filePath, ...args);
   if (filePath === blueprintPath || String(filePath) === blueprintPath) {
@@ -2885,7 +2891,13 @@ const registry = require(${registryPath});
 const routerPort = ${routerPort};
 const repoRoot = ${JSON.stringify(repoRoot)};
 const blueprintPath = path.join(repoRoot, "nemoclaw-blueprint", "blueprint.yaml");
+const routerPyproject = path.join(repoRoot, "nemoclaw-blueprint", "router", "llm-router", "pyproject.toml");
 const originalReadFileSync = fs.readFileSync;
+const originalExistsSync = fs.existsSync;
+fs.existsSync = (filePath) => {
+  if (filePath === routerPyproject || String(filePath) === routerPyproject) return true;
+  return originalExistsSync(filePath);
+};
 fs.readFileSync = (filePath, ...args) => {
   const raw = originalReadFileSync(filePath, ...args);
   if (filePath === blueprintPath || String(filePath) === blueprintPath) {
@@ -3081,8 +3093,14 @@ const registry = require(${registryPath});
 const routerPort = ${routerPort};
 const repoRoot = ${JSON.stringify(repoRoot)};
 const blueprintPath = path.join(repoRoot, "nemoclaw-blueprint", "blueprint.yaml");
+const routerPyproject = path.join(repoRoot, "nemoclaw-blueprint", "router", "llm-router", "pyproject.toml");
 const originalReadFileSync = fs.readFileSync;
 const originalRun = runner.run;
+const originalExistsSync = fs.existsSync;
+fs.existsSync = (filePath) => {
+  if (filePath === routerPyproject || String(filePath) === routerPyproject) return true;
+  return originalExistsSync(filePath);
+};
 fs.readFileSync = (filePath, ...args) => {
   const raw = originalReadFileSync(filePath, ...args);
   if (filePath === blueprintPath || String(filePath) === blueprintPath) {
