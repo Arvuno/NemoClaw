@@ -4129,6 +4129,166 @@ const { createSandbox } = require(${onboardPath});
   );
 
   it(
+    "preserves Hermes Slack policy when Slack is active at sandbox create time",
+    { timeout: 60_000 },
+    async () => {
+      const repoRoot = path.join(import.meta.dirname, "..");
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-onboard-hermes-slack-"));
+      const fakeBin = path.join(tmpDir, "bin");
+      const customBuildDir = path.join(tmpDir, "custom-build");
+      const customDockerfilePath = path.join(customBuildDir, "Dockerfile");
+      const scriptPath = path.join(tmpDir, "hermes-slack-policy.js");
+      const onboardPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "onboard.js"));
+      const agentDefsPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "agent-defs.js"));
+      const runnerPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "runner.js"));
+      const registryPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "state", "registry.js"));
+      const preflightPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "preflight.js"));
+      const credentialsPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "credentials.js"));
+      const yamlPath = JSON.stringify(path.join(repoRoot, "node_modules", "yaml"));
+      const customDockerfileArg = JSON.stringify(customDockerfilePath);
+
+      fs.mkdirSync(fakeBin, { recursive: true });
+      fs.mkdirSync(customBuildDir, { recursive: true });
+      fs.writeFileSync(customDockerfilePath, "FROM scratch\n");
+      fs.writeFileSync(path.join(fakeBin, "openshell"), "#!/usr/bin/env bash\nexit 0\n", {
+        mode: 0o755,
+      });
+
+      const script = String.raw`
+const runner = require(${runnerPath});
+const _n = (c) => (Array.isArray(c) ? c.join(" ") : String(c)).replace(/'/g, "");
+const registry = require(${registryPath});
+const preflight = require(${preflightPath});
+const credentials = require(${credentialsPath});
+const childProcess = require("node:child_process");
+const { EventEmitter } = require("node:events");
+const fs = require("node:fs");
+const YAML = require(${yamlPath});
+const { loadAgent } = require(${agentDefsPath});
+
+const commands = [];
+runner.run = (command, opts = {}) => {
+  const normalized = _n(command);
+  commands.push({ command: normalized, env: opts.env || null });
+  if (normalized.includes("provider get")) return { status: 1 };
+  return { status: 0 };
+};
+runner.runCapture = (command) => {
+  if (_n(command).includes("sandbox get my-assistant")) return "";
+  if (_n(command).includes("sandbox list")) return "my-assistant Ready";
+  if (_n(command).includes("forward list")) return "my-assistant 127.0.0.1 18789 12345 running";
+  if (_n(command).includes("sandbox exec") && _n(command).includes("curl")) return "ok";
+  return "";
+};
+registry.registerSandbox = () => true;
+registry.updateSandbox = () => true;
+registry.setDefault = () => true;
+registry.removeSandbox = () => true;
+preflight.checkPortAvailable = async () => ({ ok: true });
+credentials.prompt = async () => "";
+
+childProcess.spawn = (...args) => {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  const command = _n(args[1][1]);
+  const entry = { command, env: args[2]?.env || null };
+  const policyMatch = command.match(/--policy ([^ ]+)/);
+  if (policyMatch) {
+    entry.policyPath = policyMatch[1];
+    try {
+      entry.policyContent = fs.readFileSync(policyMatch[1], "utf-8");
+    } catch (error) {
+      entry.policyReadError = String(error);
+    }
+  }
+  commands.push(entry);
+  process.nextTick(() => {
+    child.stdout.emit("data", Buffer.from("Created sandbox: my-assistant\n"));
+    child.emit("close", 0);
+  });
+  return child;
+};
+
+const { createSandbox } = require(${onboardPath});
+
+(async () => {
+  process.env.OPENSHELL_GATEWAY = "nemoclaw";
+  process.env.NEMOCLAW_AGENT = "hermes";
+  process.env.SLACK_BOT_TOKEN = "xoxb-test-slack-token-value";
+  process.env.SLACK_APP_TOKEN = "xapp-test-slack-app-token-value";
+  const sandboxName = await createSandbox(
+    null,
+    "gpt-5.4",
+    "nvidia-prod",
+    null,
+    "my-assistant",
+    null,
+    null,
+    ${customDockerfileArg},
+    loadAgent("hermes"),
+  );
+  const createCommand = commands.find((entry) => entry.command.includes("sandbox create"));
+  const parsed = YAML.parse(createCommand?.policyContent || "") || {};
+  const slack = parsed.network_policies?.slack || {};
+  console.log(JSON.stringify({
+    sandboxName,
+    createCommand: {
+      command: createCommand?.command || "",
+      policyPath: createCommand?.policyPath || "",
+      policyReadError: createCommand?.policyReadError || null,
+    },
+    slackBinaryPaths: (slack.binaries || []).map((entry) => entry.path),
+    slackEndpointHosts: (slack.endpoints || []).map((entry) => entry.host),
+  }));
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+`;
+      fs.writeFileSync(scriptPath, script);
+
+      const result = spawnSync(process.execPath, [scriptPath], {
+        cwd: repoRoot,
+        encoding: "utf-8",
+        env: {
+          ...process.env,
+          HOME: tmpDir,
+          PATH: `${fakeBin}:${process.env.PATH || ""}`,
+          NEMOCLAW_NON_INTERACTIVE: "1",
+        },
+      });
+
+      assert.equal(result.status, 0, result.stderr);
+      const payloadLine = result.stdout
+        .trim()
+        .split("\n")
+        .slice()
+        .reverse()
+        .find((line) => line.startsWith("{") && line.endsWith("}"));
+      assert.ok(payloadLine, `expected JSON payload in stdout:\n${result.stdout}`);
+      const payload = JSON.parse(payloadLine);
+
+      assert.ok(payload.createCommand.command.includes("sandbox create"));
+      assert.match(payload.createCommand.command, /--provider my-assistant-slack-bridge/);
+      assert.match(payload.createCommand.command, /--provider my-assistant-slack-app/);
+      assert.doesNotMatch(payload.createCommand.policyPath, /nemoclaw-initial-policy/);
+      assert.equal(payload.createCommand.policyReadError, null);
+      assert.deepEqual(payload.slackBinaryPaths, [
+        "/usr/local/bin/hermes",
+        "/usr/bin/python3.11",
+        "/opt/hermes/.venv/bin/python",
+      ]);
+      assert.ok(
+        !payload.slackBinaryPaths.includes("/usr/local/bin/node"),
+        "Hermes Slack policy must not be replaced by the generic Node Slack preset",
+      );
+      assert.ok(payload.slackEndpointHosts.includes("wss-primary.slack.com"));
+      assert.ok(payload.slackEndpointHosts.includes("wss-backup.slack.com"));
+    },
+  );
+
+  it(
     "reuses existing messaging providers during non-interactive recreate when tokens are not in the host env",
     { timeout: 60_000 },
     async () => {

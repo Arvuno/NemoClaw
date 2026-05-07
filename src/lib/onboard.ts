@@ -1486,11 +1486,30 @@ const CREATE_TIME_POLICY_PRESETS_BY_CHANNEL: Record<string, string[]> = {
   slack: ["slack"],
 };
 
+function getNetworkPolicyNames(policyContent: string): Set<string> {
+  try {
+    // Lazy require: yaml is already a dependency via the policy helpers.
+    const YAML = require("yaml");
+    const parsed = YAML.parse(policyContent);
+    const networkPolicies = parsed?.network_policies;
+    if (
+      !networkPolicies ||
+      typeof networkPolicies !== "object" ||
+      Array.isArray(networkPolicies)
+    ) {
+      return new Set();
+    }
+    return new Set(Object.keys(networkPolicies));
+  } catch {
+    return new Set();
+  }
+}
+
 function prepareInitialSandboxCreatePolicy(
   basePolicyPath: string,
   activeMessagingChannels: string[],
 ): InitialSandboxPolicy {
-  const createTimePresets = [
+  const requestedCreateTimePresets = [
     ...new Set(
       activeMessagingChannels.flatMap(
         (channel) => CREATE_TIME_POLICY_PRESETS_BY_CHANNEL[channel] || [],
@@ -1498,11 +1517,19 @@ function prepareInitialSandboxCreatePolicy(
     ),
   ];
 
-  if (createTimePresets.length === 0) {
+  if (requestedCreateTimePresets.length === 0) {
     return { policyPath: basePolicyPath, appliedPresets: [] };
   }
 
   const basePolicy = fs.readFileSync(basePolicyPath, "utf-8");
+  const basePolicyNames = getNetworkPolicyNames(basePolicy);
+  const createTimePresets = requestedCreateTimePresets.filter(
+    (preset) => !basePolicyNames.has(preset),
+  );
+  if (createTimePresets.length === 0) {
+    return { policyPath: basePolicyPath, appliedPresets: [] };
+  }
+
   const mergedPolicy = policies.mergePresetNamesIntoPolicy(basePolicy, createTimePresets);
   if (mergedPolicy.missingPresets.length > 0) {
     throw new Error(

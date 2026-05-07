@@ -105,7 +105,7 @@ function cleanupSandboxServices(
   const { runOpenshell } = require("../../adapters/openshell/runtime") as {
     runOpenshell: (args: string[], opts?: Record<string, unknown>) => { status: number | null };
   };
-  for (const suffix of ["telegram-bridge", "discord-bridge", "slack-bridge"]) {
+  for (const suffix of ["telegram-bridge", "discord-bridge", "slack-bridge", "slack-app"]) {
     runOpenshell(["provider", "delete", `${sandboxName}-${suffix}`], {
       ignoreError: true,
       stdio: ["ignore", "ignore", "ignore"],
