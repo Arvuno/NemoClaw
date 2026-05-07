@@ -206,9 +206,9 @@ Respond to the wizard as follows.
 
 For setup details, including GPU recommendations and starter model choices, refer to [Use a Local Inference Server](../inference/use-local-inference.md).
 
-::::
+:::
 
-::::{dropdown} Option 8: Model Router
+:::{dropdown} Option 8: Model Router
 :icon: git-compare
 
 Starts a host-side model router and routes sandbox inference through OpenShell to that router.
