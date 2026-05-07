@@ -1,6 +1,6 @@
 ---
 name: nemoclaw-maintainer-verify-stale
-description: Verify whether old NVIDIA/NemoClaw bug reports still reproduce against the latest tag. Picks candidate issues opened against older versions, runs the reproducer locally first when possible (Linux or macOS), otherwise reuses or provisions a Brev Linux box (CPU or GPU), detects behavior that was intentionally changed, scores confidence, and posts an evidence-backed comment with a label (fixed-on-latest, wontfix, or verify-inconclusive). Tag-only — never auto-closes. Brev verification is Linux-only in v1; Windows and integration-token-dependent issues are skipped. Trigger keywords - verify stale, verify fixed, reproduce on latest, stale issue, old bug, fixed-on-latest, wontfix, verify-inconclusive, drain backlog, brev verify.
+description: Verify whether old NVIDIA/NemoClaw bug reports still reproduce against the latest tag. Picks candidate issues opened against older versions, runs the reproducer locally first when possible (Linux or macOS), otherwise reuses or provisions a Brev Linux box (CPU or GPU), detects behavior that was intentionally changed, scores confidence, and posts an evidence-backed comment with a label (fixed-on-latest, status wont-fix, or verify-inconclusive). Tag-only — never auto-closes. Brev verification is Linux-only in v1; Windows and integration-token-dependent issues are skipped. Trigger keywords - verify stale, verify fixed, reproduce on latest, stale issue, old bug, fixed-on-latest, status wont-fix, verify-inconclusive, drain backlog, brev verify.
 user_invocable: true
 ---
 
@@ -61,7 +61,7 @@ This is the version the skill will verify against. Record it — every comment m
 Apply these rules in order. Drop any issue that fails a rule.
 
 **Issue-type allowlist:** must have `bug` label.
-**Issue-type skip:** drop if any of `enhancement`, `documentation`, `wontfix`, `needs-info`, `security`.
+**Issue-type skip:** drop if any of `enhancement`, `documentation`, `status: wont-fix`, `status: needs-info`, `security`. Use the canonical repo label names — bare `wontfix` / `needs-info` are NOT the repo's labels (verified via `gh label list`); the actual labels carry a `status:` prefix and a hyphen.
 
 **Platform skip (Linux-only in v1):** drop if any of `Platform: Windows/WSL`, `Platform: MacOS`, `Platform: macOS`. Keep `Platform: Ubuntu`, `Platform: DGX Spark`, `Platform: GB10`, `Platform: All`, or no platform label.
 
@@ -71,7 +71,7 @@ Apply these rules in order. Drop any issue that fails a rule.
 
 **Idempotency:** drop if **either** of these is true:
 
-- The issue carries a `fixed-on-latest` or `verify-inconclusive` label. (Cleared by the release sweep in `nemoclaw-maintainer-cut-release-tag` so the issue re-opens on each release.) The by-design path uses the existing repo `wontfix` label, which is already covered by the issue-type skip rule above — no separate idempotency clause needed for that path.
+- The issue carries a `fixed-on-latest` or `verify-inconclusive` label. (Cleared by the release sweep in `nemoclaw-maintainer-cut-release-tag` so the issue re-opens on each release.) The by-design path uses the existing repo `status: wont-fix` label, which is already covered by the issue-type skip rule above — no separate idempotency clause needed for that path.
 - A comment matching `<!-- nemoclaw-verify-stale v\d+ YYYY-MM-DD -->` was posted **within the last 7 days**. The regex matches any marker version (`v1`, `v2`, …) so future skill versions can re-verify older-marked issues by tightening the regex (e.g. require a specific marker version). The marker carries a date so the candidate filter can apply a TTL — useful for the still-reproduces case (Step 9), where no label is applied and we want next week's run to re-verify rather than skip forever.
 
 **Candidate rule:** keep the issue if **either**:
@@ -203,6 +203,19 @@ brev ls --json >/dev/null 2>&1 || {
   echo "  3) brev login --token \"\$BREV_API_TOKEN\"  # non-interactive, same env var used by test/e2e/brev-e2e.test.ts"
   exit 1
 }
+
+# Repo labels exist — Step 8.5 / Step 10 can't apply a label that doesn't exist. Check
+# canonical label names against the live repo so a mismatch fails fast (issue #2168 hit this:
+# spec called the label `wontfix`, but the actual repo label is `status: wont-fix`).
+EXPECTED_LABELS=("fixed-on-latest" "verify-inconclusive" "status: wont-fix")
+LIVE_LABELS=$(gh label list --repo NVIDIA/NemoClaw --limit 200 --json name --jq '.[].name')
+for label in "${EXPECTED_LABELS[@]}"; do
+  printf '%s\n' "$LIVE_LABELS" | grep -Fxq "$label" || {
+    echo "ERROR: expected label not on repo: '$label'"
+    echo "       create it with: gh label create '$label' --repo NVIDIA/NemoClaw"
+    exit 1
+  }
+done
 
 # Install URL reachable — fails fast instead of mid-Brev-run if the host is down or the URL changed.
 INSTALL_URL=${NEMOCLAW_INSTALL_URL:-https://nemoclaw.nvidia.com/install.sh}
@@ -520,7 +533,7 @@ The cost of an incorrect "I checked and X is gone" claim in a public comment, or
 
 - **Skip the Step 9 score table** entirely. The "exit 0 + expected output" axis doesn't apply when the expected output is no longer the contract.
 - **Skip Brev provisioning** if the signal fires before Step 7 — a remote run would just confirm what static analysis already proved. (Signals 2 and 3 can run as soon as the reported version is parsed in Step 4.)
-- **Apply label `wontfix`** (the existing repo label, not a verify-stale-specific variant). `wontfix` is already in the Step 3 issue-type skip list, so a labelled issue is automatically excluded from future runs without needing a separate idempotency clause.
+- **Apply label `status: wont-fix`** (the existing repo label — quote it on the CLI: `gh issue edit <num> --add-label "status: wont-fix"`). It's already in the Step 3 issue-type skip list, so a labelled issue is automatically excluded from future runs without needing a separate idempotency clause.
 - **Use the by-design comment template below** instead of the standard Step 10 template.
 - **@-mention the reporter** so they can object if the framing is wrong.
 - **Never auto-close.** A maintainer pulls the trigger, same as the other label paths.
@@ -849,7 +862,7 @@ After each issue (verified, inconclusive, by-design, or infra-failed), append to
 **Latest install:** succeeded | failed (infra error)
 **Latest result:** not-reproduced (clean) | still-reproduces | partial / flake | n/a (skipped 8d)
 **Confidence:** 88 / 100 | n/a (still-reproduces)
-**Label applied:** fixed-on-latest | verify-inconclusive | wontfix | none (still-reproduces) | none (infra)
+**Label applied:** fixed-on-latest | verify-inconclusive | status: wont-fix | none (still-reproduces) | none (infra)
 **Brev wall time (approx):** N min
 
 ---
@@ -872,7 +885,7 @@ At end of a batch session, prepend a session summary:
 ## YYYY-MM-DD — Verify Session
 **Issues considered:** N
 **Verified `fixed-on-latest`:** N
-**Marked `wontfix` (by-design path):** N
+**Marked `status: wont-fix` (by-design path):** N
 **Marked `verify-inconclusive`:** N
 **Local-first short-circuits (no Brev cost):** N
 **Skipped (Windows / macOS / integration / no version):** N
@@ -905,4 +918,4 @@ Never stage or commit the log to the NemoClaw repo.
 
 ## Companion Behavior
 
-`nemoclaw-maintainer-cut-release-tag` sweeps `fixed-on-latest` and `verify-inconclusive` from all open issues at release time. Without that sweep, "latest" drifts and verifications go stale silently. The by-design path uses the existing repo `wontfix` label; that label is **not** swept (it's also applied for non-skill reasons such as scope or priority decisions, and clearing it would erase human triage work).
+`nemoclaw-maintainer-cut-release-tag` sweeps `fixed-on-latest` and `verify-inconclusive` from all open issues at release time. Without that sweep, "latest" drifts and verifications go stale silently. The by-design path uses the existing repo `status: wont-fix` label; that label is **not** swept (it's also applied for non-skill reasons such as scope or priority decisions, and clearing it would erase human triage work).

@@ -129,7 +129,7 @@ Confirm both tags point to the same commit on the remote.
 
 ## Step 7: Sweep Stale-Issue Verification Labels
 
-Strip `fixed-on-latest` and `verify-inconclusive` from all open issues so the next `nemoclaw-maintainer-verify-stale` run re-evaluates against the new release. Without this sweep, "latest" drifts and verifications go silently stale. The skill's by-design path uses the existing repo `wontfix` label, which is **not** swept here — `wontfix` is also applied for non-skill reasons (scope, priority, dup), so clearing it would erase human triage work.
+Strip `fixed-on-latest` and `verify-inconclusive` from all open issues so the next `nemoclaw-maintainer-verify-stale` run re-evaluates against the new release. Without this sweep, "latest" drifts and verifications go silently stale. The skill's by-design path uses the existing repo `status: wont-fix` label, which is **not** swept here — that label is also applied for non-skill reasons (scope, priority, dup decisions), so clearing it would erase human triage work.
 
 ```bash
 for label in fixed-on-latest verify-inconclusive; do
