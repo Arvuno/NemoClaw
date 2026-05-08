@@ -1869,6 +1869,51 @@ function providerExistsInGateway(name: string) {
   return onboardProviders.providerExistsInGateway(name, runOpenshell);
 }
 
+function getRemoteProviderConfigForName(
+  provider: string | null | undefined,
+): RemoteProviderConfigEntry | null {
+  if (!provider) return null;
+  if (provider === "nvidia-nim") return REMOTE_PROVIDER_CONFIG.build;
+  return (
+    Object.values(REMOTE_PROVIDER_CONFIG).find((entry) => entry.providerName === provider) || null
+  );
+}
+
+async function ensureResumeProviderReady(
+  provider: string | null | undefined,
+  credentialEnv: string | null | undefined,
+): Promise<{ forceInferenceSetup: boolean }> {
+  const config = getRemoteProviderConfigForName(provider);
+  if (!config || !provider) return { forceInferenceSetup: false };
+  if (providerExistsInGateway(provider)) return { forceInferenceSetup: false };
+
+  const resolvedCredentialEnv = credentialEnv || config.credentialEnv;
+  const credentialValue = hydrateCredentialEnv(resolvedCredentialEnv);
+  if (!credentialValue) {
+    if (isNonInteractive()) {
+      console.error(
+        `  ${resolvedCredentialEnv} is required to recreate provider '${provider}' during resume.`,
+      );
+      console.error(
+        `  Re-run without --non-interactive to enter it, or set ${resolvedCredentialEnv} and retry.`,
+      );
+      process.exit(1);
+    }
+    console.log("");
+    console.log(`  [resume] Provider '${provider}' is missing from the gateway.`);
+    console.log("  Re-enter the API key so onboarding can recreate it before rebuilding.");
+    await replaceNamedCredential(
+      resolvedCredentialEnv,
+      `${config.label} API key`,
+      config.helpUrl,
+      (value) => validateNvidiaApiKeyValue(value, resolvedCredentialEnv),
+    );
+  } else {
+    note(`  [resume] Provider '${provider}' is missing from the gateway; recreating it.`);
+  }
+  return { forceInferenceSetup: true };
+}
+
 function getMessagingChannelForEnvKey(envKey: string): string | null {
   if (envKey === "DISCORD_BOT_TOKEN") return "discord";
   if (envKey === "SLACK_BOT_TOKEN") return "slack";
@@ -9914,6 +9959,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     let nimContainer = session?.nimContainer || null;
     let webSearchConfig = session?.webSearchConfig || null;
     let forceProviderSelection = false;
+    let forceInferenceSetup = false;
     while (true) {
       const resumeProviderSelection =
         !forceProviderSelection &&
@@ -9922,9 +9968,12 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         typeof provider === "string" &&
         typeof model === "string";
       if (resumeProviderSelection) {
+        const resumeProvider = await ensureResumeProviderReady(provider, credentialEnv);
+        forceInferenceSetup = resumeProvider.forceInferenceSetup;
         skippedStepMessage("provider_selection", `${provider} / ${model}`);
         hydrateCredentialEnv(credentialEnv);
       } else {
+        forceInferenceSetup = false;
         // #2753: do not persist sandboxName to onboard-session.json before
         // the sandbox actually exists in the gateway (Step 6 markStepComplete
         // below). A SIGINT between any earlier step and createSandbox would
@@ -9957,7 +10006,10 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       }
       process.env.NEMOCLAW_OPENSHELL_BIN = getOpenshellBinary();
       const resumeInference =
-        !forceProviderSelection && resume && isInferenceRouteReady(provider, model);
+        !forceProviderSelection &&
+        !forceInferenceSetup &&
+        resume &&
+        isInferenceRouteReady(provider, model);
       if (resumeInference) {
         if (isRoutedInferenceProvider(provider)) {
           try {
@@ -10425,6 +10477,7 @@ module.exports = {
   printSandboxCreateRecoveryHints,
   promptYesNoOrDefault,
   providerExistsInGateway,
+  ensureResumeProviderReady,
   parsePolicyPresetEnv,
   parseSandboxStatus,
   pruneStaleSandboxEntry,

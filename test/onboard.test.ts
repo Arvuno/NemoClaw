@@ -109,6 +109,10 @@ type OnboardTestInternals = {
     flavor: "openai" | "anthropic",
   ) => string;
   providerNameToOptionKey: (name?: string | null) => string | null;
+  ensureResumeProviderReady: (
+    provider?: string | null,
+    credentialEnv?: string | null,
+  ) => Promise<{ forceInferenceSetup: boolean }>;
   parsePolicyPresetEnv: (value: string | null) => string[];
   patchStagedDockerfile: ShimFn<void>;
   pullAndResolveBaseImageDigest: () => { digest: string; ref: string } | null;
@@ -158,6 +162,7 @@ function isOnboardTestInternals(
     typeof value.formatSandboxBuildEstimateNote === "function" &&
     Object.prototype.hasOwnProperty.call(value, "providerNameToOptionKey") &&
     typeof value.providerNameToOptionKey === "function" &&
+    typeof value.ensureResumeProviderReady === "function" &&
     typeof value.shouldRunCompatibleEndpointSandboxSmoke === "function" &&
     typeof value.writeSandboxConfigSyncFile === "function"
   );
@@ -212,6 +217,7 @@ const {
   isLoopbackHostname,
   normalizeProviderBaseUrl,
   providerNameToOptionKey,
+  ensureResumeProviderReady,
   parsePolicyPresetEnv,
   patchStagedDockerfile,
   pullAndResolveBaseImageDigest,
@@ -403,6 +409,80 @@ describe("onboard helpers", () => {
       source,
       /messagingChannels: Array\.isArray\(activeMessagingChannels\) \? activeMessagingChannels : \[\]/,
     );
+  });
+
+  it("re-prompts and forces inference setup when a resumed remote provider was reset", () => {
+    const repoRoot = path.join(import.meta.dirname, "..");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-resume-provider-reset-"));
+    const fakeBin = path.join(tmpDir, "bin");
+    const scriptPath = path.join(tmpDir, "resume-provider-reset.js");
+    const onboardPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "onboard.js"));
+    const credentialsPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "credentials", "store.js"));
+    const runnerPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "runner.js"));
+    const openshellPath = path.join(fakeBin, "openshell");
+
+    fs.mkdirSync(fakeBin, { recursive: true });
+    fs.writeFileSync(openshellPath, "#!/usr/bin/env bash\nexit 0\n", { mode: 0o755 });
+
+    const script = `
+const credentials = require(${credentialsPath});
+const runner = require(${runnerPath});
+const calls = [];
+const saved = [];
+
+runner.run = (command) => {
+  calls.push(Array.isArray(command) ? command.slice(1).join(" ") : String(command));
+  if (Array.isArray(command) && command.includes("provider") && command.includes("get")) {
+    return { status: 1, stdout: "", stderr: "provider not found" };
+  }
+  return { status: 0, stdout: "", stderr: "" };
+};
+credentials.resolveProviderCredential = () => null;
+credentials.prompt = async () => "fresh-compatible-key";
+credentials.saveCredential = (name, value) => saved.push({ name, value });
+
+process.env.NEMOCLAW_OPENSHELL_BIN = ${JSON.stringify(openshellPath)};
+delete process.env.COMPATIBLE_API_KEY;
+
+const { ensureResumeProviderReady } = require(${onboardPath});
+(async () => {
+  const result = await ensureResumeProviderReady("compatible-endpoint", "COMPATIBLE_API_KEY");
+  console.log(JSON.stringify({
+    result,
+    saved,
+    envValue: process.env.COMPATIBLE_API_KEY,
+    providerGet: calls.some((call) => call === "provider get compatible-endpoint"),
+  }));
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+`;
+    fs.writeFileSync(scriptPath, script);
+
+    const result = spawnSync(process.execPath, [scriptPath], {
+      cwd: repoRoot,
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        HOME: tmpDir,
+        PATH: `${fakeBin}:${process.env.PATH || ""}`,
+      },
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    const payload = parseStdoutJson<{
+      result: { forceInferenceSetup: boolean };
+      saved: Array<{ name: string; value: string }>;
+      envValue: string;
+      providerGet: boolean;
+    }>(result.stdout);
+    assert.equal(payload.providerGet, true);
+    assert.deepEqual(payload.result, { forceInferenceSetup: true });
+    assert.deepEqual(payload.saved, [
+      { name: "COMPATIBLE_API_KEY", value: "fresh-compatible-key" },
+    ]);
+    assert.equal(payload.envValue, "fresh-compatible-key");
   });
 
   it("uses explicit messaging selections for policy suggestions when provided", () => {
