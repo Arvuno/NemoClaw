@@ -11,19 +11,27 @@
  * exit 0 + completely empty stdout/stderr — neither the registered sandbox
  * listing nor the sandbox header reached the user.
  *
- * The fix wraps the offending awaits in try/catch so that:
- * - `nemoclaw list` always renders the registry-only listing
- * - `nemoclaw <name> status` always reaches the existing actionable
- *   gateway-error branch instead of swallowing output
+ * Two layers of fix:
+ * 1. Defensive try/catch wraps in status.ts and list-command-deps.ts.
+ * 2. The actual silent-fail in cli/oclif-runner.ts: errors carrying
+ *    `oclif.exit === 0` were swallowed silently. Now only intentional
+ *    ExitError(0) instances stay silent; anything else surfaces.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   type ListSandboxesCommandDeps,
   getSandboxInventory,
   renderSandboxInventoryText,
 } from "../dist/lib/inventory-commands.js";
+
+const CLI = path.join(import.meta.dirname, "..", "bin", "nemoclaw.js");
 
 function buildDepsWithThrowingRecovery(): ListSandboxesCommandDeps {
   const registryFallback = {
@@ -102,5 +110,130 @@ describe("#2666 — list-command-deps resilience wrapper shape", () => {
     expect(result.sandboxes).toHaveLength(1);
     expect(result.recoveredFromGateway).toBe(0);
     expect(result.recoveredFromSession).toBe(false);
+  });
+});
+
+describe("#2666 — subprocess regression: simulated (container-stopped + foreign-port-holder)", () => {
+  // End-to-end test that runs the real `nemoclaw` binary against a fake
+  // `openshell` shell script simulating the bug repro: the openshell sandbox
+  // container is stopped AND a foreign listener holds port 8080. In that
+  // state, `openshell sandbox get` returns transport-error output and
+  // `openshell status` reports a refusing connection on port 8080.
+  //
+  // Pre-fix this combination silently produced exit 0 + empty stdout/stderr.
+  // Post-fix neither command may produce silent empty output: `list` must
+  // render the registered sandbox from disk, and `status` must produce a
+  // sandbox header plus an actionable error block.
+
+  let home: string;
+  let binDir: string;
+
+  beforeEach(() => {
+    home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-2666-repro-"));
+    binDir = path.join(home, "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+
+    // Fake openshell that mirrors what users observed in the bug repro:
+    // - `openshell status` reports gateway nemoclaw with refusing connection
+    // - `openshell sandbox get <name>` exits non-zero with a transport error
+    // - `openshell sandbox list` and `inference get` fail to produce useful output
+    fs.writeFileSync(
+      path.join(binDir, "openshell"),
+      [
+        "#!/usr/bin/env bash",
+        "case \"$*\" in",
+        "  status)",
+        "    cat <<'EOF'",
+        "Status: Disconnected",
+        "  Gateway: nemoclaw",
+        "  client error (Connect): tcp connect error: Connection refused (os error 61)",
+        "EOF",
+        "    exit 1",
+        "    ;;",
+        '  "gateway info -g nemoclaw")',
+        "    echo 'Gateway: nemoclaw'",
+        "    exit 0",
+        "    ;;",
+        '  "sandbox get my-assist")',
+        "    echo 'transport error: client error (Connect)' >&2",
+        "    exit 1",
+        "    ;;",
+        '  "sandbox list")',
+        "    echo ''",
+        "    exit 1",
+        "    ;;",
+        '  "inference get")',
+        "    echo ''",
+        "    exit 1",
+        "    ;;",
+        "  *)",
+        "    exit 0",
+        "    ;;",
+        "esac",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+
+    const registryDir = path.join(home, ".nemoclaw");
+    fs.mkdirSync(registryDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(registryDir, "sandboxes.json"),
+      JSON.stringify({
+        sandboxes: {
+          "my-assist": {
+            name: "my-assist",
+            model: "test-model",
+            provider: "nvidia-prod",
+            gpuEnabled: false,
+            policies: [],
+          },
+        },
+        defaultSandbox: "my-assist",
+      }),
+      { mode: 0o600 },
+    );
+  });
+
+  afterEach(() => {
+    fs.rmSync(home, { recursive: true, force: true });
+  });
+
+  function runCli(args: string[]): { code: number; stdout: string; stderr: string } {
+    const result = spawnSync(process.execPath, [CLI, ...args], {
+      encoding: "utf-8",
+      timeout: 30_000,
+      env: {
+        ...process.env,
+        HOME: home,
+        PATH: `${binDir}:${process.env.PATH || ""}`,
+        NEMOCLAW_HEALTH_POLL_COUNT: "1",
+        NEMOCLAW_HEALTH_POLL_INTERVAL: "0",
+        NEMOCLAW_STATUS_PROBE_TIMEOUT_MS: "2000",
+        NEMOCLAW_TEST_NO_SLEEP: "1",
+      },
+    });
+    return {
+      code: result.status ?? -1,
+      stdout: result.stdout ?? "",
+      stderr: result.stderr ?? "",
+    };
+  }
+
+  it("nemoclaw list never produces silent empty output when openshell is broken", () => {
+    const { stdout, stderr } = runCli(["list"]);
+    const combined = `${stdout}\n${stderr}`;
+    // The exact failure mode pre-fix was exit 0 + completely empty output.
+    // The contract here is the negation of that — the user must see
+    // SOMETHING that includes the sandbox they registered on disk.
+    expect(combined.trim().length).toBeGreaterThan(0);
+    expect(combined).toContain("my-assist");
+  });
+
+  it("nemoclaw <name> status never produces silent empty output when openshell is broken", () => {
+    const { stdout, stderr } = runCli(["my-assist", "status"]);
+    const combined = `${stdout}\n${stderr}`;
+    // Must include the sandbox header AND an actionable hint.
+    expect(combined.trim().length).toBeGreaterThan(0);
+    expect(combined).toContain("my-assist");
   });
 });

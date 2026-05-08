@@ -99,12 +99,39 @@ describe("runRegisteredOclifCommand", () => {
     expect(exit).toHaveBeenCalledWith(2);
   });
 
-  it("treats oclif help exits as success", async () => {
-    runCommandMock.mockRejectedValue({ oclif: { exit: 0 } });
+  it("treats oclif graceful ExitError(0) as silent success", async () => {
+    // Mirrors what `Command.exit(0)` and `--help` actually throw in oclif: an
+    // ExitError instance whose synthetic `EEXIT: 0` message must NOT leak to
+    // the user.
+    class ExitError extends Error {
+      oclif = { exit: 0 };
+    }
+    runCommandMock.mockRejectedValue(new ExitError("EEXIT: 0"));
+    const errorLine = vi.fn();
 
-    await runRegisteredOclifCommand("list", ["--help"], { rootDir: "/repo" });
+    await runRegisteredOclifCommand("list", ["--help"], { rootDir: "/repo", error: errorLine });
 
     expect(process.exitCode).toBe(0);
+    expect(errorLine).not.toHaveBeenCalled();
+  });
+
+  it("#2666: surfaces errors that happen to carry oclif.exit === 0 instead of swallowing them", async () => {
+    // Before #2666 this branch silently set exit 0 and produced no output.
+    // The bug was an arbitrary error riding the same `oclif.exit === 0`
+    // channel, e.g. propagated from inside a command's run(). Surface the
+    // message so the user gets signal.
+    class WeirdError extends Error {
+      oclif = { exit: 0 };
+    }
+    runCommandMock.mockRejectedValue(new WeirdError("Could not verify sandbox 'my-assist' against the live OpenShell gateway"));
+    const errorLine = vi.fn();
+
+    await runRegisteredOclifCommand("status", ["my-assist"], { rootDir: "/repo", error: errorLine });
+
+    expect(process.exitCode).toBe(0);
+    expect(errorLine).toHaveBeenCalledWith(
+      "  Could not verify sandbox 'my-assist' against the live OpenShell gateway",
+    );
   });
 
   it("rethrows non-parse command failures", async () => {
