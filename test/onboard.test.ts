@@ -149,6 +149,7 @@ function isOnboardTestInternals(
     typeof value.buildCompatibleEndpointSandboxSmokeScript === "function" &&
     typeof value.buildSandboxConfigSyncScript === "function" &&
     typeof value.classifySandboxCreateFailure === "function" &&
+    typeof value.filterPolicyPresetsForAgent === "function" &&
     typeof value.getDefaultSandboxNameForAgent === "function" &&
     typeof value.getSandboxPromptDefault === "function" &&
     typeof value.getRequestedSandboxAgentName === "function" &&
@@ -4079,7 +4080,7 @@ const { setupInference } = require(${onboardPath});
     assert.match(source, /skippedStepMessage\("openclaw", sandboxName\)/);
     assert.match(
       source,
-      /skippedStepMessage\("policies", \(recordedPolicyPresets \|\| \[\]\)\.join\(", "\)\)/,
+      /skippedStepMessage\("policies", recordedPolicyPresetsForAgent\.join\(", "\)\)/,
     );
   });
 

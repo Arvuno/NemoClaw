@@ -8580,6 +8580,25 @@ function resolvePolicyPresetAgentName(
   }
 }
 
+function listPolicyPresetsForAgent(
+  sandboxName: string,
+  agentName: string | null | undefined,
+): Array<{ name: string; description?: string }> {
+  const policyPresetAgentName = resolvePolicyPresetAgentName(sandboxName, agentName);
+  return [
+    ...filterPolicyPresetsForAgent(policies.listPresets(), policyPresetAgentName),
+    ...policies.listCustomPresets(sandboxName),
+  ];
+}
+
+function clampPolicyPresetNames(
+  presetNames: string[],
+  allowedPresets: Array<{ name: string }>,
+): string[] {
+  const knownPresets = new Set(allowedPresets.map((p) => p.name));
+  return presetNames.filter((name) => knownPresets.has(name));
+}
+
 async function setupPoliciesWithSelection(
   sandboxName: string,
   options: {
@@ -8600,10 +8619,11 @@ async function setupPoliciesWithSelection(
 
   step(8, 8, "Policy presets");
 
-  const policyPresetAgentName = resolvePolicyPresetAgentName(sandboxName, options.agentName);
-  const allPresets = filterPolicyPresetsForAgent(policies.listPresets(), policyPresetAgentName);
-  const applied = policies.getAppliedPresets(sandboxName);
-  let chosen = selectedPresets;
+  const allPresets = listPolicyPresetsForAgent(sandboxName, options.agentName);
+  const knownPresets = new Set(allPresets.map((p) => p.name));
+  const currentAppliedPresets = policies.getAppliedPresets(sandboxName);
+  const applied = clampPolicyPresetNames(currentAppliedPresets, allPresets);
+  let chosen = selectedPresets ? clampPolicyPresetNames(selectedPresets, allPresets) : null;
 
   // Resume path: caller supplies the preset list from a previous run.
   if (chosen && chosen.length > 0) {
@@ -8613,7 +8633,7 @@ async function setupPoliciesWithSelection(
       process.exit(1);
     }
     note(`  [resume] Reapplying policy presets: ${chosen.join(", ")}`);
-    syncPresetSelection(sandboxName, applied, chosen);
+    syncPresetSelection(sandboxName, currentAppliedPresets, chosen);
     return chosen;
   }
 
@@ -8663,7 +8683,6 @@ async function setupPoliciesWithSelection(
       console.warn(`  Falling back to suggested presets for tier '${tierName}'.`);
     }
 
-    const knownPresets = new Set(allPresets.map((p) => p.name));
     const invalidPresets = chosen.filter((name) => !knownPresets.has(name));
     if (invalidPresets.length > 0) {
       console.error(`  Unknown policy preset(s): ${invalidPresets.join(", ")}`);
@@ -8698,7 +8717,7 @@ async function setupPoliciesWithSelection(
       process.exit(1);
     }
     note(`  [non-interactive] Applying policy presets: ${chosen.join(", ")}`);
-    syncPresetSelection(sandboxName, applied, chosen);
+    syncPresetSelection(sandboxName, currentAppliedPresets, chosen);
     return chosen;
   }
 
@@ -8722,7 +8741,7 @@ async function setupPoliciesWithSelection(
 
   const accessByName: Record<string, string> = {};
   for (const p of resolvedPresets) accessByName[p.name] = p.access;
-  syncPresetSelection(sandboxName, applied, interactiveChoice, accessByName);
+  syncPresetSelection(sandboxName, currentAppliedPresets, interactiveChoice, accessByName);
   return interactiveChoice;
 }
 
@@ -10278,17 +10297,21 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       messagingChannels: Array.isArray(activeMessagingChannels) ? activeMessagingChannels : [],
       agent,
     });
+    const recordedPolicyPresetsForAgent = clampPolicyPresetNames(
+      recordedPolicyPresets || [],
+      listPolicyPresetsForAgent(sandboxName, agent?.name ?? null),
+    );
     const resumePolicies =
-      resume && sandboxName && arePolicyPresetsApplied(sandboxName, recordedPolicyPresets || []);
+      resume && sandboxName && arePolicyPresetsApplied(sandboxName, recordedPolicyPresetsForAgent);
     if (resumePolicies) {
-      skippedStepMessage("policies", (recordedPolicyPresets || []).join(", "));
+      skippedStepMessage("policies", recordedPolicyPresetsForAgent.join(", "));
       onboardSession.markStepComplete(
         "policies",
         toSessionUpdates({
           sandboxName,
           provider,
           model,
-          policyPresets: recordedPolicyPresets || [],
+          policyPresets: recordedPolicyPresetsForAgent,
         }),
       );
     } else {
@@ -10296,12 +10319,12 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         sandboxName,
         provider,
         model,
-        policyPresets: recordedPolicyPresets || [],
+        policyPresets: recordedPolicyPresetsForAgent,
       });
       const appliedPolicyPresets = await setupPoliciesWithSelection(sandboxName, {
         selectedPresets:
-          Array.isArray(recordedPolicyPresets) && recordedPolicyPresets.length > 0
-            ? recordedPolicyPresets
+          recordedPolicyPresetsForAgent.length > 0
+            ? recordedPolicyPresetsForAgent
             : null,
         enabledChannels:
           selectedMessagingChannels.length > 0

@@ -326,6 +326,89 @@ console.log = () => {};
     assert.ok(payload.applied.includes("pypi"), "Hermes should still include normal dev presets");
   });
 
+  it("removes a previously-applied Brave preset during Hermes policy selection", () => {
+    const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policies.js"));
+    const script =
+      buildPreamble({
+        tierEnv: "balanced",
+        policyMode: "suggested",
+        stubOpenshellBin: true,
+        runCaptureReturn: "Running",
+      }) +
+      String.raw`
+const policies = require(${policiesPath});
+const appliedCalls = [];
+const removedCalls = [];
+policies.applyPreset = (_sandbox, name) => { appliedCalls.push(name); return true; };
+policies.removePreset = (_sandbox, name) => { removedCalls.push(name); return true; };
+policies.getAppliedPresets = () => ["brave", "npm"];
+
+console.log = () => {};
+
+(async () => {
+  try {
+    const applied = await setupPoliciesWithSelection("test-sb", { agentName: "hermes" });
+    process.stdout.write(JSON.stringify({ applied, appliedCalls, removedCalls }) + "\n");
+  } catch (err) {
+    process.stdout.write(JSON.stringify({ error: err.message }) + "\n");
+  }
+})();
+`;
+    const result = runScript(script);
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout.trim());
+    assert.ok(!payload.error, `unexpected error: ${payload.error}`);
+    assert.ok(
+      !payload.applied.includes("brave"),
+      `Hermes presets included Brave: ${payload.applied}`,
+    );
+    assert.ok(
+      payload.removedCalls.includes("brave"),
+      `Hermes did not remove Brave: ${payload.removedCalls}`,
+    );
+    assert.ok(!payload.appliedCalls.includes("brave"), `Hermes applied Brave: ${payload.appliedCalls}`);
+  });
+
+  it("clamps resumed Hermes policy presets to agent-allowed presets", () => {
+    const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policies.js"));
+    const script =
+      buildPreamble({
+        tierEnv: "balanced",
+        policyMode: "suggested",
+        stubOpenshellBin: true,
+        runCaptureReturn: "Running",
+      }) +
+      String.raw`
+const policies = require(${policiesPath});
+const appliedCalls = [];
+const removedCalls = [];
+policies.applyPreset = (_sandbox, name) => { appliedCalls.push(name); return true; };
+policies.removePreset = (_sandbox, name) => { removedCalls.push(name); return true; };
+policies.getAppliedPresets = () => ["brave"];
+
+console.log = () => {};
+
+(async () => {
+  try {
+    const applied = await setupPoliciesWithSelection("test-sb", {
+      agentName: "hermes",
+      selectedPresets: ["brave", "npm"],
+    });
+    process.stdout.write(JSON.stringify({ applied, appliedCalls, removedCalls }) + "\n");
+  } catch (err) {
+    process.stdout.write(JSON.stringify({ error: err.message }) + "\n");
+  }
+})();
+`;
+    const result = runScript(script);
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout.trim());
+    assert.ok(!payload.error, `unexpected error: ${payload.error}`);
+    assert.deepEqual(payload.applied, ["npm"]);
+    assert.deepEqual(payload.appliedCalls, ["npm"]);
+    assert.deepEqual(payload.removedCalls, ["brave"]);
+  });
+
   // #2429: an unrecognised NEMOCLAW_POLICY_MODE used to hard-exit at step 8/8,
   // leaving the already-built sandbox with zero presets. We now warn and fall
   // back to the tier-derived suggestions so the sandbox stays usable, and hint
