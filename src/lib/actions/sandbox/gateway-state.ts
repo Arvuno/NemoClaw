@@ -32,7 +32,7 @@ import {
 } from "../../adapters/openshell/timeouts";
 import * as registry from "../../state/registry";
 
-type SandboxGatewayState = {
+export type SandboxGatewayState = {
   state: string;
   output: string;
   activeGateway?: string | null;

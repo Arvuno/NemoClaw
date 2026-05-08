@@ -11,6 +11,7 @@ import { parseSshProcesses, createSystemDeps } from "./state/sandbox-session";
 import { resolveOpenshell } from "./adapters/openshell/resolve";
 import { captureOpenshell } from "./adapters/openshell/runtime";
 import { recoverRegistryEntries } from "./registry-recovery-action";
+import * as registry from "./state/registry";
 
 export function buildListCommandDeps(): ListSandboxesCommandDeps {
   const opsBinList = resolveOpenshell();
@@ -31,14 +32,30 @@ export function buildListCommandDeps(): ListSandboxesCommandDeps {
   };
 
   return {
-    recoverRegistryEntries: () => recoverRegistryEntries(),
-    getLiveInference: () =>
-      parseGatewayInference(
-        captureOpenshell(["inference", "get"], {
-          ignoreError: true,
-          timeout: OPENSHELL_PROBE_TIMEOUT_MS,
-        }).output,
-      ),
+    // #2666: never let an unexpected throw from gateway-side recovery (e.g.
+    // openshell hanging on a foreign port-holder while its container is
+    // stopped) suppress the registry-only listing. The registry lives on
+    // disk and is independent of runtime state.
+    recoverRegistryEntries: async () => {
+      try {
+        return await recoverRegistryEntries();
+      } catch {
+        const fallback = registry.listSandboxes();
+        return { ...fallback, recoveredFromSession: false, recoveredFromGateway: 0 };
+      }
+    },
+    getLiveInference: () => {
+      try {
+        return parseGatewayInference(
+          captureOpenshell(["inference", "get"], {
+            ignoreError: true,
+            timeout: OPENSHELL_PROBE_TIMEOUT_MS,
+          }).output,
+        );
+      } catch {
+        return null;
+      }
+    },
     loadLastSession: () => onboardSession.loadSession(),
     getActiveSessionCount: sessionDeps
       ? (name) => {
