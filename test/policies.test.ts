@@ -797,11 +797,16 @@ describe("policies", () => {
       >;
       const rulesFor = (policy: string, host: string) =>
         (networkPolicies[policy]?.endpoints ?? [])
-          .find((endpoint) => endpoint.host === host)
-          ?.rules?.map((rule) => rule.allow)
+          .filter((endpoint) => endpoint.host === host)
+          .flatMap((endpoint) => endpoint.rules ?? [])
+          .map((rule) => rule.allow)
           .filter((rule): rule is { method: string; path: string } =>
             Boolean(rule?.method && rule?.path),
-          ) ?? [];
+          );
+      const sortRules = (rules: Array<{ method: string; path: string }>) =>
+        [...rules].sort((a, b) =>
+          `${a.method} ${a.path}`.localeCompare(`${b.method} ${b.path}`),
+        );
 
       const nousRules = rulesFor("nous_research", "nousresearch.com");
       expect(nousRules).not.toContainEqual({ method: "PUT", path: "/**" });
@@ -810,9 +815,13 @@ describe("policies", () => {
         nousRules.filter((rule) => ["PUT", "PATCH", "DELETE"].includes(rule.method)),
       ).toEqual([]);
 
-      const discordRules = rulesFor("discord", "discord.com");
-      expect(discordRules).toEqual(
-        expect.arrayContaining([
+      const discordMutationRules = sortRules(
+        rulesFor("discord", "discord.com").filter((rule) =>
+          ["PUT", "PATCH", "DELETE"].includes(rule.method),
+        ),
+      );
+      expect(discordMutationRules).toEqual(
+        sortRules([
           { method: "PUT", path: "/api/v*/applications/*/commands" },
           { method: "PUT", path: "/api/v*/channels/*/messages/*/reactions/*/@me" },
           { method: "PATCH", path: "/api/v*/applications/*" },
@@ -825,9 +834,7 @@ describe("policies", () => {
           { method: "DELETE", path: "/api/v*/webhooks/*/*/messages/*" },
         ]),
       );
-      expect(
-        discordRules.filter((rule) => ["PUT", "PATCH"].includes(rule.method) && rule.path === "/**"),
-      ).toEqual([]);
+      expect(discordMutationRules.some((rule) => rule.path === "/**")).toBe(false);
     });
 
     it("REST policy YAML avoids deprecated tls: terminate", () => {

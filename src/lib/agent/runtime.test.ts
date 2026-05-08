@@ -112,11 +112,13 @@ describe("buildRecoveryScript", () => {
     expect(recoveryScript).not.toBeNull();
     for (const script of [recoveryScript!, buildManualRecoveryCommand(hermesAgent, 8642)]) {
       expect(script).toContain(
-        'command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q "127.0.0.1:3129" && break',
+        'command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -Eq "127\\.0\\.0\\.1:3129([[:space:]]|$)" && break',
       );
       expect(script).toContain(
-        'command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q "127.0.0.1:3130" && break',
+        'command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -Eq "127\\.0\\.0\\.1:3130([[:space:]]|$)" && break',
       );
+      expect(script).not.toContain('grep -q "127.0.0.1:3129"');
+      expect(script).not.toContain('grep -q "127.0.0.1:3130"');
       expect(script).not.toContain("do ! command -v ss >/dev/null 2>&1 || ss -tln");
     }
   });
@@ -126,15 +128,20 @@ describe("buildRecoveryScript", () => {
     expect(recoveryScript).not.toBeNull();
     for (const script of [recoveryScript!, buildManualRecoveryCommand(hermesAgent, 8642)]) {
       expect(script).toContain("/tmp/discord-facade.log");
+      expect(script).toContain("/tmp/discord-facade-recovery.log");
       expect(script).toContain("O_NOFOLLOW");
+      expect(script).toContain("_DISCORD_FACADE_LOG='/tmp/discord-facade.log'");
+      expect(script).toContain("_DISCORD_FACADE_LOG='/tmp/discord-facade-recovery.log'");
+      expect(script).toContain('DISCORD_FACADE_LOG="$_DISCORD_FACADE_LOG"');
       expect(script).toContain(
-        'sh -c \'umask 0007; exec "$@" >/tmp/discord-facade.log 2>&1\' sh python3 /usr/local/bin/nemoclaw-discord-facade &',
+        'sh -c \'umask 0007; exec "$@" >>"$DISCORD_FACADE_LOG" 2>&1\' sh python3 /usr/local/bin/nemoclaw-discord-facade &',
       );
       expect(script).not.toContain(
         "nohup python3 /usr/local/bin/nemoclaw-discord-facade >/tmp/discord-facade.log 2>&1",
       );
+      expect(script).not.toContain('exec "$@" >/tmp/discord-facade.log 2>&1');
       expect(script.indexOf("O_NOFOLLOW")).toBeLessThan(
-        script.indexOf('exec "$@" >/tmp/discord-facade.log 2>&1'),
+        script.indexOf('DISCORD_FACADE_LOG="$_DISCORD_FACADE_LOG"'),
       );
     }
   });
