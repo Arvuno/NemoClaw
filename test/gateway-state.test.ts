@@ -294,7 +294,7 @@ describe("mergeLivePolicyIntoSandboxOutput (#1961)", () => {
 
   it("rewrites the YAML version line to the gateway active version", () => {
     const livePolicy = [
-      "Version:      6",
+      "Version:      5",
       "Hash:         738a54c8520a",
       "Status:       Loaded",
       "Active:       6",
@@ -307,6 +307,7 @@ describe("mergeLivePolicyIntoSandboxOutput (#1961)", () => {
     const merged = mergeLivePolicyIntoSandboxOutput(sandboxOutput, livePolicy);
     expect(merged).toContain("  version: 6");
     expect(merged).not.toContain("  version: 1");
+    expect(merged).not.toContain("  version: 5");
   });
 
   it("leaves the YAML untouched when no Active metadata is provided", () => {
@@ -321,5 +322,20 @@ describe("mergeLivePolicyIntoSandboxOutput (#1961)", () => {
   it("returns the original output when livePolicy is an error string", () => {
     const merged = mergeLivePolicyIntoSandboxOutput(sandboxOutput, "Error: not found");
     expect(merged).toBe(sandboxOutput);
+  });
+
+  it("rewrites version when metadata and separator are ANSI-wrapped", () => {
+    const livePolicy = [
+      "\x1b[1mVersion:\x1b[0m      5",
+      "\x1b[1mActive:\x1b[0m       6",
+      "\x1b[2m---\x1b[0m",
+      "version: 1",
+      "filesystem_policy:",
+      "  include_workdir: false",
+    ].join("\n");
+
+    const merged = mergeLivePolicyIntoSandboxOutput(sandboxOutput, livePolicy);
+    expect(merged).toContain("  version: 6");
+    expect(merged).not.toContain("  version: 1");
   });
 });
