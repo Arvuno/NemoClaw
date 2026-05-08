@@ -136,7 +136,7 @@ Strip `fixed-on-latest` from open issues only when the verification has actually
 | Order | Check | Action |
 |---|---|---|
 | 1 | Project [NVIDIA/199](https://github.com/orgs/NVIDIA/projects/199) status == **Done** | **Skip clear** — maintainer already accepted the verification; label can stay until the issue closes. |
-| 2 | More than 10 days since the skill marker comment AND status != Done | **Clear** — verification is stale; reporter never confirmed in the review window. Re-verify on next skill run. |
+| 2 | More than 14 days since the skill marker comment AND status != Done | **Clear** — verification is stale; reporter never confirmed in the review window. Re-verify on next skill run. |
 | 3 | A PR merged since the marker date touches the paths the comment cited in `Relevant changes since v0.0.X` | **Clear** — regression risk; what was "fixed" may have been re-broken. |
 | — | else | **Skip clear** — verification still holds; skill won't re-run on this issue (still excluded by Step 3 marker-TTL plus the live label). |
 
@@ -187,7 +187,7 @@ for label in fixed-on-latest verify-inconclusive; do
     fi
 
     AGE_DAYS=$(( (TODAY_TS - $(date -u -j -f "%Y-%m-%d" "$MARKER_DATE" +%s 2>/dev/null || date -u -d "$MARKER_DATE" +%s)) / 86400 ))
-    if [ "$AGE_DAYS" -ge 10 ]; then
+    if [ "$AGE_DAYS" -ge 14 ]; then
       gh issue edit "$n" --repo NVIDIA/NemoClaw --remove-label "$label"
       echo "[release-sweep] cleared #$n ($label) — stale (verified ${AGE_DAYS}d ago, reporter not confirmed)"
       continue
