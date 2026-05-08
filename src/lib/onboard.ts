@@ -1869,6 +1869,9 @@ function providerExistsInGateway(name: string) {
   return onboardProviders.providerExistsInGateway(name, runOpenshell);
 }
 
+/**
+ * Resolve a persisted OpenShell provider name back to its onboard provider config.
+ */
 function getRemoteProviderConfigForName(
   provider: string | null | undefined,
 ): RemoteProviderConfigEntry | null {
@@ -1879,6 +1882,9 @@ function getRemoteProviderConfigForName(
   );
 }
 
+/**
+ * Ensure a resumed remote provider still exists, re-prompting for credentials when needed.
+ */
 async function ensureResumeProviderReady(
   provider: string | null | undefined,
   credentialEnv: string | null | undefined,
