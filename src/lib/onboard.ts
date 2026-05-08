@@ -8558,14 +8558,19 @@ const AGENT_POLICY_PRESET_EXCLUSIONS: Record<string, readonly string[]> = {
   hermes: ["brave"],
 };
 
+function isPolicyPresetExcludedForAgent(
+  presetName: string,
+  agentName: string | null | undefined,
+): boolean {
+  const excluded = AGENT_POLICY_PRESET_EXCLUSIONS[normalizeSandboxAgentName(agentName)];
+  return Boolean(excluded && excluded.includes(presetName));
+}
+
 function filterPolicyPresetsForAgent<T extends { name: string }>(
   presets: T[],
   agentName: string | null | undefined,
 ): T[] {
-  const excluded = AGENT_POLICY_PRESET_EXCLUSIONS[normalizeSandboxAgentName(agentName)];
-  if (!excluded || excluded.length === 0) return presets;
-  const excludedSet = new Set(excluded);
-  return presets.filter((preset) => !excludedSet.has(preset.name));
+  return presets.filter((preset) => !isPolicyPresetExcludedForAgent(preset.name, agentName));
 }
 
 function resolvePolicyPresetAgentName(
@@ -8594,9 +8599,12 @@ function listPolicyPresetsForAgent(
 function clampPolicyPresetNames(
   presetNames: string[],
   allowedPresets: Array<{ name: string }>,
+  agentName: string | null | undefined,
 ): string[] {
   const knownPresets = new Set(allowedPresets.map((p) => p.name));
-  return presetNames.filter((name) => knownPresets.has(name));
+  return presetNames.filter(
+    (name) => knownPresets.has(name) && !isPolicyPresetExcludedForAgent(name, agentName),
+  );
 }
 
 async function setupPoliciesWithSelection(
@@ -8619,11 +8627,22 @@ async function setupPoliciesWithSelection(
 
   step(8, 8, "Policy presets");
 
-  const allPresets = listPolicyPresetsForAgent(sandboxName, options.agentName);
+  const policyPresetAgentName = resolvePolicyPresetAgentName(sandboxName, options.agentName);
+  const allPresets = listPolicyPresetsForAgent(sandboxName, policyPresetAgentName);
   const knownPresets = new Set(allPresets.map((p) => p.name));
   const currentAppliedPresets = policies.getAppliedPresets(sandboxName);
-  const applied = clampPolicyPresetNames(currentAppliedPresets, allPresets);
-  let chosen = selectedPresets ? clampPolicyPresetNames(selectedPresets, allPresets) : null;
+  const selectablePresets = [
+    ...allPresets,
+    ...currentAppliedPresets.map((name) => ({ name })),
+  ];
+  const applied = clampPolicyPresetNames(
+    currentAppliedPresets,
+    selectablePresets,
+    policyPresetAgentName,
+  );
+  let chosen = selectedPresets
+    ? clampPolicyPresetNames(selectedPresets, selectablePresets, policyPresetAgentName)
+    : null;
 
   // Resume path: caller supplies the preset list from a previous run.
   if (chosen && chosen.length > 0) {
@@ -10299,7 +10318,11 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     });
     const recordedPolicyPresetsForAgent = clampPolicyPresetNames(
       recordedPolicyPresets || [],
-      listPolicyPresetsForAgent(sandboxName, agent?.name ?? null),
+      [
+        ...listPolicyPresetsForAgent(sandboxName, agent?.name ?? null),
+        ...policies.getAppliedPresets(sandboxName).map((name) => ({ name })),
+      ],
+      agent?.name ?? null,
     );
     const resumePolicies =
       resume && sandboxName && arePolicyPresetsApplied(sandboxName, recordedPolicyPresetsForAgent);
