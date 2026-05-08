@@ -471,6 +471,15 @@ describe("onboard helpers", () => {
       expect(suggestions).toEqual(["npm", "pypi", "huggingface", "brew", "brave"]);
     });
 
+    it("drops Brave tier defaults when web search is unsupported", () => {
+      const suggestions = computeSetupPresetSuggestions("balanced", {
+        enabledChannels: [],
+        knownPresetNames: known,
+        webSearchSupported: false,
+      });
+      expect(suggestions).toEqual(["npm", "pypi", "huggingface", "brew"]);
+    });
+
     it("forwards enabled messaging channels into the balanced tier suggestions", () => {
       const suggestions = computeSetupPresetSuggestions("balanced", {
         enabledChannels: ["telegram"],
@@ -514,6 +523,15 @@ describe("onboard helpers", () => {
         knownPresetNames: known,
       });
       expect(suggestions).toContain("brave");
+    });
+
+    it("does not add Brave from webSearchConfig when web search is unsupported", () => {
+      const suggestions = computeSetupPresetSuggestions("restricted", {
+        webSearchConfig: { provider: "brave" },
+        knownPresetNames: known,
+        webSearchSupported: false,
+      });
+      expect(suggestions).not.toContain("brave");
     });
 
     it("adds local-inference for local providers", () => {
