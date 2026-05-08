@@ -7,11 +7,11 @@
 // When the session agent is openclaw (or absent), all functions return
 // defaults that match the hardcoded OpenClaw values on main.
 
-import { DASHBOARD_PORT } from "../core/ports";
-import { shellQuote } from "../runner";
-import * as onboardSession from "../state/onboard-session";
-import * as registry from "../state/registry";
-import { loadAgent, type AgentDefinition } from "./defs";
+import * as registry from "./state/registry";
+import { DASHBOARD_PORT } from "./ports";
+import * as onboardSession from "./onboard-session";
+import { loadAgent, type AgentDefinition } from "./agent-defs";
+import { shellQuote } from "./runner";
 
 /**
  * Resolve the agent for a sandbox. Checks the per-sandbox registry first
@@ -158,14 +158,7 @@ function hermesGatewayEnvPrefix(): string {
 }
 
 function hermesDecodeProxyRecoveryCommand(): string {
-  const decodeProxyListening = 'ss -tln 2>/dev/null | grep -Eq "127\\.0\\.0\\.1:3129([[:space:]]|$)"';
-  const facadeListening = 'ss -tln 2>/dev/null | grep -Eq "127\\.0\\.0\\.1:3130([[:space:]]|$)"';
-  const primaryFacadeLog = "/tmp/discord-facade.log";
-  const fallbackFacadeLog = "/tmp/discord-facade-recovery.log";
-  const facadeLogSetup = `${buildNoFollowLogSetupCommand(primaryFacadeLog, undefined, "0o600")} || exit 1; _DISCORD_FACADE_LOG=${shellQuote(primaryFacadeLog)}; if ! : >> "$_DISCORD_FACADE_LOG" 2>/dev/null; then ${buildNoFollowLogSetupCommand(fallbackFacadeLog, undefined, "0o600")} || exit 1; _DISCORD_FACADE_LOG=${shellQuote(fallbackFacadeLog)}; : >> "$_DISCORD_FACADE_LOG" 2>/dev/null || exit 1; fi`;
-  const facadeLaunch =
-    'nohup env -u NEMOCLAW_DISCORD_FACADE_URL -u PYTHONPATH DISCORD_PROXY=http://127.0.0.1:3129 HTTPS_PROXY=http://127.0.0.1:3129 HTTP_PROXY=http://127.0.0.1:3129 NEMOCLAW_DISCORD_FACADE_PORT=3130 DISCORD_FACADE_LOG="$_DISCORD_FACADE_LOG" sh -c \'umask 0007; exec "$@" >>"$DISCORD_FACADE_LOG" 2>&1\' sh python3 /usr/local/bin/nemoclaw-discord-facade &';
-  return `if ! command -v ss >/dev/null 2>&1 || ! ${decodeProxyListening}; then nohup python3 /usr/local/bin/nemoclaw-decode-proxy >/dev/null 2>&1 & for _i in 1 2 3 4 5 6 7 8 9 10; do command -v ss >/dev/null 2>&1 && ${decodeProxyListening} && break; sleep 0.5; done; fi; if ! command -v ss >/dev/null 2>&1 || ! ${facadeListening}; then ${facadeLogSetup}; ${facadeLaunch} for _i in 1 2 3 4 5 6 7 8 9 10; do command -v ss >/dev/null 2>&1 && ${facadeListening} && break; sleep 0.5; done; fi;`;
+  return 'if ! command -v ss >/dev/null 2>&1 || ! ss -tln 2>/dev/null | grep -q "127.0.0.1:3129"; then nohup /opt/hermes/.venv/bin/python /usr/local/bin/nemoclaw-decode-proxy >/dev/null 2>&1 & for _i in 1 2 3 4 5 6 7 8 9 10; do command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q "127.0.0.1:3129" && break; sleep 0.5; done; fi; if ! command -v ss >/dev/null 2>&1 || ! ss -tln 2>/dev/null | grep -q "127.0.0.1:3130"; then env -u NEMOCLAW_DISCORD_FACADE_URL -u PYTHONPATH DISCORD_PROXY=http://127.0.0.1:3129 HTTPS_PROXY=http://127.0.0.1:3129 HTTP_PROXY=http://127.0.0.1:3129 NEMOCLAW_DISCORD_FACADE_PORT=3130 nohup /opt/hermes/.venv/bin/python /usr/local/bin/nemoclaw-discord-facade >/tmp/discord-facade.log 2>&1 & for _i in 1 2 3 4 5 6 7 8 9 10; do command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q "127.0.0.1:3130" && break; sleep 0.5; done; fi;';
 }
 
 /**
