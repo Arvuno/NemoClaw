@@ -103,34 +103,62 @@ fi
 
 Run this check for every candidate that survived the label-based filters above; drop those whose `RECENT_MARKER` is non-empty.
 
-**Active-maintainer-discussion skip.** Drop the issue if a `MEMBER`, `OWNER`, or `COLLABORATOR` comment was posted within the last 7 days AND the original reporter hasn't replied since. The skill is for *stale* issues; actively-discussed ones are in-flight. Posting verify-stale verdicts on top of an open question from a maintainer creates noise and can conflict with the maintainer's framing. Surfaced during pre-flight on #2757 — the maintainer @cjagwani had just asked the reporter clarifying questions about whether the bug premise was even correct, and running verify-stale would have stomped on that conversation.
+**Unanswered-maintainer-question handling.** Find the most recent maintainer (`MEMBER`, `OWNER`, `COLLABORATOR`) comment that the reporter has not replied to since. The age of that comment determines whether the skill skips or proceeds, with a different comment shape if it proceeds:
+
+- **Within 7 days:** **skip the issue** — the discussion is active, the skill running on top would conflict with the maintainer's framing or confuse the reporter. Surfaced during pre-flight on #2757; running verify-stale on top of a fresh "let me clarify what you observed" question from @cjagwani would have stomped on that conversation.
+- **Older than 7 days:** **proceed with verification, but use the unanswered-question comment variant.** After 7 days the maintainer's question has either been forgotten or the reporter has dropped the ball; an independent skill verdict becomes the *unsticking voice* rather than a clueless interruption. The comment leads with "[@&lt;maint&gt;'s question from N days ago](url) is still unanswered" and @-mentions BOTH the maintainer and the reporter, not just the reporter.
+
+Reuse the `$SEVEN_DAYS_AGO` cutoff from the marker-TTL check above for portability — no cross-platform date math beyond what's already in scope.
 
 ```bash
-# Reuse the cutoff from the marker-TTL check above ($SEVEN_DAYS_AGO).
 REPORTER=$(gh issue view "$ISSUE_NUMBER" --repo NVIDIA/NemoClaw --json author --jq .author.login)
 
-ACTIVE_DISCUSSION=$(gh issue view "$ISSUE_NUMBER" --repo NVIDIA/NemoClaw --json comments \
-  --jq --arg cutoff "$SEVEN_DAYS_AGO" --arg reporter "$REPORTER" '
+# Most recent unanswered maintainer comment, with age-relative-to-cutoff classification.
+UNANSWERED_MAINT=$(gh issue view "$ISSUE_NUMBER" --repo NVIDIA/NemoClaw --json comments \
+  --jq --arg reporter "$REPORTER" --arg cutoff "$SEVEN_DAYS_AGO" '
     (.comments
-     | map(select(
-         (.authorAssociation == "MEMBER" or .authorAssociation == "OWNER" or .authorAssociation == "COLLABORATOR")
-         and .createdAt > $cutoff))
+     | map(select(.authorAssociation == "MEMBER" or .authorAssociation == "OWNER" or .authorAssociation == "COLLABORATOR"))
      | sort_by(.createdAt) | last) as $maint
     | if $maint == null then null
       else
         ((.comments
           | map(select(.author.login == $reporter and .createdAt > $maint.createdAt))
           | length) as $replies
-         | if $replies > 0 then null else $maint.createdAt end)
+         | if $replies > 0 then null
+           else {
+             createdAt: $maint.createdAt,
+             url: $maint.url,
+             login: $maint.author.login,
+             recent: ($maint.createdAt > $cutoff)
+           }
+           end)
       end')
 
-if [ -n "$ACTIVE_DISCUSSION" ] && [ "$ACTIVE_DISCUSSION" != "null" ]; then
-  echo "Skip: active maintainer discussion since $ACTIVE_DISCUSSION (reporter has not replied)"
-  # Single-issue mode: exit 0 with the message; batch mode: continue to next candidate.
+if [ -n "$UNANSWERED_MAINT" ] && [ "$UNANSWERED_MAINT" != "null" ]; then
+  MAINT_RECENT=$(printf '%s' "$UNANSWERED_MAINT" | jq -r .recent)
+  MAINT_DATE=$(printf '%s' "$UNANSWERED_MAINT" | jq -r .createdAt)
+  MAINT_LOGIN=$(printf '%s' "$UNANSWERED_MAINT" | jq -r .login)
+  MAINT_URL=$(printf '%s' "$UNANSWERED_MAINT" | jq -r .url)
+
+  if [ "$MAINT_RECENT" = "true" ]; then
+    echo "Skip: active maintainer discussion (unanswered comment from @$MAINT_LOGIN at $MAINT_DATE, within 7 days)"
+    # Single-issue mode: exit 0 with the message; batch mode: continue to next candidate.
+  else
+    echo "[verify-stale] proceeding with unanswered-question variant — @$MAINT_LOGIN's comment from $MAINT_DATE is older than 7 days"
+    # Step 10's comment template will lead with the unanswered-question prefix and @-mention
+    # both the maintainer and the reporter. Export these for the templater:
+    export UNANSWERED_MAINT_LOGIN="$MAINT_LOGIN"
+    export UNANSWERED_MAINT_URL="$MAINT_URL"
+    export UNANSWERED_MAINT_DATE="$MAINT_DATE"
+  fi
 fi
 ```
 
-Applies to both single-issue and batch mode. Single-issue mode shows the message and exits friendlily so the maintainer knows why the skill bailed. Batch mode just moves on.
+When the unanswered-question variant fires (`UNANSWERED_MAINT_LOGIN` set), Step 10's comment template prepends a lead paragraph:
+
+> [@&lt;maint&gt;'s comment](url) from YYYY-MM-DD is still unanswered. Independent verification below.
+
+…and the closing @-mention block names BOTH the maintainer (acknowledging their question) and the reporter (asking for confirmation per the standard pattern), instead of just the reporter.
 
 **Candidate rule:** keep the issue if **either**:
 
@@ -1229,6 +1257,18 @@ Transcripts and synth-repro scripts are already plain text and skip the pre-pass
 > @\<reporter\> — please confirm the symptom is gone on a recent build (≥ v0.0.\<Z\>) and reopen with a fresh reproducer if you observe otherwise.
 
 The skill cannot independently confirm a closed-as-fixed verdict — only the reporter knows whether their original symptom is gone in their environment. The @-mention is what converts a "skill says it's fixed" claim into actionable confirmation work for QA. Customize `<Z>` per case (the version that shipped the fix or `$LATEST`), but never omit the line.
+
+**Mandatory unanswered-question prefix and dual @-mention.** When Step 3 sets `UNANSWERED_MAINT_LOGIN` (a maintainer's question is older than 7 days and the reporter never replied), the verdict comment changes shape in two places:
+
+1. **Prepend a lead paragraph** as the very first line of the body, before the `## Stale-issue verification` heading:
+
+   > [@\<UNANSWERED_MAINT_LOGIN\>'s comment](\<UNANSWERED_MAINT_URL\>) from \<UNANSWERED_MAINT_DATE\> is still unanswered. Posting independent verification below to unstick the thread.
+
+2. **Replace the closing reporter-only @-mention with a dual @-mention** that names BOTH the maintainer (acknowledging the open question) and the reporter (per the standard confirmation pattern):
+
+   > @\<UNANSWERED_MAINT_LOGIN\> — flagging that your question above is still open; the verification below may answer it. @\<reporter\> — please confirm the symptom is gone on a recent build (≥ v0.0.\<Z\>) and reopen with a fresh reproducer if you observe otherwise.
+
+This applies to all three templates (fixed, still-reproduces, by-design). The skill becomes the *unsticking voice* on a thread that has gone quiet — never a clueless interruption when discussion is fresh (Step 3 already filtered the within-7-day case).
 
 **Comment template (fixed / inconclusive — bug not reproduced on latest):**
 
