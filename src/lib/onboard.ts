@@ -141,6 +141,7 @@ const { detectVllmProfile, installVllm } = require("./inference/vllm");
 const inferenceConfig: typeof import("./inference/config") = require("./inference/config");
 const {
   DEFAULT_CLOUD_MODEL,
+  DEFAULT_ROUTE_CREDENTIAL_ENV,
   INFERENCE_ROUTE_URL,
   MANAGED_PROVIDER_ID,
   getProviderSelectionConfig,
@@ -1883,6 +1884,19 @@ function getRemoteProviderConfigForName(
 }
 
 /**
+ * Choose the credential env used to recreate a missing provider during resume.
+ */
+function getResumeProviderCredentialEnv(
+  provider: string,
+  config: RemoteProviderConfigEntry | null,
+  credentialEnv: string | null | undefined,
+): string {
+  if (credentialEnv) return credentialEnv;
+  if (config?.credentialEnv) return config.credentialEnv;
+  return isRoutedInferenceProvider(provider) ? DEFAULT_ROUTE_CREDENTIAL_ENV : "";
+}
+
+/**
  * Ensure a resumed remote provider still exists, re-prompting for credentials when needed.
  */
 async function ensureResumeProviderReady(
@@ -1890,11 +1904,15 @@ async function ensureResumeProviderReady(
   credentialEnv: string | null | undefined,
 ): Promise<{ forceInferenceSetup: boolean }> {
   const config = getRemoteProviderConfigForName(provider);
-  if (!config || !provider) return { forceInferenceSetup: false };
+  if (!provider || (!config && !isRoutedInferenceProvider(provider))) {
+    return { forceInferenceSetup: false };
+  }
   if (providerExistsInGateway(provider)) return { forceInferenceSetup: false };
 
-  const resolvedCredentialEnv = credentialEnv || config.credentialEnv;
+  const resolvedCredentialEnv = getResumeProviderCredentialEnv(provider, config, credentialEnv);
   const credentialValue = hydrateCredentialEnv(resolvedCredentialEnv);
+  const providerLabel = config?.label || getProviderLabel(provider) || provider;
+  const helpUrl = config?.helpUrl || null;
   if (!credentialValue) {
     if (isNonInteractive()) {
       console.error(
@@ -1910,8 +1928,8 @@ async function ensureResumeProviderReady(
     console.log("  Re-enter the API key so onboarding can recreate it before rebuilding.");
     await replaceNamedCredential(
       resolvedCredentialEnv,
-      `${config.label} API key`,
-      config.helpUrl,
+      `${providerLabel} API key`,
+      helpUrl,
       (value) => validateNvidiaApiKeyValue(value, resolvedCredentialEnv),
     );
   } else {

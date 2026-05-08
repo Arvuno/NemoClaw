@@ -421,10 +421,11 @@ describe("onboard helpers", () => {
     const runnerPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "runner.js"));
     const openshellPath = path.join(fakeBin, "openshell");
 
-    fs.mkdirSync(fakeBin, { recursive: true });
-    fs.writeFileSync(openshellPath, "#!/usr/bin/env bash\nexit 0\n", { mode: 0o755 });
+    try {
+      fs.mkdirSync(fakeBin, { recursive: true });
+      fs.writeFileSync(openshellPath, "#!/usr/bin/env bash\nexit 0\n", { mode: 0o755 });
 
-    const script = `
+      const script = `
 const credentials = require(${credentialsPath});
 const runner = require(${runnerPath});
 const calls = [];
@@ -458,31 +459,34 @@ const { ensureResumeProviderReady } = require(${onboardPath});
   process.exit(1);
 });
 `;
-    fs.writeFileSync(scriptPath, script);
+      fs.writeFileSync(scriptPath, script);
 
-    const result = spawnSync(process.execPath, [scriptPath], {
-      cwd: repoRoot,
-      encoding: "utf-8",
-      env: {
-        ...process.env,
-        HOME: tmpDir,
-        PATH: `${fakeBin}:${process.env.PATH || ""}`,
-      },
-    });
+      const result = spawnSync(process.execPath, [scriptPath], {
+        cwd: repoRoot,
+        encoding: "utf-8",
+        env: {
+          ...process.env,
+          HOME: tmpDir,
+          PATH: `${fakeBin}:${process.env.PATH || ""}`,
+        },
+      });
 
-    assert.equal(result.status, 0, result.stderr);
-    const payload = parseStdoutJson<{
-      result: { forceInferenceSetup: boolean };
-      saved: Array<{ name: string; value: string }>;
-      envValue: string;
-      providerGet: boolean;
-    }>(result.stdout);
-    assert.equal(payload.providerGet, true);
-    assert.deepEqual(payload.result, { forceInferenceSetup: true });
-    assert.deepEqual(payload.saved, [
-      { name: "COMPATIBLE_API_KEY", value: "fresh-compatible-key" },
-    ]);
-    assert.equal(payload.envValue, "fresh-compatible-key");
+      assert.equal(result.status, 0, result.stderr);
+      const payload = parseStdoutJson<{
+        result: { forceInferenceSetup: boolean };
+        saved: Array<{ name: string; value: string }>;
+        envValue: string;
+        providerGet: boolean;
+      }>(result.stdout);
+      assert.equal(payload.providerGet, true);
+      assert.deepEqual(payload.result, { forceInferenceSetup: true });
+      assert.deepEqual(payload.saved, [
+        { name: "COMPATIBLE_API_KEY", value: "fresh-compatible-key" },
+      ]);
+      assert.equal(payload.envValue, "fresh-compatible-key");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it("uses explicit messaging selections for policy suggestions when provided", () => {
