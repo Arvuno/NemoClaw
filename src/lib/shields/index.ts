@@ -12,7 +12,8 @@
 
 const fs = require("fs");
 const path = require("path");
-const { fork } = require("child_process");
+const { fork, execFileSync } = require("child_process");
+const { randomBytes } = require("crypto");
 const { run, runCapture, validateName, shellQuote } = require("../runner");
 const { dockerExecFileSync } = require("../adapters/docker/exec");
 const { dockerCapture } = require("../adapters/docker/run");
@@ -212,6 +213,7 @@ interface TimerMarker {
   sandboxName: string;
   snapshotPath: string;
   restoreAt: string;
+  processToken?: string;
 }
 
 type UnknownRecord = { [key: string]: unknown };
@@ -272,7 +274,8 @@ function isTimerMarker(value: unknown): value is TimerMarker {
     pid > 0 &&
     typeof value.sandboxName === "string" &&
     typeof value.snapshotPath === "string" &&
-    typeof value.restoreAt === "string"
+    typeof value.restoreAt === "string" &&
+    (value.processToken === undefined || typeof value.processToken === "string")
   );
 }
 
@@ -325,6 +328,61 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
+function readProcessCommandLine(pid: number): string | null {
+  const procCmdline = `/proc/${String(pid)}/cmdline`;
+  try {
+    if (fs.existsSync(procCmdline)) {
+      const cmdline = fs.readFileSync(procCmdline, "utf-8").replaceAll("\0", " ").trim();
+      return cmdline || null;
+    }
+  } catch {
+    // Fall through to ps-based lookup.
+  }
+
+  try {
+    const psCommand = execFileSync("ps", ["-o", "command=", "-p", String(pid)], {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+    return psCommand || null;
+  } catch {
+    return null;
+  }
+}
+
+function verifyTimerMarkerIdentity(
+  marker: TimerMarker,
+): { verified: boolean; warning?: string } {
+  const commandLine = readProcessCommandLine(marker.pid);
+  if (!commandLine) {
+    return {
+      verified: false,
+      warning: `Unable to verify shields timer PID ${String(marker.pid)} for sandbox '${marker.sandboxName}'; clearing marker without signaling.`,
+    };
+  }
+
+  const looksLikeTimerProcess =
+    commandLine.includes("shields/timer.js") || commandLine.includes("shields/timer.ts");
+  const hasSandboxArg = commandLine.includes(marker.sandboxName);
+
+  if (!looksLikeTimerProcess || !hasSandboxArg) {
+    return {
+      verified: false,
+      warning: `PID ${String(marker.pid)} does not match shields timer identity for sandbox '${marker.sandboxName}'; clearing marker without signaling.`,
+    };
+  }
+
+  if (marker.processToken && !commandLine.includes(marker.processToken)) {
+    return {
+      verified: false,
+      warning: `PID ${String(marker.pid)} token mismatch for sandbox '${marker.sandboxName}'; clearing marker without signaling.`,
+    };
+  }
+
+  return { verified: true };
+}
+
 interface KillTimerResult {
   markerFound: boolean;
   markerPid: number | null;
@@ -342,15 +400,22 @@ function killTimer(sandboxName: string): KillTimerResult {
   if (marker) {
     wasAlive = isProcessAlive(marker.pid);
     if (wasAlive) {
-      try {
-        process.kill(marker.pid, "SIGTERM");
-        terminated = true;
-      } catch (error) {
-        const errno = error as NodeJS.ErrnoException;
-        if (errno.code !== "ESRCH") {
-          warnings.push(
-            `Failed to terminate shields timer PID ${String(marker.pid)} for sandbox '${sandboxName}': ${errno.message}`,
-          );
+      const verification = verifyTimerMarkerIdentity(marker);
+      if (!verification.verified) {
+        if (verification.warning) {
+          warnings.push(verification.warning);
+        }
+      } else {
+        try {
+          process.kill(marker.pid, "SIGTERM");
+          terminated = true;
+        } catch (error) {
+          const errno = error as NodeJS.ErrnoException;
+          if (errno.code !== "ESRCH") {
+            warnings.push(
+              `Failed to terminate shields timer PID ${String(marker.pid)} for sandbox '${sandboxName}': ${errno.message}`,
+            );
+          }
         }
       }
     }
@@ -988,6 +1053,7 @@ function shieldsDown(sandboxName: string, opts: ShieldsDownOpts = {}): void {
   //    can take minutes (policy apply + kubectl chmod), so a relative timeout
   //    passed at fork time would fire too early.
   const restoreAt = new Date(Date.now() + timeoutSeconds * 1000);
+  const processToken = randomBytes(16).toString("hex");
   const timerScript = path.join(__dirname, "timer.ts");
   const timerScriptJs = timerScript.replace(/\.ts$/, ".js");
   const actualScript = fs.existsSync(timerScriptJs)
@@ -1003,6 +1069,7 @@ function shieldsDown(sandboxName: string, opts: ShieldsDownOpts = {}): void {
         restoreAt.toISOString(),
         target.configPath,
         target.configDir,
+        processToken,
       ],
       {
         detached: true,
@@ -1021,6 +1088,7 @@ function shieldsDown(sandboxName: string, opts: ShieldsDownOpts = {}): void {
         sandboxName,
         snapshotPath,
         restoreAt: restoreAt.toISOString(),
+        processToken,
       }),
       { mode: 0o600 },
     );
@@ -1281,6 +1349,7 @@ function shieldsStatus(sandboxName: string, allowInlineRecovery = true): void {
  */
 function isShieldsDown(sandboxName: string): boolean {
   const state = recoverExpiredAutoRestoreGate(sandboxName, true);
+  if (state._isCorrupt) return false;
   const mode = deriveShieldsMode(state, state._hasStateFile);
   return mode !== "locked";
 }

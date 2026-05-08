@@ -580,9 +580,30 @@ describe("NC-2227-05: shields.ts locks state directories", () => {
     expect(fnStart).not.toBe(-1);
     const fnBody = src.slice(fnStart, src.indexOf("const HIGH_RISK_STATE_DIRS"));
     expect(fnBody).toContain("wasAlive = isProcessAlive(marker.pid)");
+    expect(fnBody).toContain("verifyTimerMarkerIdentity(marker)");
     expect(fnBody).toContain('process.kill(marker.pid, "SIGTERM")');
     expect(fnBody).toContain("const markerClear = clearTimerMarker(sandboxName)");
     expect(fnBody).toContain("warnings.push(markerClear.warning)");
     expect(fnBody).toContain("warnings");
+  });
+
+  it("shieldsDown writes a process token into the timer marker and passes it to timer args", () => {
+    const src = getSourceCode();
+    const downStart = src.indexOf("function shieldsDown");
+    expect(downStart).not.toBe(-1);
+    const fnBody = src.slice(downStart, src.indexOf("function shieldsUp"));
+
+    expect(fnBody).toContain("const processToken = randomBytes(16).toString(\"hex\")");
+    expect(fnBody).toContain("processToken,");
+  });
+
+  it("isShieldsDown fails closed when shields state is corrupt", () => {
+    const src = getSourceCode();
+    const fnStart = src.indexOf("function isShieldsDown");
+    expect(fnStart).not.toBe(-1);
+    const fnBody = src.slice(fnStart, src.indexOf("// ---------------------------------------------------------------------------\n// Exports"));
+
+    expect(fnBody).toContain("if (state._isCorrupt)");
+    expect(fnBody).toContain("return false");
   });
 });

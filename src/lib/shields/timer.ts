@@ -6,7 +6,7 @@
 // restores the captured policy snapshot.
 //
 // Usage (internal — called by shields.ts via fork()):
-//   node shields-timer.js <sandbox-name> <snapshot-path> <restore-at-iso> <config-path> <config-dir>
+//   node shields-timer.js <sandbox-name> <snapshot-path> <restore-at-iso> <config-path> <config-dir> <process-token>
 
 import fs from "node:fs";
 import path from "node:path";
@@ -37,6 +37,7 @@ interface TimerArgs {
   markerPath: string;
   configPath?: string;
   configDir?: string;
+  processToken?: string;
 }
 
 const STATE_DIR = resolveNemoclawStateDir();
@@ -47,7 +48,7 @@ function isRecord(value: unknown): value is UnknownRecord {
 }
 
 function parseTimerArgs(argv: string[]): TimerArgs | null {
-  const [sandboxName, snapshotPath, restoreAtIso, configPath, configDir] = argv;
+  const [sandboxName, snapshotPath, restoreAtIso, configPath, configDir, processToken] = argv;
   const restoreAtMs = restoreAtIso ? new Date(restoreAtIso).getTime() : Number.NaN;
 
   if (!sandboxName || !snapshotPath || !restoreAtIso || Number.isNaN(restoreAtMs)) {
@@ -64,6 +65,7 @@ function parseTimerArgs(argv: string[]): TimerArgs | null {
     markerPath: path.join(STATE_DIR, `shields-timer-${sandboxName}.json`),
     configPath,
     configDir,
+    processToken,
   };
 }
 
