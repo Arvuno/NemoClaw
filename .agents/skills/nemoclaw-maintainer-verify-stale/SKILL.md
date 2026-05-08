@@ -1191,7 +1191,30 @@ Transcripts and synth-repro scripts are already plain text and skip the pre-pass
 
 **File paths under the reporter's home directory** (`/Users/<name>/`, `/home/<name>/`) → replace with `~/`. Run last; catches incidental username PII.
 
-**Length target.** Default rendered comment to **400–500 words**. The evidence table (or by-design "What's structurally fixed" + "Vestigial references" sections) is the hero. Strip architectural prose "for QA reference," PR-attribution caveats beyond one sentence, and closing reopen-instructions boilerplate. If a comment runs past 500 words, cut everything that doesn't directly support the verdict — every section needs to either change a reader's mind about the verdict or be deleted.
+**Comment authoring principle.** Every section in a rendered comment must either change a reader's mind about the verdict, or be cut. Word counts follow from that — 500 is a **ceiling**, not a target. Most fixed-on-latest and by-design comments land in the 200–400 range; simple cases (clear PR ref, deterministic check) land under 200. The principle generalizes: comments posted by this skill compete for a maintainer's attention against every other in-flight thread, and "AI-slop" prose — architectural sidebars, file:line citations the maintainer can find via the PR ref, bare-output reproductions when the load-bearing evidence is elsewhere, "if this verification is wrong, please reopen…" boilerplate — actively reduces the comment's signal-to-noise ratio.
+
+**For each section in a draft, ask: would the maintainer reach a different conclusion *without* this section? If no, delete.** Lessons accumulated from real runs:
+
+- **#2007 first draft (~750 words):** had a multi-paragraph "Architectural notes for QA reference" section that didn't change the verdict. Cut → 371 words.
+- **#2604 first three drafts:** wavered between fixed-on-latest, still-reproduces, and by-design across iterations because each draft padded the verdict with prose that didn't ground it. Final 190-word draft cut a maintainer-note sidebar about platform attribution, a bare-status output reproduction, and a file:line citation of the source — none affected the verdict, all were AI-slop padding. Rule learned: **before drafting any prose, name the verdict in one sentence; if a section doesn't directly support that one sentence, cut it before writing it.**
+
+**Per-verdict length defaults:**
+
+| Verdict | Target | Rationale |
+|---|---|---|
+| `fixed-on-latest` | 200–400 words | Header + evidence + verdict + @-mention. Add hardware-substitution caveat or related-failure-mode section only if they shift the maintainer's read. |
+| `wontfix` (by-design) | 250–500 words | Needs the structurally-fixed + vestigial + what's-not-the-same-bug sections to land cleanly. Skip the bug-report-quote-back if the issue is short. |
+| **`verify-inconclusive`** | 100–200 words | One paragraph naming what the skill couldn't establish. No transcripts beyond a single quoted line. |
+| **Still-reproduces (no label)** | **30–80 words** | The reporter already has the symptom; the maintainer can see the issue is open. The skill is just confirming + setting the TTL marker. **No transcripts** (the issue body has them), **no @-mention** (the reporter knows their bug is real), **no architectural prose**. One sentence stating "skill ran reproducer on `<latest>`, symptom still present" + one sentence on any partial-fix PR if relevant + marker. That's it. |
+
+**Cut, by default:**
+
+- Maintainer-note sidebars about labels / platform attribution unrelated to the bug surface.
+- Bare-output reproductions when the load-bearing evidence is in a different command's output.
+- File:line citations of source code already findable via the cited PR.
+- Closing "if this verification is wrong, please reopen…" boilerplate.
+- Redundant verbal framing of what the evidence already shows ("the table above proves…").
+- "Verification mode" pleasantries beyond one factual line.
 
 **Mandatory cap caveat.** When the score is capped (Step 9 baseline-validation gating, or any Step 11 degraded-mode path), the rendered Verdict section must include a one-line caveat naming the cap and the reason. Example: `Capped at 84 because Step 9's baseline-validation gate did not run (sandbox-build rot on v0.0.18: Dockerfile symlink layer removed by #2227).` Don't make readers reverse-engineer why the score didn't go higher — name it.
 
