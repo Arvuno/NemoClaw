@@ -14,6 +14,7 @@ import path from "node:path";
 import { buildPolicySetCommand } from "../policy";
 import { run } from "../runner";
 import { DEFAULT_AGENT_CONFIG, resolveAgentConfig } from "../sandbox/config";
+import { resolveNemoclawStateDir } from "../state/paths";
 import { lockAgentConfig } from "./index";
 
 type UnknownRecord = { [key: string]: unknown };
@@ -38,7 +39,7 @@ interface TimerArgs {
   configDir?: string;
 }
 
-const STATE_DIR = path.join(process.env.HOME ?? "/tmp", ".nemoclaw", "state");
+const STATE_DIR = resolveNemoclawStateDir();
 const AUDIT_FILE = path.join(STATE_DIR, "shields-audit.jsonl");
 
 function isRecord(value: unknown): value is UnknownRecord {

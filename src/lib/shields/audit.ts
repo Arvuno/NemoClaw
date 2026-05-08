@@ -13,8 +13,9 @@ import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { redactFull } from "../security/redact";
 import { ensureConfigDir } from "../state/config-io";
+import { resolveNemoclawStateDir } from "../state/paths";
 
-const AUDIT_DIR = join(process.env.HOME ?? "/tmp", ".nemoclaw", "state");
+const AUDIT_DIR = resolveNemoclawStateDir();
 const AUDIT_FILE = join(AUDIT_DIR, "shields-audit.jsonl");
 
 export interface ShieldsAuditEntry {

@@ -336,6 +336,15 @@ describe("shields — unit logic", () => {
       );
       expect(fnBody).toContain("Shields: DOWN (temporarily unlocked)");
     });
+    it("status fails fast on corrupt shields state instead of reporting NOT CONFIGURED", () => {
+      const src = getSourceCode();
+      const fnStart = src.indexOf("function shieldsStatus");
+      expect(fnStart).toBeGreaterThan(-1);
+      const fnBody = src.slice(fnStart, src.indexOf("function isShieldsDown"));
+      expect(fnBody).toContain("if (state._isCorrupt)");
+      expect(fnBody).toContain("Shields: ERROR (state file is corrupt)");
+      expect(fnBody).toContain("process.exit(1)");
+    });
   });
 });
 
@@ -553,5 +562,27 @@ describe("NC-2227-05: shields.ts locks state directories", () => {
     expect(src).toContain("legacy data dir exists");
     expect(src).toContain("legacy symlink remains");
     expect(fnBody).toContain("assertNoLegacyStateLayout");
+  });
+
+  it("timer marker validation requires a positive integer pid", () => {
+    const src = getSourceCode();
+    const fnStart = src.indexOf("function isTimerMarker");
+    expect(fnStart).not.toBe(-1);
+    const fnBody = src.slice(fnStart, src.indexOf("function timerMarkerPath"));
+    expect(fnBody).toContain('typeof pid === "number"');
+    expect(fnBody).toContain("Number.isInteger(pid)");
+    expect(fnBody).toContain("pid > 0");
+  });
+
+  it("killTimer checks liveness before SIGTERM, clears marker, and surfaces warnings", () => {
+    const src = getSourceCode();
+    const fnStart = src.indexOf("function killTimer");
+    expect(fnStart).not.toBe(-1);
+    const fnBody = src.slice(fnStart, src.indexOf("const HIGH_RISK_STATE_DIRS"));
+    expect(fnBody).toContain("wasAlive = isProcessAlive(marker.pid)");
+    expect(fnBody).toContain('process.kill(marker.pid, "SIGTERM")');
+    expect(fnBody).toContain("const markerClear = clearTimerMarker(sandboxName)");
+    expect(fnBody).toContain("warnings.push(markerClear.warning)");
+    expect(fnBody).toContain("warnings");
   });
 });

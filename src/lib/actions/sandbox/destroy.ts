@@ -28,6 +28,7 @@ import {
   shouldCleanupGatewayAfterDestroy,
   shouldStopHostServicesAfterDestroy,
 } from "../../domain/sandbox/destroy";
+import { resolveNemoclawStateDir } from "../../state/paths";
 import { G, R, YW } from "../../cli/terminal-style";
 
 type DockerRmi = (tag: string, opts?: { ignoreError?: boolean }) => { status: number | null };
@@ -53,6 +54,22 @@ export type CleanupSandboxServicesDeps = {
   unloadOllamaModels?: () => void;
   runOpenshell?: RunOpenshell;
   rmSync?: typeof fs.rmSync;
+};
+
+type ShieldsTimerNeutralizeResult = {
+  warnings?: string[];
+};
+
+type CleanupShieldsDestroyArtifactsDeps = {
+  killShieldsTimer?: (sandboxName: string) => ShieldsTimerNeutralizeResult | void;
+  rmSync?: typeof fs.rmSync;
+  stateDir?: string;
+  warn?: (message: string) => void;
+};
+
+type RemoveShieldsStateDeps = {
+  rmSync?: typeof fs.rmSync;
+  warn?: (message: string) => void;
 };
 
 const NEMOCLAW_GATEWAY_NAME = "nemoclaw";
@@ -260,8 +277,11 @@ export function cleanupSandboxServices(
  */
 export function removeShieldsState(
   sandboxName: string,
-  stateDir = path.join(process.env.HOME ?? "/tmp", ".nemoclaw", "state"),
+  stateDir = resolveNemoclawStateDir(),
+  deps: RemoveShieldsStateDeps = {},
 ): void {
+  const rmSync = deps.rmSync ?? fs.rmSync;
+  const warn = deps.warn ?? ((message: string) => console.warn(`  ${YW}⚠${R} ${message}`));
   const resolvedStateDir = path.resolve(stateDir);
   for (const prefix of ["shields-", "shields-timer-"]) {
     const filePath = path.resolve(resolvedStateDir, `${prefix}${sandboxName}.json`);
@@ -271,12 +291,15 @@ export function removeShieldsState(
       continue;
     }
     try {
-      fs.rmSync(filePath, { force: true });
+      rmSync(filePath, { force: true });
     } catch (error) {
       // force: true already suppresses ENOENT; warn on real failures
       // (e.g. EPERM) so stale state doesn't silently survive.
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn(`  ${YW}⚠${R} Failed to remove shields state '${filePath}': ${message}`);
+      const errno = error as NodeJS.ErrnoException;
+      if (errno.code !== "ENOENT") {
+        const message = error instanceof Error ? error.message : String(error);
+        warn(`Failed to remove shields cleanup artifact '${filePath}': ${message}`);
+      }
     }
   }
 }
@@ -312,6 +335,36 @@ export function removeSandboxRegistryEntry(
   const removeSandbox = deps.removeSandbox ?? registry.removeSandbox;
   removeImage(sandboxName);
   return removeSandbox(sandboxName);
+}
+
+function defaultDestroyWarn(message: string): void {
+  console.warn(`  ${YW}⚠${R} ${message}`);
+}
+
+function getKillTimer(): (sandboxName: string) => ShieldsTimerNeutralizeResult | void {
+  const shields = require("../../shields") as {
+    killTimer: (sandboxName: string) => ShieldsTimerNeutralizeResult | void;
+  };
+  return shields.killTimer;
+}
+
+export function cleanupShieldsDestroyArtifacts(
+  sandboxName: string,
+  deps: CleanupShieldsDestroyArtifactsDeps = {},
+): void {
+  const killShieldsTimer = deps.killShieldsTimer ?? getKillTimer();
+  const stateDir = deps.stateDir ?? resolveNemoclawStateDir();
+  const warn = deps.warn ?? defaultDestroyWarn;
+
+  const timerResult = killShieldsTimer(sandboxName);
+  for (const warning of timerResult?.warnings ?? []) {
+    warn(warning);
+  }
+
+  removeShieldsState(sandboxName, stateDir, {
+    rmSync: deps.rmSync ?? fs.rmSync,
+    warn,
+  });
 }
 
 export async function destroySandbox(
@@ -409,7 +462,7 @@ export async function destroySandbox(
   });
 
   cleanupSandboxServices(sandboxName, { stopHostServices: shouldStopHostServices });
-  removeShieldsState(sandboxName);
+  cleanupShieldsDestroyArtifacts(sandboxName);
   const removed = removeSandboxRegistryEntry(sandboxName);
   const session = onboardSession.loadSession();
   if (session && session.sandboxName === sandboxName) {

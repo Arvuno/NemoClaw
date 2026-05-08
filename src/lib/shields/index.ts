@@ -26,10 +26,11 @@ const {
   PERMISSIVE_POLICY_PATH,
 } = require("../policy");
 const { parseDuration, MAX_SECONDS, DEFAULT_SECONDS } = require("../domain/duration");
+const { resolveNemoclawStateDir } = require("../state/paths");
 const { appendAuditEntry } = require("./audit");
 const { resolveAgentConfig } = require("../sandbox/config");
 
-const STATE_DIR = path.join(process.env.HOME ?? "/tmp", ".nemoclaw", "state");
+const STATE_DIR = resolveNemoclawStateDir();
 
 // ---------------------------------------------------------------------------
 // privileged sandbox exec — bypasses the sandbox's Landlock context
@@ -148,17 +149,31 @@ function deriveShieldsMode(
   return "mutable_default";
 }
 
-function loadShieldsState(
-  sandboxName: string,
-): ShieldsState & { _hasStateFile: boolean } {
+function loadShieldsState(sandboxName: string): ShieldsState & {
+  _hasStateFile: boolean;
+  _isCorrupt?: boolean;
+  _corruptError?: string;
+} {
   const filePath = stateFilePath(sandboxName);
   if (!fs.existsSync(filePath)) return { _hasStateFile: false };
   try {
     const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-    const state: ShieldsState = isShieldsState(parsed) ? parsed : {};
+    if (!isShieldsState(parsed)) {
+      return {
+        _hasStateFile: true,
+        _isCorrupt: true,
+        _corruptError: "invalid shields state shape",
+      };
+    }
+    const state: ShieldsState = parsed;
     return { ...state, _hasStateFile: true };
-  } catch {
-    return { _hasStateFile: false };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      _hasStateFile: true,
+      _isCorrupt: true,
+      _corruptError: message,
+    };
   }
 }
 
@@ -245,9 +260,12 @@ function isShieldsState(value: unknown): value is ShieldsState {
 }
 
 function isTimerMarker(value: unknown): value is TimerMarker {
+  const pid = isObjectRecord(value) ? value.pid : undefined;
   return (
     isObjectRecord(value) &&
-    typeof value.pid === "number" &&
+    typeof pid === "number" &&
+    Number.isInteger(pid) &&
+    pid > 0 &&
     typeof value.sandboxName === "string" &&
     typeof value.snapshotPath === "string" &&
     typeof value.restoreAt === "string"
@@ -269,11 +287,25 @@ function readTimerMarker(sandboxName: string): TimerMarker | null {
   }
 }
 
-function clearTimerMarker(sandboxName: string): void {
+interface ClearTimerMarkerResult {
+  cleared: boolean;
+  warning?: string;
+}
+
+function clearTimerMarker(sandboxName: string): ClearTimerMarkerResult {
+  const markerPath = timerMarkerPath(sandboxName);
   try {
-    fs.unlinkSync(timerMarkerPath(sandboxName));
-  } catch {
-    // Best effort
+    fs.unlinkSync(markerPath);
+    return { cleared: true };
+  } catch (error) {
+    const errno = error as NodeJS.ErrnoException;
+    if (errno.code === "ENOENT") {
+      return { cleared: false };
+    }
+    return {
+      cleared: false,
+      warning: `Failed to remove shields timer marker '${markerPath}': ${errno.message}`,
+    };
   }
 }
 
@@ -289,16 +321,47 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-function killTimer(sandboxName: string): void {
+interface KillTimerResult {
+  markerFound: boolean;
+  markerPid: number | null;
+  wasAlive: boolean;
+  terminated: boolean;
+  warnings: string[];
+}
+
+function killTimer(sandboxName: string): KillTimerResult {
   const marker = readTimerMarker(sandboxName);
+  let wasAlive = false;
+  let terminated = false;
+  const warnings: string[] = [];
+
   if (marker) {
-    try {
-      process.kill(marker.pid, "SIGTERM");
-    } catch {
-      // Process already exited — fine
+    wasAlive = isProcessAlive(marker.pid);
+    if (wasAlive) {
+      try {
+        process.kill(marker.pid, "SIGTERM");
+        terminated = true;
+      } catch (error) {
+        const errno = error as NodeJS.ErrnoException;
+        if (errno.code !== "ESRCH") {
+          warnings.push(
+            `Failed to terminate shields timer PID ${String(marker.pid)} for sandbox '${sandboxName}': ${errno.message}`,
+          );
+        }
+      }
     }
   }
-  clearTimerMarker(sandboxName);
+  const markerClear = clearTimerMarker(sandboxName);
+  if (markerClear.warning) {
+    warnings.push(markerClear.warning);
+  }
+  return {
+    markerFound: marker !== null,
+    markerPid: marker?.pid ?? null,
+    wasAlive,
+    terminated,
+    warnings,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -731,8 +794,9 @@ function activateLockdownFromSnapshot(
 
 function recoverExpiredAutoRestoreInline(
   sandboxName: string,
-  state: ShieldsState,
+  state: ShieldsState & { _isCorrupt?: boolean; _corruptError?: string },
 ): { attempted: boolean; restored: boolean } {
+  if (state._isCorrupt) return { attempted: false, restored: false };
   if (state.shieldsDown !== true) return { attempted: false, restored: false };
 
   const marker = readTimerMarker(sandboxName);
@@ -1144,6 +1208,16 @@ function shieldsStatus(sandboxName: string, allowInlineRecovery = true): void {
   validateName(sandboxName, "sandbox name");
 
   const state = recoverExpiredAutoRestoreGate(sandboxName, allowInlineRecovery);
+  if (state._isCorrupt) {
+    console.error("  Shields: ERROR (state file is corrupt)");
+    console.error(
+      `  ${stateFilePath(sandboxName)} could not be parsed: ${state._corruptError ?? "unknown error"}`,
+    );
+    console.error(
+      `  Recovery warning: run \`nemoclaw ${sandboxName} shields up\` to restore a known-good state.`,
+    );
+    process.exit(1);
+  }
   const mode = deriveShieldsMode(state, state._hasStateFile);
 
   switch (mode) {
@@ -1216,6 +1290,9 @@ export {
   shieldsUp,
   shieldsStatus,
   isShieldsDown,
+  readTimerMarker,
+  clearTimerMarker,
+  killTimer,
   deriveShieldsMode,
   parseDuration,
   lockAgentConfig,
