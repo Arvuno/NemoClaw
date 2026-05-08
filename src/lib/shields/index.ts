@@ -20,10 +20,10 @@ const {
   buildPolicySetCommand,
   parseCurrentPolicy,
   PERMISSIVE_POLICY_PATH,
-} = require("../policies");
+} = require("../policy");
 const { parseDuration, MAX_SECONDS, DEFAULT_SECONDS } = require("../domain/duration");
 const { appendAuditEntry } = require("./audit");
-const { resolveAgentConfig } = require("../sandbox-config");
+const { resolveAgentConfig } = require("../sandbox/config");
 
 const STATE_DIR = path.join(process.env.HOME ?? "/tmp", ".nemoclaw", "state");
 

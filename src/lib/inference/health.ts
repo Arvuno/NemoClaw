@@ -7,8 +7,8 @@
  * and performs lightweight reachability checks for remote cloud providers.
  */
 
-import type { CurlProbeResult } from "../http-probe";
-import { runCurlProbe } from "../http-probe";
+import type { CurlProbeResult } from "../adapters/http/probe";
+import { runCurlProbe } from "../adapters/http/probe";
 import { getProviderSelectionConfig } from "./config";
 import type { LocalProviderHealthProbeOptions } from "./local";
 import { probeLocalProviderHealth } from "./local";

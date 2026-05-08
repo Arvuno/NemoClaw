@@ -10,7 +10,7 @@ import { dockerCapture, dockerInspect } from "../../adapters/docker";
 import { parseLiveSandboxNames } from "../../runtime-recovery";
 import { ROOT, run, shellQuote, validateName } from "../../runner";
 import { captureOpenshell, getOpenshellBinary } from "../../adapters/openshell/runtime";
-import * as policies from "../../policies";
+import * as policies from "../../policy";
 import * as registry from "../../state/registry";
 import type { SandboxEntry } from "../../state/registry";
 import * as sandboxState from "../../state/sandbox";
@@ -117,7 +117,7 @@ async function autoCreateSandboxFromSource(
   dstName: string,
   srcEntry: SandboxEntry | { name: string },
 ): Promise<void> {
-  const sandboxCreateStream = require("../../sandbox-create-stream");
+  const sandboxCreateStream = require("../../sandbox/create-stream");
   const { isSandboxReady } = require("../../state/gateway");
   const basePolicy = path.join(ROOT, "nemoclaw-blueprint", "policies", "openclaw-sandbox.yaml");
   const openshellBin = getOpenshellBinary();

@@ -110,7 +110,7 @@ console.log = () => {};
   });
 
   it("restricted tier produces an empty preset list", () => {
-    const tiersPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "tiers.js"));
+    const tiersPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policy", "tiers.js"));
     const script =
       buildPreamble({ tierEnv: "restricted" }) +
       String.raw`
@@ -130,7 +130,7 @@ console.log = () => {};
   });
 
   it("balanced tier resolves presets all with read-write access", () => {
-    const tiersPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "tiers.js"));
+    const tiersPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policy", "tiers.js"));
     const script =
       buildPreamble({ tierEnv: "balanced" }) +
       String.raw`
@@ -153,7 +153,7 @@ console.log = () => {};
   });
 
   it("open tier resolves presets including at least one social/messaging preset", () => {
-    const tiersPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "tiers.js"));
+    const tiersPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policy", "tiers.js"));
     const script =
       buildPreamble({ tierEnv: "open" }) +
       String.raw`
@@ -179,7 +179,7 @@ console.log = () => {};
   });
 
   it("a preset can be deselected via selected option in resolveTierPresets", () => {
-    const tiersPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "tiers.js"));
+    const tiersPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policy", "tiers.js"));
     const script =
       buildPreamble({ tierEnv: "balanced" }) +
       String.raw`
@@ -199,7 +199,7 @@ console.log = () => {};
   });
 
   it("access level can be restricted from read-write to read via override", () => {
-    const tiersPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "tiers.js"));
+    const tiersPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policy", "tiers.js"));
     const script =
       buildPreamble({ tierEnv: "balanced" }) +
       String.raw`
@@ -250,7 +250,7 @@ console.log = (...args) => lines.push(args.join(" "));
   });
 
   it("selected tier is persisted to the registry via updateSandbox({ policyTier })", () => {
-    const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policies.js"));
+    const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policy", "index.js"));
     const script =
       buildPreamble({ tierEnv: "open", policyMode: "skip" }) +
       String.raw`
@@ -294,7 +294,7 @@ console.log = (...args) => lines.push(args.join(" "));
   // that the user may have meant NEMOCLAW_POLICY_TIER when the value looks like
   // a tier name.
   it("falls back to tier suggestions when NEMOCLAW_POLICY_MODE is unknown (#2429)", () => {
-    const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policies.js"));
+    const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policy", "index.js"));
     const script =
       buildPreamble({
         tierEnv: "balanced",
@@ -337,7 +337,7 @@ console.log = () => {};
   });
 
   it("omits the tier-name hint for a non-tier invalid value (#2429)", () => {
-    const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policies.js"));
+    const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policy", "index.js"));
     const script =
       buildPreamble({
         tierEnv: "balanced",
@@ -374,8 +374,8 @@ console.log = () => {};
 });
 
 describe("selectTierPresetsAndAccess", () => {
-  const tiersPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "tiers.js"));
-  const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policies.js"));
+  const tiersPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policy", "tiers.js"));
+  const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policy", "index.js"));
 
   function buildPresetsScript(body: string): string {
     const credPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "credentials", "store.js"));
