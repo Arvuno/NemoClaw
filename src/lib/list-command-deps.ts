@@ -43,8 +43,6 @@ export async function recoverRegistryEntriesWithFallback(
   }
 }
 
-/* v8 ignore start -- runtime dependency adapter covered through CLI integration tests. */
-
 export function buildListCommandDeps(): ListSandboxesCommandDeps {
   const opsBinList = resolveOpenshell();
   const sessionDeps = opsBinList ? createSystemDeps(opsBinList) : null;
