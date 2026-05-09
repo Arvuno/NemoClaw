@@ -1772,6 +1772,26 @@ Set them before running <code class="docutils literal notranslate"><span class="
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code> to enable</p></td>
 <td><p>Accepts a new sandbox config path without an interactive prompt when the stored path differs from the discovered one.</p></td>
 </tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_SANDBOX_GPU</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">auto</span></code>, <code class="docutils literal notranslate"><span class="pre">1</span></code>, or <code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
+<td><p>Controls sandbox GPU passthrough during onboarding. <code class="docutils literal notranslate"><span class="pre">auto</span></code> enables GPU passthrough when an NVIDIA GPU is detected, <code class="docutils literal notranslate"><span class="pre">1</span></code> requires GPU passthrough, and <code class="docutils literal notranslate"><span class="pre">0</span></code> forces CPU-only sandbox creation.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_SANDBOX_GPU_DEVICE</span></code></p></td>
+<td><p>OpenShell GPU device selector</p></td>
+<td><p>Selects the GPU device passed with <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">sandbox</span> <span class="pre">create</span> <span class="pre">--gpu-device</span></code>. Setting this value enables sandbox GPU passthrough unless <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_SANDBOX_GPU=0</span></code> is also set, which is rejected.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_OPENSHELL_GATEWAY_BIN</span></code></p></td>
+<td><p>path</p></td>
+<td><p>Advanced override for the <code class="docutils literal notranslate"><span class="pre">openshell-gateway</span></code> binary used by the Linux Docker-driver gateway. Defaults to the binary next to <code class="docutils literal notranslate"><span class="pre">openshell</span></code>, then common install paths.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_OPENSHELL_SANDBOX_BIN</span></code></p></td>
+<td><p>path</p></td>
+<td><p>Advanced override for the <code class="docutils literal notranslate"><span class="pre">openshell-sandbox</span></code> binary passed to the Linux Docker-driver gateway supervisor. Defaults to the binary next to <code class="docutils literal notranslate"><span class="pre">openshell</span></code>, then common install paths.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_OPENSHELL_GATEWAY_STATE_DIR</span></code></p></td>
+<td><p>path</p></td>
+<td><p>Advanced override for the Linux Docker-driver gateway pid file and SQLite state directory. Defaults to <code class="docutils literal notranslate"><span class="pre">~/.local/state/nemoclaw/openshell-docker-gateway</span></code>.</p></td>
+</tr>
 </tbody>
 </table>
 </div>
