@@ -15,6 +15,7 @@ import { buildPolicySetCommand } from "../policy";
 import { run } from "../runner";
 import { DEFAULT_AGENT_CONFIG, resolveAgentConfig } from "../sandbox/config";
 import { resolveNemoclawStateDir } from "../state/paths";
+import { appendAuditEntry, type ShieldsAuditEntry } from "./audit";
 import { lockAgentConfig } from "./index";
 
 type UnknownRecord = { [key: string]: unknown };
@@ -41,7 +42,6 @@ interface TimerArgs {
 }
 
 const STATE_DIR = resolveNemoclawStateDir();
-const AUDIT_FILE = path.join(STATE_DIR, "shields-audit.jsonl");
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -69,9 +69,9 @@ function parseTimerArgs(argv: string[]): TimerArgs | null {
   };
 }
 
-function appendAudit(entry: UnknownRecord): void {
+function appendAudit(entry: ShieldsAuditEntry): void {
   try {
-    fs.appendFileSync(AUDIT_FILE, `${JSON.stringify(entry)}\n`, { mode: 0o600 });
+    appendAuditEntry(entry);
   } catch {
     // Best effort — don't crash the timer
   }

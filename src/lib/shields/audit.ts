@@ -19,7 +19,12 @@ const AUDIT_DIR = resolveNemoclawStateDir();
 const AUDIT_FILE = join(AUDIT_DIR, "shields-audit.jsonl");
 
 export interface ShieldsAuditEntry {
-  action: "shields_down" | "shields_up" | "shields_auto_restore" | "shields_up_failed";
+  action:
+    | "shields_down"
+    | "shields_up"
+    | "shields_auto_restore"
+    | "shields_up_failed"
+    | "shields_auto_restore_lock_warning";
   sandbox: string;
   timestamp: string;
   timeout_seconds?: number;
@@ -31,6 +36,8 @@ export interface ShieldsAuditEntry {
   restored_by?: "operator" | "auto_timer";
   duration_seconds?: number;
   error?: string;
+  warning?: string;
+  lock_verified?: boolean;
 }
 
 /**
