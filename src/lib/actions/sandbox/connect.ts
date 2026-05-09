@@ -13,7 +13,10 @@ import {
   getOpenshellBinary,
   runOpenshell,
 } from "../../adapters/openshell/runtime";
-import { OPENSHELL_PROBE_TIMEOUT_MS } from "../../adapters/openshell/timeouts";
+import {
+  OPENSHELL_INFERENCE_ROUTE_PROBE_TIMEOUT_MS,
+  OPENSHELL_PROBE_TIMEOUT_MS,
+} from "../../adapters/openshell/timeouts";
 import * as registry from "../../state/registry";
 import type { SandboxEntry } from "../../state/registry";
 import { ROOT } from "../../runner";
@@ -31,7 +34,6 @@ import { resolveOpenshell } from "../../adapters/openshell/resolve";
 const agentRuntime = require("../../../../bin/lib/agent-runtime");
 
 const NEMOCLAW_GATEWAY_NAME = "nemoclaw";
-const INFERENCE_ROUTE_PROBE_TIMEOUT_MS = 10_000;
 
 export type SandboxConnectOptions = {
   probeOnly?: boolean;
@@ -130,6 +132,9 @@ function runSandboxConnectProbe(sandboxName: string): void {
 }
 
 function isSandboxInferenceRouteHealthy(sandboxName: string): boolean {
+  // Keep the shell string inside the sandbox: curl write-out, body capture,
+  // and status classification must run as one bounded probe. sandboxName
+  // remains an argv value, so no user input is interpolated into the script.
   const probe = captureOpenshell(
     [
       "sandbox",
@@ -145,7 +150,7 @@ function isSandboxInferenceRouteHealthy(sandboxName: string): boolean {
         "case \"$HTTP_CODE\" in 000|5*) printf 'BROKEN %s ' \"$HTTP_CODE\"; head -c 160 \"$OUT\" 2>/dev/null ;; *) printf 'OK %s' \"$HTTP_CODE\" ;; esac",
       ].join("; "),
     ],
-    { ignoreError: true, timeout: INFERENCE_ROUTE_PROBE_TIMEOUT_MS },
+    { ignoreError: true, timeout: OPENSHELL_INFERENCE_ROUTE_PROBE_TIMEOUT_MS },
   );
   return probe.status === 0 && /^OK\s+[0-9]{3}\b/.test(probe.output.trim());
 }

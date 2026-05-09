@@ -8541,15 +8541,19 @@ function computeSetupPresetSuggestions(
     webSearchConfig?: WebSearchConfig | null;
     provider?: string | null;
     knownPresetNames?: string[] | null;
+    webSearchSupported?: boolean | null;
   } = {},
 ): string[] {
   const { enabledChannels = null, webSearchConfig = null, provider = null } = options;
   const known = Array.isArray(options.knownPresetNames) ? new Set(options.knownPresetNames) : null;
+  const supportOptions = { webSearchSupported: options.webSearchSupported };
   const suggestions = tiers
     .resolveTierPresets(tierName)
     .map((p) => p.name)
+    .filter((name) => policies.setupPolicyPresetSupported(name, supportOptions))
     .filter((name) => !known || known.has(name));
   const add = (name: string) => {
+    if (!policies.setupPolicyPresetSupported(name, supportOptions)) return;
     if (suggestions.includes(name)) return;
     if (known && !known.has(name)) return;
     suggestions.push(name);
@@ -8562,62 +8566,6 @@ function computeSetupPresetSuggestions(
   return suggestions;
 }
 
-const AGENT_POLICY_PRESET_EXCLUSIONS: Record<string, readonly string[]> = {
-  hermes: ["brave"],
-};
-
-function isPolicyPresetExcludedForAgent(
-  presetName: string,
-  agentName: string | null | undefined,
-): boolean {
-  const excluded = AGENT_POLICY_PRESET_EXCLUSIONS[normalizeSandboxAgentName(agentName)];
-  return Boolean(excluded && excluded.includes(presetName));
-}
-
-function filterPolicyPresetsForAgent<T extends { name: string }>(
-  presets: T[],
-  agentName: string | null | undefined,
-): T[] {
-  return presets.filter((preset) => !isPolicyPresetExcludedForAgent(preset.name, agentName));
-}
-
-function resolvePolicyPresetAgentName(
-  sandboxName: string,
-  explicitAgentName: string | null | undefined,
-): string {
-  if (explicitAgentName) return normalizeSandboxAgentName(explicitAgentName);
-  try {
-    return normalizeSandboxAgentName(registry.getSandbox(sandboxName)?.agent);
-  } catch {
-    return "openclaw";
-  }
-}
-
-function listPolicyPresetsForAgent(
-  sandboxName: string,
-  agentName: string | null | undefined,
-): Array<{ name: string; description?: string }> {
-  const policyPresetAgentName = resolvePolicyPresetAgentName(sandboxName, agentName);
-  return [
-    ...filterPolicyPresetsForAgent(policies.listPresets(), policyPresetAgentName),
-    ...policies.listCustomPresets(sandboxName),
-  ];
-}
-
-function clampPolicyPresetNames(
-  presetNames: string[],
-  allowedPresets: Array<{ name: string }>,
-  agentName: string | null | undefined,
-  customPresetNames: ReadonlySet<string> = new Set(),
-): string[] {
-  const knownPresets = new Set(allowedPresets.map((p) => p.name));
-  return presetNames.filter((name) => {
-    if (!knownPresets.has(name)) return false;
-    if (customPresetNames.has(name)) return true;
-    return !isPolicyPresetExcludedForAgent(name, agentName);
-  });
-}
-
 async function setupPoliciesWithSelection(
   sandboxName: string,
   options: {
@@ -8627,7 +8575,7 @@ async function setupPoliciesWithSelection(
     enabledChannels?: string[] | null;
     provider?: string | null;
     knownPresetNames?: string[];
-    agentName?: string | null;
+    webSearchSupported?: boolean | null;
   } = {},
 ) {
   const selectedPresets = Array.isArray(options.selectedPresets) ? options.selectedPresets : null;
@@ -8638,8 +8586,8 @@ async function setupPoliciesWithSelection(
 
   step(8, 8, "Policy presets");
 
-  const policyPresetAgentName = resolvePolicyPresetAgentName(sandboxName, options.agentName);
-  const allPresets = listPolicyPresetsForAgent(sandboxName, policyPresetAgentName);
+  const supportOptions = { webSearchSupported: options.webSearchSupported };
+  const allPresets = policies.listSetupPolicyPresets(sandboxName, supportOptions);
   const knownPresets = new Set(allPresets.map((p) => p.name));
   const customPresetNames = new Set(
     policies.listCustomPresets(sandboxName).map((p: { name: string }) => p.name),
@@ -8649,31 +8597,32 @@ async function setupPoliciesWithSelection(
     ...allPresets,
     ...currentAppliedPresets.map((name) => ({ name })),
   ];
-  const applied = clampPolicyPresetNames(
+  const applied = policies.clampSetupPolicyPresetNames(
     currentAppliedPresets,
     selectablePresets,
-    policyPresetAgentName,
+    supportOptions,
     customPresetNames,
   );
   let chosen = selectedPresets
-    ? clampPolicyPresetNames(
+    ? policies.clampSetupPolicyPresetNames(
         selectedPresets,
         selectablePresets,
-        policyPresetAgentName,
+        supportOptions,
         customPresetNames,
       )
     : null;
 
   // Resume path: caller supplies the preset list from a previous run.
-  if (chosen && chosen.length > 0) {
-    if (onSelection) onSelection(chosen);
+  if (selectedPresets && selectedPresets.length > 0) {
+    const resumeSelection = chosen || [];
+    if (onSelection) onSelection(resumeSelection);
     if (!waitForSandboxReady(sandboxName)) {
       console.error(`  Sandbox '${sandboxName}' was not ready for policy application.`);
       process.exit(1);
     }
-    note(`  [resume] Reapplying policy presets: ${chosen.join(", ")}`);
-    syncPresetSelection(sandboxName, currentAppliedPresets, chosen);
-    return chosen;
+    note(`  [resume] Reapplying policy presets: ${resumeSelection.join(", ")}`);
+    syncPresetSelection(sandboxName, currentAppliedPresets, resumeSelection);
+    return resumeSelection;
   }
 
   // Tier selection — determines the default preset list for this install.
@@ -8684,6 +8633,7 @@ async function setupPoliciesWithSelection(
     webSearchConfig,
     provider,
     knownPresetNames: allPresets.map((p) => p.name),
+    webSearchSupported: options.webSearchSupported,
   });
 
   if (isNonInteractive()) {
@@ -10131,7 +10081,8 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     }
 
     const webSearchSupportProbePath = fromDockerfile ? path.resolve(fromDockerfile) : null;
-    if (webSearchConfig && !agentSupportsWebSearch(agent, webSearchSupportProbePath)) {
+    const webSearchSupported = agentSupportsWebSearch(agent, webSearchSupportProbePath);
+    if (webSearchConfig && !webSearchSupported) {
       note(
         `  Web search is not yet supported by ${agent?.displayName ?? "this sandbox image"}. Clearing stale config.`,
       );
@@ -10347,28 +10298,29 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       messagingChannels: Array.isArray(activeMessagingChannels) ? activeMessagingChannels : [],
       agent,
     });
-    const recordedPolicyPresetsForAgent = clampPolicyPresetNames(
+    const policyPresetSupportOptions = { webSearchSupported };
+    const recordedPolicyPresetsForSupport = policies.clampSetupPolicyPresetNames(
       recordedPolicyPresets || [],
       [
-        ...listPolicyPresetsForAgent(sandboxName, agent?.name ?? null),
+        ...policies.listSetupPolicyPresets(sandboxName, policyPresetSupportOptions),
         ...policies.getAppliedPresets(sandboxName).map((name) => ({ name })),
       ],
-      agent?.name ?? null,
+      policyPresetSupportOptions,
       new Set(
         policies.listCustomPresets(sandboxName).map((p: { name: string }) => p.name),
       ),
     );
     const resumePolicies =
-      resume && sandboxName && arePolicyPresetsApplied(sandboxName, recordedPolicyPresetsForAgent);
+      resume && sandboxName && arePolicyPresetsApplied(sandboxName, recordedPolicyPresetsForSupport);
     if (resumePolicies) {
-      skippedStepMessage("policies", recordedPolicyPresetsForAgent.join(", "));
+      skippedStepMessage("policies", recordedPolicyPresetsForSupport.join(", "));
       onboardSession.markStepComplete(
         "policies",
         toSessionUpdates({
           sandboxName,
           provider,
           model,
-          policyPresets: recordedPolicyPresetsForAgent,
+          policyPresets: recordedPolicyPresetsForSupport,
         }),
       );
     } else {
@@ -10376,12 +10328,12 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         sandboxName,
         provider,
         model,
-        policyPresets: recordedPolicyPresetsForAgent,
+        policyPresets: recordedPolicyPresetsForSupport,
       });
       const appliedPolicyPresets = await setupPoliciesWithSelection(sandboxName, {
         selectedPresets:
-          recordedPolicyPresetsForAgent.length > 0
-            ? recordedPolicyPresetsForAgent
+          recordedPolicyPresetsForSupport.length > 0
+            ? recordedPolicyPresetsForSupport
             : null,
         enabledChannels:
           selectedMessagingChannels.length > 0
@@ -10389,7 +10341,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
             : recordedMessagingChannels,
         webSearchConfig,
         provider,
-        agentName: agent?.name ?? null,
+        webSearchSupported,
         onSelection: (policyPresets) => {
           onboardSession.updateSession((current: Session) => {
             current.policyPresets = policyPresets;
@@ -10560,7 +10512,7 @@ module.exports = {
   arePolicyPresetsApplied,
   getSuggestedPolicyPresets,
   computeSetupPresetSuggestions,
-  filterPolicyPresetsForAgent,
+  filterSetupPolicyPresets: policies.filterSetupPolicyPresets,
   LOCAL_INFERENCE_PROVIDERS,
   presetsCheckboxSelector,
   selectPolicyTier,

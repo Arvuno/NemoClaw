@@ -52,9 +52,9 @@ type OnboardTestInternals = {
   classifySandboxCreateFailure: (output?: string) => { kind: string; uploadedToGateway: boolean };
   compactText: (value?: string) => string;
   computeSetupPresetSuggestions: ShimFn<string[]>;
-  filterPolicyPresetsForAgent: <T extends { name: string }>(
+  filterSetupPolicyPresets: <T extends { name: string }>(
     presets: T[],
-    agentName?: string | null,
+    options?: { webSearchSupported?: boolean | null },
   ) => T[];
   formatEnvAssignment: (name: string, value: string) => string;
   findDashboardForwardOwner: (
@@ -153,7 +153,7 @@ function isOnboardTestInternals(
     typeof value.classifySandboxCreateFailure === "function" &&
     typeof value.hasChatCompletionsToolCall === "function" &&
     typeof value.hasChatCompletionsToolCallLeak === "function" &&
-    typeof value.filterPolicyPresetsForAgent === "function" &&
+    typeof value.filterSetupPolicyPresets === "function" &&
     typeof value.getDefaultSandboxNameForAgent === "function" &&
     typeof value.getSandboxPromptDefault === "function" &&
     typeof value.getRequestedSandboxAgentName === "function" &&
@@ -185,7 +185,7 @@ const {
   classifySandboxCreateFailure,
   compactText,
   computeSetupPresetSuggestions,
-  filterPolicyPresetsForAgent,
+  filterSetupPolicyPresets,
   formatEnvAssignment,
   getNavigationChoice,
   getGatewayReuseState,
@@ -491,14 +491,25 @@ describe("onboard helpers", () => {
       expect(suggestions).toEqual(["npm", "pypi", "huggingface", "brew"]);
     });
 
-    it("omits Brave from Hermes onboarding presets", () => {
+    it("omits Brave when web search is unsupported", () => {
       const allPresets = known.map((name) => ({ name }));
-      const hermesPresets = filterPolicyPresetsForAgent(allPresets, "hermes").map((p) => p.name);
-      const openclawPresets = filterPolicyPresetsForAgent(allPresets, "openclaw").map(
-        (p) => p.name,
-      );
-      expect(hermesPresets).not.toContain("brave");
-      expect(openclawPresets).toContain("brave");
+      const unsupportedPresets = filterSetupPolicyPresets(allPresets, {
+        webSearchSupported: false,
+      }).map((p) => p.name);
+      const supportedPresets = filterSetupPolicyPresets(allPresets, {
+        webSearchSupported: true,
+      }).map((p) => p.name);
+      expect(unsupportedPresets).not.toContain("brave");
+      expect(supportedPresets).toContain("brave");
+    });
+
+    it("drops Brave tier defaults when web search is unsupported", () => {
+      const suggestions = computeSetupPresetSuggestions("balanced", {
+        enabledChannels: [],
+        knownPresetNames: known,
+        webSearchSupported: false,
+      });
+      expect(suggestions).toEqual(["npm", "pypi", "huggingface", "brew"]);
     });
 
     it("forwards enabled messaging channels into the balanced tier suggestions", () => {
@@ -544,6 +555,15 @@ describe("onboard helpers", () => {
         knownPresetNames: known,
       });
       expect(suggestions).toContain("brave");
+    });
+
+    it("does not add Brave from webSearchConfig when web search is unsupported", () => {
+      const suggestions = computeSetupPresetSuggestions("restricted", {
+        webSearchConfig: { provider: "brave" },
+        knownPresetNames: known,
+        webSearchSupported: false,
+      });
+      expect(suggestions).not.toContain("brave");
     });
 
     it("adds local-inference for local providers", () => {
@@ -4287,7 +4307,7 @@ const { setupInference } = require(${onboardPath});
     assert.match(source, /skippedStepMessage\("openclaw", sandboxName\)/);
     assert.match(
       source,
-      /skippedStepMessage\("policies", recordedPolicyPresetsForAgent\.join\(", "\)\)/,
+      /skippedStepMessage\("policies", recordedPolicyPresetsForSupport\.join\(", "\)\)/,
     );
   });
 

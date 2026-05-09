@@ -288,7 +288,7 @@ console.log = (...args) => lines.push(args.join(" "));
     assert.deepEqual(payload.applied, []);
   });
 
-  it("omits Brave from Hermes policy preset selection", () => {
+  it("omits Brave from policy preset selection when web search is unsupported", () => {
     const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policies.js"));
     const script =
       buildPreamble({
@@ -307,7 +307,7 @@ console.log = () => {};
 
 (async () => {
   try {
-    const applied = await setupPoliciesWithSelection("test-sb", { agentName: "hermes" });
+    const applied = await setupPoliciesWithSelection("test-sb", { webSearchSupported: false });
     process.stdout.write(JSON.stringify({ applied, appliedCalls }) + "\n");
   } catch (err) {
     process.stdout.write(JSON.stringify({ error: err.message }) + "\n");
@@ -318,15 +318,18 @@ console.log = () => {};
     assert.equal(result.status, 0, result.stderr);
     const payload = JSON.parse(result.stdout.trim());
     assert.ok(!payload.error, `unexpected error: ${payload.error}`);
-    assert.ok(!payload.applied.includes("brave"), `Hermes presets included Brave: ${payload.applied}`);
+    assert.ok(
+      !payload.applied.includes("brave"),
+      `Unsupported web-search presets included Brave: ${payload.applied}`,
+    );
     assert.ok(
       !payload.appliedCalls.includes("brave"),
-      `Hermes applied Brave: ${payload.appliedCalls}`,
+      `Unsupported web-search flow applied Brave: ${payload.appliedCalls}`,
     );
-    assert.ok(payload.applied.includes("pypi"), "Hermes should still include normal dev presets");
+    assert.ok(payload.applied.includes("pypi"), "normal dev presets should still be included");
   });
 
-  it("removes a previously-applied Brave preset during Hermes policy selection", () => {
+  it("removes a previously-applied Brave preset when web search is unsupported", () => {
     const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policies.js"));
     const script =
       buildPreamble({
@@ -347,7 +350,7 @@ console.log = () => {};
 
 (async () => {
   try {
-    const applied = await setupPoliciesWithSelection("test-sb", { agentName: "hermes" });
+    const applied = await setupPoliciesWithSelection("test-sb", { webSearchSupported: false });
     process.stdout.write(JSON.stringify({ applied, appliedCalls, removedCalls }) + "\n");
   } catch (err) {
     process.stdout.write(JSON.stringify({ error: err.message }) + "\n");
@@ -360,16 +363,19 @@ console.log = () => {};
     assert.ok(!payload.error, `unexpected error: ${payload.error}`);
     assert.ok(
       !payload.applied.includes("brave"),
-      `Hermes presets included Brave: ${payload.applied}`,
+      `Unsupported web-search presets included Brave: ${payload.applied}`,
     );
     assert.ok(
       payload.removedCalls.includes("brave"),
-      `Hermes did not remove Brave: ${payload.removedCalls}`,
+      `Unsupported web-search flow did not remove Brave: ${payload.removedCalls}`,
     );
-    assert.ok(!payload.appliedCalls.includes("brave"), `Hermes applied Brave: ${payload.appliedCalls}`);
+    assert.ok(
+      !payload.appliedCalls.includes("brave"),
+      `Unsupported web-search flow applied Brave: ${payload.appliedCalls}`,
+    );
   });
 
-  it("clamps resumed Hermes policy presets to agent-allowed presets", () => {
+  it("clamps resumed policy presets to web-search-supported presets", () => {
     const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policies.js"));
     const script =
       buildPreamble({
@@ -391,7 +397,7 @@ console.log = () => {};
 (async () => {
   try {
     const applied = await setupPoliciesWithSelection("test-sb", {
-      agentName: "hermes",
+      webSearchSupported: false,
       selectedPresets: ["brave", "npm"],
     });
     process.stdout.write(JSON.stringify({ applied, appliedCalls, removedCalls }) + "\n");
@@ -409,7 +415,47 @@ console.log = () => {};
     assert.deepEqual(payload.removedCalls, ["brave"]);
   });
 
-  it("preserves a resumed Hermes custom preset whose name matches an excluded built-in", () => {
+  it("clamps an unsupported-only resumed policy preset list to empty", () => {
+    const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policies.js"));
+    const script =
+      buildPreamble({
+        tierEnv: "balanced",
+        policyMode: "suggested",
+        stubOpenshellBin: true,
+        runCaptureReturn: "Running",
+      }) +
+      String.raw`
+const policies = require(${policiesPath});
+const appliedCalls = [];
+const removedCalls = [];
+policies.applyPreset = (_sandbox, name) => { appliedCalls.push(name); return true; };
+policies.removePreset = (_sandbox, name) => { removedCalls.push(name); return true; };
+policies.getAppliedPresets = () => ["brave"];
+
+console.log = () => {};
+
+(async () => {
+  try {
+    const applied = await setupPoliciesWithSelection("test-sb", {
+      webSearchSupported: false,
+      selectedPresets: ["brave"],
+    });
+    process.stdout.write(JSON.stringify({ applied, appliedCalls, removedCalls }) + "\n");
+  } catch (err) {
+    process.stdout.write(JSON.stringify({ error: err.message }) + "\n");
+  }
+})();
+`;
+    const result = runScript(script);
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout.trim());
+    assert.ok(!payload.error, `unexpected error: ${payload.error}`);
+    assert.deepEqual(payload.applied, []);
+    assert.deepEqual(payload.appliedCalls, []);
+    assert.deepEqual(payload.removedCalls, ["brave"]);
+  });
+
+  it("preserves a resumed custom preset whose name matches an unsupported built-in", () => {
     const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policies.js"));
     const script =
       buildPreamble({
@@ -432,7 +478,7 @@ console.log = () => {};
 (async () => {
   try {
     const applied = await setupPoliciesWithSelection("test-sb", {
-      agentName: "hermes",
+      webSearchSupported: false,
       selectedPresets: ["brave", "npm"],
     });
     process.stdout.write(JSON.stringify({ applied, appliedCalls, removedCalls }) + "\n");
@@ -450,7 +496,7 @@ console.log = () => {};
     assert.deepEqual(payload.removedCalls, []);
   });
 
-  it("preserves a non-interactive Hermes custom preset whose name matches an excluded built-in", () => {
+  it("preserves a non-interactive custom preset whose name matches an unsupported built-in", () => {
     const policiesPath = JSON.stringify(path.join(repoRoot, "dist", "lib", "policies.js"));
     const script =
       buildPreamble({
@@ -472,7 +518,7 @@ console.log = () => {};
 
 (async () => {
   try {
-    const applied = await setupPoliciesWithSelection("test-sb", { agentName: "hermes" });
+    const applied = await setupPoliciesWithSelection("test-sb", { webSearchSupported: false });
     process.stdout.write(JSON.stringify({ applied, appliedCalls, removedCalls }) + "\n");
   } catch (err) {
     process.stdout.write(JSON.stringify({ error: err.message }) + "\n");
@@ -485,11 +531,11 @@ console.log = () => {};
     assert.ok(!payload.error, `unexpected error: ${payload.error}`);
     assert.ok(
       payload.applied.includes("brave"),
-      `Hermes custom Brave was dropped: ${payload.applied}`,
+      `custom Brave was dropped: ${payload.applied}`,
     );
     assert.ok(
       !payload.appliedCalls.includes("brave"),
-      `Hermes re-applied Brave: ${payload.appliedCalls}`,
+      `custom Brave was re-applied: ${payload.appliedCalls}`,
     );
     assert.deepEqual(payload.removedCalls, []);
   });
