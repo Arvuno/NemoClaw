@@ -36,6 +36,9 @@ const {
   patchStagedDockerfile,
 }: typeof import("./onboard/dockerfile-patch") = require("./onboard/dockerfile-patch");
 const {
+  agentSupportsWebSearch,
+}: typeof import("./onboard/web-search-support") = require("./onboard/web-search-support");
+const {
   prepareInitialSandboxCreatePolicy,
 }: typeof import("./onboard/initial-policy") = require("./onboard/initial-policy");
 const {
@@ -2104,51 +2107,12 @@ async function ensureValidatedBraveSearchCredential(
   }
 }
 
-/**
- * Check whether the agent's Dockerfile declares ARG NEMOCLAW_WEB_SEARCH_ENABLED.
- * If the ARG is absent, the patchStagedDockerfile replace is a silent no-op and
- * the config generator has no code path to emit a web search block — so offering
- * the Brave prompt would mislead the user.
- *
- * OpenClaw uses the root Dockerfile (not agents/openclaw/Dockerfile), so we
- * fall back to the root Dockerfile when the agent-specific one doesn't exist.
- */
-function agentSupportsWebSearch(
-  agent: AgentDefinition | null | undefined,
-  dockerfilePathOverride: string | null = null,
-): boolean {
-  // Hermes has native web tools, but the NemoClaw onboarding wizard wires the
-  // OpenClaw Brave provider path. Do not offer a Brave prompt for Hermes until
-  // that provider is supported end to end.
-  if (agent?.name === "hermes") {
-    return false;
-  }
-
-  const candidates = [
-    dockerfilePathOverride,
-    agent?.dockerfilePath,
-    path.join(ROOT, "Dockerfile"),
-  ].filter(
-    (candidate): candidate is string => typeof candidate === "string" && candidate.length > 0,
-  );
-
-  for (const dockerfilePath of candidates) {
-    try {
-      const content = fs.readFileSync(dockerfilePath, "utf-8");
-      return /^\s*ARG\s+NEMOCLAW_WEB_SEARCH_ENABLED=/m.test(content);
-    } catch {
-      // Try the next candidate; custom Dockerfile paths can disappear between resume runs.
-    }
-  }
-  return false;
-}
-
 async function configureWebSearch(
   existingConfig: WebSearchConfig | null = null,
   agent: AgentDefinition | null = null,
   dockerfilePathOverride: string | null = null,
 ): Promise<WebSearchConfig | null> {
-  if (!agentSupportsWebSearch(agent, dockerfilePathOverride)) {
+  if (!agentSupportsWebSearch(agent, dockerfilePathOverride, ROOT)) {
     note(`  Web search is not yet supported by ${agent?.displayName ?? "this agent"}. Skipping.`);
     return null;
   }
@@ -9463,7 +9427,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     }
 
     const webSearchSupportProbePath = fromDockerfile ? path.resolve(fromDockerfile) : null;
-    if (webSearchConfig && !agentSupportsWebSearch(agent, webSearchSupportProbePath)) {
+    if (webSearchConfig && !agentSupportsWebSearch(agent, webSearchSupportProbePath, ROOT)) {
       note(
         `  Web search is not yet supported by ${agent?.displayName ?? "this sandbox image"}. Clearing stale config.`,
       );
