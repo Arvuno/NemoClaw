@@ -18,7 +18,7 @@
 #      process list, or filesystem
 #   4. Config patching — openclaw.json channels use placeholder values
 #   5. Network reachability — Node.js can reach messaging APIs through proxy
-#   6. Native Discord gateway path — WebSocket path is probed separately from REST
+#   6. Native Discord gateway path — WebSocket L7 path is tested hermetically
 #   7. L7 proxy rewriting — placeholder is rewritten to real token at egress
 #
 # Uses fake tokens by default (no external accounts needed). With fake tokens,
@@ -47,7 +47,8 @@
 #   SLACK_BOT_TOKEN_REVOKED                — optional: revoked xoxb- token to test auth pre-validation (#2340)
 #   SLACK_APP_TOKEN_REVOKED                — optional: paired xapp- token for the revoked bot token
 #   TELEGRAM_CHAT_ID_E2E                   — optional: enables sendMessage test
-#   NEMOCLAW_E2E_STRICT_DISCORD_GATEWAY    — fail instead of skip on known Discord gateway blockers
+#   NEMOCLAW_OPENSHELL_BIN                 — optional OpenShell binary under test
+#   NEMOCLAW_FRESH=1                       — auto-set to discard interrupted onboard sessions
 #
 # Usage:
 #   NEMOCLAW_NON_INTERACTIVE=1 NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 \
@@ -94,6 +95,11 @@ else
 fi
 
 SANDBOX_NAME="${NEMOCLAW_SANDBOX_NAME:-e2e-msg-provider}"
+OPENSHELL_BIN="${NEMOCLAW_OPENSHELL_BIN:-openshell}"
+
+openshell() {
+  "$OPENSHELL_BIN" "$@"
+}
 
 # shellcheck source=test/e2e/lib/sandbox-teardown.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib/sandbox-teardown.sh"
@@ -153,6 +159,11 @@ sandbox_exec() {
   echo "$result"
 }
 
+# shellcheck source=test/e2e/lib/discord-gateway-proof.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/discord-gateway-proof.sh"
+# shellcheck source=test/e2e/lib/slack-api-proof.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/slack-api-proof.sh"
+
 # ══════════════════════════════════════════════════════════════════
 # Phase 0: Prerequisites
 # ══════════════════════════════════════════════════════════════════
@@ -175,7 +186,6 @@ info "Discord token: ${DISCORD_TOKEN:0:10}... (${#DISCORD_TOKEN} chars)"
 info "Slack bot token: configured (${#SLACK_TOKEN} chars)"
 info "Slack app token: configured (${#SLACK_APP} chars)"
 info "Sandbox name: $SANDBOX_NAME"
-STRICT_DISCORD_GATEWAY="${NEMOCLAW_E2E_STRICT_DISCORD_GATEWAY:-0}"
 
 # ══════════════════════════════════════════════════════════════════
 # Phase 1: Install NemoClaw (non-interactive mode)
@@ -189,11 +199,18 @@ info "Pre-cleanup..."
 if command -v nemoclaw >/dev/null 2>&1; then
   nemoclaw "$SANDBOX_NAME" destroy --yes 2>/dev/null || true
 fi
-if command -v openshell >/dev/null 2>&1; then
+if openshell --version >/dev/null 2>&1; then
   openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
   openshell gateway destroy -g nemoclaw 2>/dev/null || true
 fi
 pass "Pre-cleanup complete"
+
+if [ -z "${NEMOCLAW_SKIP_TELEGRAM_REACHABILITY:-}" ]; then
+  if ! curl -fsS --max-time 10 https://api.telegram.org/ >/dev/null 2>&1; then
+    export NEMOCLAW_SKIP_TELEGRAM_REACHABILITY=1
+    info "Host cannot reach api.telegram.org; skipping onboarding Telegram reachability probe for fake-token E2E"
+  fi
+fi
 
 # Pre-merge Slack policy into the base sandbox policy.
 #
@@ -249,12 +266,18 @@ if [ -f "$BASE_POLICY" ] && [ -f "$SLACK_PRESET" ] && ! grep -q "api.slack.com" 
           - allow: { method: POST, path: "/**" }
       - host: wss-primary.slack.com
         port: 443
-        access: full
-        tls: skip
+        protocol: websocket
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: WEBSOCKET_TEXT, path: "/**" }
       - host: wss-backup.slack.com
         port: 443
-        access: full
-        tls: skip
+        protocol: websocket
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: WEBSOCKET_TEXT, path: "/**" }
     binaries:
       - { path: /usr/local/bin/node }
       - { path: /usr/bin/node }
@@ -282,6 +305,7 @@ info "Expected duration: 5-10 minutes on first run."
 
 export NEMOCLAW_SANDBOX_NAME="$SANDBOX_NAME"
 export NEMOCLAW_RECREATE_SANDBOX=1
+export NEMOCLAW_FRESH=1
 
 INSTALL_LOG="/tmp/nemoclaw-e2e-install.log"
 bash install.sh --non-interactive >"$INSTALL_LOG" 2>&1 &
@@ -317,7 +341,7 @@ else
 fi
 
 # Verify tools are on PATH
-if ! command -v openshell >/dev/null 2>&1; then
+if ! openshell --version >/dev/null 2>&1; then
   fail "openshell not found on PATH after install"
   exit 1
 fi
@@ -565,10 +589,8 @@ fi
 
 # M-S5h: The rewriter actually wraps http.request at runtime. NODE_OPTIONS
 # pointing at an empty file (or a syntax-error file) would still make
-# M-S5g pass and a subsequent slack.com round-trip would still return
-# invalid_auth (because the un-translated Bolt-shape token is not a valid
-# Slack token either) — so the slack.com 200 invalid_auth in M-S15/M-S16
-# alone doesn't prove the rewriter ran. This loopback probe forces a
+# M-S5g pass and a subsequent fake Slack round-trip would fail later at the
+# L7 proxy boundary. This loopback probe forces a
 # definitive answer: send a Bolt-shape Authorization header and urlencoded
 # token body to a 127.0.0.1 listener (loopback bypasses the L7 proxy), have
 # the listener echo what it actually received, then assert the placeholder is
@@ -837,6 +859,8 @@ if echo "$tg_reach" | grep -q "HTTP_"; then
   pass "M12: Node.js reached api.telegram.org (${tg_reach})"
 elif echo "$tg_reach" | grep -q "TIMEOUT"; then
   skip "M12: api.telegram.org timed out (network may be slow)"
+elif echo "$tg_reach" | grep -qiE "ERROR:.*(ECONNRESET|reset|socket hang up|ENETUNREACH|EHOSTUNREACH|ETIMEDOUT)"; then
+  skip "M12: api.telegram.org unreachable from this network (${tg_reach:0:160})"
 else
   fail "M12: Node.js could not reach api.telegram.org (${tg_reach:0:200})"
 fi
@@ -860,282 +884,70 @@ else
   fail "M13: Node.js could not reach discord.com (${dc_reach:0:200})"
 fi
 
-# M13b: Probe the native Discord gateway path separately from REST.
-# This catches failures where REST succeeds but the WebSocket path still fails
-# (for example EAI_AGAIN on gateway.discord.gg or proxy misuse returning 400).
-dc_gateway=$(sandbox_exec 'node -e "
-const url = \"wss://gateway.discord.gg/?v=10&encoding=json\";
-if (typeof WebSocket !== \"function\") {
-  console.log(\"UNSUPPORTED WebSocket\");
-  process.exit(0);
-}
-const ws = new WebSocket(url);
-const done = (msg) => {
-  console.log(msg);
-  try { ws.close(); } catch {}
-  setTimeout(() => process.exit(0), 50);
-};
-const timer = setTimeout(() => done(\"TIMEOUT\"), 15000);
-ws.addEventListener(\"open\", () => console.log(\"OPEN\"));
-ws.addEventListener(\"message\", (event) => {
-  clearTimeout(timer);
-  const body = String(event.data || \"\").slice(0, 200).replace(/\\s+/g, \" \");
-  done(\"MESSAGE \" + body);
-});
-ws.addEventListener(\"error\", (event) => {
-  clearTimeout(timer);
-  const msg = event?.message || event?.error?.message || \"websocket_error\";
-  done(\"ERROR \" + msg);
-});
-ws.addEventListener(\"close\", (event) => {
-  if (event.code && event.code !== 1000) console.log(\"CLOSE \" + event.code);
-});
-"' 2>/dev/null || true)
-
-info "Discord gateway probe: ${dc_gateway:0:300}"
-
-if echo "$dc_gateway" | grep -q "MESSAGE "; then
-  pass "M13b: Native Discord gateway returned a WebSocket message"
-elif echo "$dc_gateway" | grep -qiE "EAI_AGAIN|getaddrinfo"; then
-  if [ "$STRICT_DISCORD_GATEWAY" = "1" ]; then
-    fail "M13b: Native Discord gateway hit DNS resolution failure (${dc_gateway:0:200})"
-  else
-    skip "M13b: Native Discord gateway hit DNS resolution failure (${dc_gateway:0:200})"
-  fi
-elif echo "$dc_gateway" | grep -q "400"; then
-  if [ "$STRICT_DISCORD_GATEWAY" = "1" ]; then
-    fail "M13b: Native Discord gateway probe returned 400 (${dc_gateway:0:200})"
-  else
-    skip "M13b: Native Discord gateway probe returned 400 (${dc_gateway:0:200})"
-  fi
-elif echo "$dc_gateway" | grep -q "UNSUPPORTED"; then
-  skip "M13b: WebSocket runtime unsupported in sandbox Node.js"
-elif echo "$dc_gateway" | grep -q "TIMEOUT"; then
-  if [ "$STRICT_DISCORD_GATEWAY" = "1" ]; then
-    fail "M13b: Native Discord gateway probe timed out"
-  else
-    skip "M13b: Native Discord gateway probe timed out"
-  fi
-elif echo "$dc_gateway" | grep -q "ERROR"; then
-  if [ "$STRICT_DISCORD_GATEWAY" = "1" ]; then
-    fail "M13b: Native Discord gateway probe failed (${dc_gateway:0:200})"
-  else
-    skip "M13b: Native Discord gateway probe failed (${dc_gateway:0:200})"
-  fi
-elif echo "$dc_gateway" | grep -q "CLOSE"; then
-  if [ "$STRICT_DISCORD_GATEWAY" = "1" ]; then
-    fail "M13b: Native Discord gateway probe closed abnormally (${dc_gateway:0:200})"
-  else
-    skip "M13b: Native Discord gateway probe closed abnormally (${dc_gateway:0:200})"
-  fi
-elif echo "$dc_gateway" | grep -q "OPEN"; then
-  pass "M13b: Native Discord gateway opened a WebSocket session"
+# M13b-M13f: Hermetic Discord Gateway over OpenShell's native WebSocket L7 path.
+fake_gateway_ready=0
+if start_fake_discord_gateway "$DISCORD_TOKEN"; then
+  fake_gateway_ready=1
+  pass "M13b: Hermetic fake Discord Gateway started on host port ${FAKE_DISCORD_GATEWAY_PORT}"
 else
-  if [ "$STRICT_DISCORD_GATEWAY" = "1" ]; then
-    fail "M13b: Native Discord gateway probe returned an unclassified result (${dc_gateway:0:200})"
-  else
-    skip "M13b: Native Discord gateway probe returned an unclassified result (${dc_gateway:0:200})"
-  fi
+  fail "M13b: Failed to start hermetic fake Discord Gateway"
 fi
 
-# M13c: Unauthenticated Discord gateway transport via ws-proxy-fix CONNECT tunnel (#1570).
-# The `ws` library opens WebSocket connections via https.request() with an
-# Upgrade: websocket header.  The preload patches https.request() to issue a
-# CONNECT tunnel for Discord gateway hosts.
-#
-# This test exercises the transport/protocol path, not bot authentication:
-#   1. https.request with Upgrade: websocket → CONNECT tunnel via proxy
-#   2. Receive Discord Hello (opcode 10) with heartbeat_interval
-#   3. Send a Heartbeat (opcode 1) back to the gateway
-#   4. Receive Heartbeat ACK (opcode 11)
-#   5. Send close frame and disconnect cleanly
-#
-# If the CONNECT tunnel is broken the connection never upgrades (400 from L7
-# proxy) and none of the protocol steps succeed. This deliberately does not
-# send IDENTIFY, so it must not be treated as proof that placeholder tokens are
-# rewritten inside gateway WebSocket payloads.
-dc_ws_tunnel=$(sandbox_exec 'node -e "
-const https = require(\"https\");
-const crypto = require(\"crypto\");
-
-// --- Minimal WebSocket framing (no ws dependency) ---
-function unmaskFrame(buf) {
-  if (buf.length < 2) return null;
-  const fin = (buf[0] & 0x80) !== 0;
-  const opcode = buf[0] & 0x0f;
-  const masked = (buf[1] & 0x80) !== 0;
-  let payloadLen = buf[1] & 0x7f;
-  let offset = 2;
-  if (payloadLen === 126) {
-    if (buf.length < 4) return null;
-    payloadLen = buf.readUInt16BE(2);
-    offset = 4;
-  } else if (payloadLen === 127) {
-    if (buf.length < 10) return null;
-    payloadLen = Number(buf.readBigUInt64BE(2));
-    offset = 10;
-  }
-  if (masked) offset += 4;
-  if (buf.length < offset + payloadLen) return null;
-  const data = buf.slice(offset, offset + payloadLen);
-  return { fin, opcode, data, totalLen: offset + payloadLen };
-}
-
-function makeFrame(opcode, payload) {
-  const buf = Buffer.from(payload);
-  const mask = crypto.randomBytes(4);
-  const masked = Buffer.alloc(buf.length);
-  for (let i = 0; i < buf.length; i++) masked[i] = buf[i] ^ mask[i % 4];
-  let header;
-  if (buf.length < 126) {
-    header = Buffer.alloc(6);
-    header[0] = 0x80 | opcode;
-    header[1] = 0x80 | buf.length;
-    mask.copy(header, 2);
-  } else {
-    header = Buffer.alloc(8);
-    header[0] = 0x80 | opcode;
-    header[1] = 0x80 | 126;
-    header.writeUInt16BE(buf.length, 2);
-    mask.copy(header, 4);
-  }
-  return Buffer.concat([header, masked]);
-}
-
-function makeCloseFrame(code) {
-  const payload = Buffer.alloc(2);
-  payload.writeUInt16BE(code, 0);
-  return makeFrame(8, payload);
-}
-
-// --- Handshake ---
-const results = [];
-const done = () => {
-  console.log(results.join(\"\\n\"));
-  process.exit(0);
-};
-const timer = setTimeout(() => { results.push(\"TIMEOUT\"); done(); }, 20000);
-
-const key = crypto.randomBytes(16).toString(\"base64\");
-const req = https.request({
-  hostname: \"gateway.discord.gg\",
-  port: 443,
-  path: \"/?v=10&encoding=json\",
-  method: \"GET\",
-  headers: {
-    \"Connection\": \"Upgrade\",
-    \"Upgrade\": \"websocket\",
-    \"Sec-WebSocket-Key\": key,
-    \"Sec-WebSocket-Version\": \"13\",
-  },
-});
-
-req.on(\"upgrade\", (_res, socket, head) => {
-  results.push(\"UPGRADED\");
-  let pending = head && head.length ? Buffer.from(head) : Buffer.alloc(0);
-
-  socket.on(\"data\", (chunk) => {
-    pending = Buffer.concat([pending, chunk]);
-    while (true) {
-      const frame = unmaskFrame(pending);
-      if (!frame) break;
-      pending = pending.slice(frame.totalLen);
-
-      if (frame.opcode === 1) {
-        let msg;
-        try { msg = JSON.parse(frame.data.toString()); } catch { continue; }
-
-        if (msg.op === 10) {
-          const hbInterval = msg.d && msg.d.heartbeat_interval;
-          results.push(\"HELLO op=10 heartbeat_interval=\" + hbInterval);
-
-          // Send Heartbeat (opcode 1, d: null)
-          const hb = JSON.stringify({ op: 1, d: null });
-          socket.write(makeFrame(1, hb));
-          results.push(\"SENT_HEARTBEAT op=1\");
-        } else if (msg.op === 11) {
-          results.push(\"HEARTBEAT_ACK op=11\");
-          // Full round-trip complete — close cleanly
-          socket.write(makeCloseFrame(1000));
-          setTimeout(() => { socket.destroy(); clearTimeout(timer); done(); }, 500);
-        }
-      } else if (frame.opcode === 8) {
-        results.push(\"CLOSE_FRAME code=\" + (frame.data.length >= 2 ? frame.data.readUInt16BE(0) : \"none\"));
-        socket.destroy();
-        clearTimeout(timer);
-        done();
-      }
-    }
-  });
-
-  socket.on(\"error\", (e) => { results.push(\"SOCKET_ERROR \" + e.message); });
-  socket.on(\"close\", () => { clearTimeout(timer); done(); });
-});
-
-req.on(\"response\", (res) => {
-  results.push(\"HTTP_\" + res.statusCode);
-  res.resume();
-  res.on(\"end\", () => { clearTimeout(timer); done(); });
-});
-req.on(\"error\", (e) => {
-  results.push(\"ERROR \" + e.message);
-  clearTimeout(timer);
-  done();
-});
-req.end();
-"' 2>/dev/null || true)
-
-info "Discord ws-proxy-fix probe: ${dc_ws_tunnel:0:500}"
-
-# Check each step of the handshake independently
-if echo "$dc_ws_tunnel" | grep -q "UPGRADED"; then
-  pass "M13c: WebSocket upgrade succeeded via CONNECT tunnel (#1570)"
-elif echo "$dc_ws_tunnel" | grep -q "HTTP_400"; then
-  if [ "$STRICT_DISCORD_GATEWAY" = "1" ]; then
-    fail "M13c: Discord gateway got 400 — CONNECT tunnel not working"
-  else
-    skip "M13c: Discord gateway got 400 — ws-proxy-fix may not be active"
-  fi
-elif echo "$dc_ws_tunnel" | grep -qiE "EAI_AGAIN|getaddrinfo"; then
-  if [ "$STRICT_DISCORD_GATEWAY" = "1" ]; then
-    fail "M13c: Discord gateway DNS failure (${dc_ws_tunnel:0:200})"
-  else
-    skip "M13c: Discord gateway DNS failure (${dc_ws_tunnel:0:200})"
-  fi
-elif echo "$dc_ws_tunnel" | grep -q "TIMEOUT"; then
-  if [ "$STRICT_DISCORD_GATEWAY" = "1" ]; then
-    fail "M13c: Discord gateway CONNECT tunnel timed out"
-  else
-    skip "M13c: Discord gateway CONNECT tunnel timed out"
-  fi
-elif echo "$dc_ws_tunnel" | grep -q "ERROR"; then
-  if [ "$STRICT_DISCORD_GATEWAY" = "1" ]; then
-    fail "M13c: Discord gateway CONNECT tunnel failed (${dc_ws_tunnel:0:200})"
-  else
-    skip "M13c: Discord gateway CONNECT tunnel failed (${dc_ws_tunnel:0:200})"
-  fi
+if [ "$fake_gateway_ready" = "1" ] \
+  && apply_fake_discord_gateway_policy "$SANDBOX_NAME" "$FAKE_DISCORD_GATEWAY_PORT" >/tmp/nemoclaw-fake-discord-policy.log 2>&1; then
+  pass "M13c: Applied native WebSocket policy with credential rewrite for fake Discord Gateway"
 else
-  if [ "$STRICT_DISCORD_GATEWAY" = "1" ]; then
-    fail "M13c: Discord gateway returned unclassified result (${dc_ws_tunnel:0:200})"
-  else
-    skip "M13c: Discord gateway returned unclassified result (${dc_ws_tunnel:0:200})"
-  fi
+  fail "M13c: Failed to apply fake Discord Gateway policy: $(tail -20 /tmp/nemoclaw-fake-discord-policy.log 2>/dev/null | tr '\n' ' ' | cut -c1-300)"
 fi
 
-if echo "$dc_ws_tunnel" | grep -q "HELLO op=10"; then
-  pass "M13d: Received Discord Hello (opcode 10) with heartbeat interval"
-elif echo "$dc_ws_tunnel" | grep -q "UPGRADED"; then
-  fail "M13d: Upgraded but never received Discord Hello"
+dc_ws_native=""
+if [ "$fake_gateway_ready" = "1" ]; then
+  dc_ws_native=$(run_fake_discord_gateway_node_client "$FAKE_DISCORD_GATEWAY_PORT" "openshell:resolve:env:DISCORD_BOT_TOKEN" || true)
+fi
+info "Native fake Discord Gateway probe: ${dc_ws_native:0:500}"
+
+if echo "$dc_ws_native" | grep -q "^UPGRADE$"; then
+  pass "M13d: Native WebSocket upgrade reached fake Discord Gateway through OpenShell"
 else
-  skip "M13d: WebSocket upgrade did not complete"
+  fail "M13d: Native WebSocket upgrade failed: ${dc_ws_native:0:300}"
 fi
 
-if echo "$dc_ws_tunnel" | grep -q "HEARTBEAT_ACK op=11"; then
-  pass "M13e: Sent Heartbeat, received ACK (opcode 11) — unauthenticated transport round-trip verified"
-elif echo "$dc_ws_tunnel" | grep -q "SENT_HEARTBEAT"; then
-  fail "M13e: Sent Heartbeat but never received ACK"
+if echo "$dc_ws_native" | grep -q "^HELLO$" \
+  && echo "$dc_ws_native" | grep -q "^IDENTIFY_SENT_PLACEHOLDER$" \
+  && echo "$dc_ws_native" | grep -q "^READY$" \
+  && echo "$dc_ws_native" | grep -q "^HEARTBEAT_ACK$"; then
+  pass "M13e: Discord HELLO, placeholder IDENTIFY, READY, and heartbeat ACK completed"
 else
-  skip "M13e: Heartbeat exchange did not occur"
+  fail "M13e: Discord Gateway protocol proof incomplete: ${dc_ws_native:0:400}"
+fi
+
+if [ "$fake_gateway_ready" = "1" ] \
+  && grep -Fq "\"token\":\"$DISCORD_TOKEN\"" "$FAKE_DISCORD_GATEWAY_CAPTURE_FILE" \
+  && ! grep -Fq "openshell:resolve:env:DISCORD_BOT_TOKEN" "$FAKE_DISCORD_GATEWAY_CAPTURE_FILE"; then
+  pass "M13f: Fake Gateway received host-side Discord token; sandbox-visible IDENTIFY used only the placeholder"
+else
+  if [ "$fake_gateway_ready" = "1" ]; then
+    info "Fake Discord Gateway capture: $(tail -20 "$FAKE_DISCORD_GATEWAY_CAPTURE_FILE" 2>/dev/null | tr '\n' ' ' | cut -c1-500)"
+  fi
+  fail "M13f: Fake Gateway did not prove placeholder-to-token rewrite at the relay boundary"
+fi
+
+capture_before_negative=0
+capture_after_negative=0
+dc_ws_negative=""
+if [ "$fake_gateway_ready" = "1" ]; then
+  capture_before_negative=$(wc -l <"$FAKE_DISCORD_GATEWAY_CAPTURE_FILE" 2>/dev/null || echo 0)
+  dc_ws_negative=$(run_fake_discord_gateway_node_client "$FAKE_DISCORD_GATEWAY_PORT" "openshell:resolve:env:DEFINITELY_NOT_REGISTERED" || true)
+  capture_after_negative=$(wc -l <"$FAKE_DISCORD_GATEWAY_CAPTURE_FILE" 2>/dev/null || echo 0)
+fi
+info "Native fake Discord Gateway negative probe: ${dc_ws_negative:0:300}"
+
+if [ "$fake_gateway_ready" = "1" ] \
+  && ! echo "$dc_ws_negative" | grep -q "^READY$" \
+  && ! tail -n "$((capture_after_negative - capture_before_negative + 1))" "$FAKE_DISCORD_GATEWAY_CAPTURE_FILE" 2>/dev/null | grep -Fq "DEFINITELY_NOT_REGISTERED"; then
+  pass "M13g: Unregistered Discord WebSocket placeholder is rejected before upstream token exposure"
+else
+  fail "M13g: Unregistered Discord WebSocket placeholder reached READY or leaked upstream"
 fi
 
 # M14 (negative): curl should be blocked by binary restriction
@@ -1190,6 +1002,8 @@ elif [ "$tg_status" = "401" ] || [ "$tg_status" = "404" ]; then
   pass "M16: Full chain verified: sandbox → proxy → token rewrite → Telegram API"
 elif echo "$tg_api" | grep -q "TIMEOUT"; then
   skip "M15: Telegram API timed out (network issue, not a plumbing failure)"
+elif echo "$tg_api" | grep -qiE "ERROR:.*(ECONNRESET|reset|socket hang up|ENETUNREACH|EHOSTUNREACH|ETIMEDOUT)"; then
+  skip "M15: Telegram API unreachable from this network (${tg_api:0:160})"
 elif echo "$tg_api" | grep -q "ERROR"; then
   fail "M15: Telegram API call failed with error: ${tg_api:0:200}"
 else
@@ -1232,41 +1046,31 @@ else
 fi
 
 # ── Slack: rewriter + L7 proxy chain (#2085) ─────────────────────
-# Verifies the full chain: Bolt-shape placeholder in Authorization
-# header → slack-token-rewriter (Node preload) translates to canonical
-# form → OpenShell L7 proxy substitutes real env value → request
-# reaches slack.com which responds with invalid_auth (because the
-# host-side fake token is, well, fake). The 200 OK + invalid_auth
-# response is the proof the chain worked end-to-end.
-#
-# Slack returns HTTP 200 with {"ok":false,"error":"invalid_auth"} for
-# auth failures on auth.test (it does NOT use 401). The body is the
-# load-bearing assertion, not the status.
+# Verifies the full chain hermetically: Bolt-shape placeholder in the
+# Authorization header → slack-token-rewriter translates it to canonical
+# form → OpenShell L7 proxy substitutes the real env value → a host-side fake
+# Slack API receives the resolved token and returns Slack-shaped invalid_auth.
 
-info "Calling slack.com/api/auth.test from inside sandbox with Bolt-shape placeholder..."
-sl_api=$(sandbox_exec 'node -e "
-const https = require(\"https\");
-const data = \"\";
-const options = {
-  hostname: \"slack.com\",
-  path: \"/api/auth.test\",
-  method: \"POST\",
-  headers: {
-    \"Authorization\": \"Bearer xoxb-OPENSHELL-RESOLVE-ENV-SLACK_BOT_TOKEN\",
-    \"Content-Type\": \"application/x-www-form-urlencoded\",
-    \"Content-Length\": data.length,
-  },
-};
-const req = https.request(options, (res) => {
-  let body = \"\";
-  res.on(\"data\", (d) => body += d);
-  res.on(\"end\", () => console.log(res.statusCode + \" \" + body.slice(0, 300)));
-});
-req.on(\"error\", (e) => console.log(\"ERROR: \" + e.message));
-req.setTimeout(30000, () => { req.destroy(); console.log(\"TIMEOUT\"); });
-req.write(data);
-req.end();
-"' 2>/dev/null || true)
+fake_slack_ready=0
+if start_fake_slack_api "$SLACK_TOKEN" "$SLACK_APP"; then
+  fake_slack_ready=1
+  pass "M-S14a: Hermetic fake Slack API started on host port ${FAKE_SLACK_API_PORT}"
+else
+  fail "M-S14a: Failed to start hermetic fake Slack API"
+fi
+
+if [ "$fake_slack_ready" = "1" ] \
+  && apply_fake_slack_api_policy "$SANDBOX_NAME" "$FAKE_SLACK_API_PORT" >/tmp/nemoclaw-fake-slack-policy.log 2>&1; then
+  pass "M-S14b: Applied REST policy for hermetic fake Slack API"
+else
+  fail "M-S14b: Failed to apply fake Slack API policy: $(tail -20 /tmp/nemoclaw-fake-slack-policy.log 2>/dev/null | tr '\n' ' ' | cut -c1-300)"
+fi
+
+info "Calling fake Slack /api/auth.test from inside sandbox with Bolt-shape placeholder..."
+sl_api=""
+if [ "$fake_slack_ready" = "1" ]; then
+  sl_api=$(run_fake_slack_api_node_request "$FAKE_SLACK_API_PORT" "/api/auth.test" "Bearer xoxb-OPENSHELL-RESOLVE-ENV-SLACK_BOT_TOKEN" || true)
+fi
 
 info "Slack auth.test response: ${sl_api:0:300}"
 sl_status=$(echo "$sl_api" | grep -E '^[0-9]' | head -1 | awk '{print $1}')
@@ -1274,9 +1078,9 @@ sl_status=$(echo "$sl_api" | grep -E '^[0-9]' | head -1 | awk '{print $1}')
 if [ "$sl_status" = "200" ] && echo "$sl_api" | grep -q '"ok":true'; then
   pass "M-S15: Slack auth.test returned ok:true — real token round-trip verified!"
 elif [ "$sl_status" = "200" ] && echo "$sl_api" | grep -qE 'invalid_auth|not_authed'; then
-  pass "M-S15: Slack auth.test returned invalid_auth — full chain verified (rewriter → L7 proxy → slack.com)"
+  pass "M-S15: Slack auth.test returned invalid_auth — full chain verified (rewriter → L7 proxy → fake Slack)"
 elif echo "$sl_api" | grep -q "TIMEOUT"; then
-  skip "M-S15: Slack API timed out (network issue, not a plumbing failure)"
+  skip "M-S15: fake Slack API timed out"
 elif echo "$sl_api" | grep -q "ERROR"; then
   fail "M-S15: Slack API call failed with error: ${sl_api:0:200}"
 elif echo "$sl_api" | grep -qF 'OPENSHELL-RESOLVE-ENV-'; then
@@ -1290,41 +1094,17 @@ fi
 # M-S15b: L7 proxy substitution for SLACK_BOT_TOKEN, isolated from the
 # rewriter. Sends the canonical openshell:resolve:env:SLACK_BOT_TOKEN
 # placeholder directly (no Bolt-shape, so the rewriter is a no-op for
-# this request). If the L7 proxy substitutes correctly, the fake xoxb-
-# token reaches slack.com which returns invalid_auth. If the proxy
-# doesn't substitute, slack.com sees the literal placeholder and STILL
-# returns invalid_auth — same response shape as M-S15. To distinguish,
-# we additionally call with an env var that does NOT exist in the
-# sandbox (DEFINITELY_NOT_SET_XYZ); the L7 proxy's behavior on an
-# unset var differs from a successful substitution.
+# this request). If the L7 proxy substitutes correctly, the fake Slack API
+# receives the host-side xoxb token and returns invalid_auth.
 #
 # Mirrors the proof technique already used by Telegram M15 and Discord
 # M17 (they get 401/404 from the real APIs because the L7 proxy
 # substituted the canonical form into a real fake-token-shape value).
 info "Probing L7 proxy substitution for SLACK_BOT_TOKEN (canonical placeholder, bypasses rewriter)..."
-sl_canonical=$(sandbox_exec 'node -e "
-const https = require(\"https\");
-const data = \"\";
-const options = {
-  hostname: \"slack.com\",
-  path: \"/api/auth.test\",
-  method: \"POST\",
-  headers: {
-    \"Authorization\": \"Bearer openshell:resolve:env:SLACK_BOT_TOKEN\",
-    \"Content-Type\": \"application/x-www-form-urlencoded\",
-    \"Content-Length\": data.length,
-  },
-};
-const req = https.request(options, (res) => {
-  let body = \"\";
-  res.on(\"data\", (d) => body += d);
-  res.on(\"end\", () => console.log(res.statusCode + \" \" + body.slice(0, 300)));
-});
-req.on(\"error\", (e) => console.log(\"ERROR: \" + e.message));
-req.setTimeout(30000, () => { req.destroy(); console.log(\"TIMEOUT\"); });
-req.write(data);
-req.end();
-"' 2>/dev/null || true)
+sl_canonical=""
+if [ "$fake_slack_ready" = "1" ]; then
+  sl_canonical=$(run_fake_slack_api_node_request "$FAKE_SLACK_API_PORT" "/api/auth.test" "Bearer openshell:resolve:env:SLACK_BOT_TOKEN" || true)
+fi
 
 info "Slack auth.test (canonical) response: ${sl_canonical:0:300}"
 sl_canon_status=$(echo "$sl_canonical" | grep -E '^[0-9]' | head -1 | awk '{print $1}')
@@ -1347,36 +1127,17 @@ fi
 # they differ, the proxy distinguishes set vs unset env vars (i.e.,
 # substitution is actually running on the substring it recognizes).
 info "Probing L7 proxy substitution with an unset env var (negative control)..."
-sl_unset=$(sandbox_exec 'node -e "
-const https = require(\"https\");
-const data = \"\";
-const options = {
-  hostname: \"slack.com\",
-  path: \"/api/auth.test\",
-  method: \"POST\",
-  headers: {
-    \"Authorization\": \"Bearer openshell:resolve:env:DEFINITELY_NOT_SET_XYZ\",
-    \"Content-Type\": \"application/x-www-form-urlencoded\",
-    \"Content-Length\": data.length,
-  },
-};
-const req = https.request(options, (res) => {
-  let body = \"\";
-  res.on(\"data\", (d) => body += d);
-  res.on(\"end\", () => console.log(res.statusCode + \" \" + body.slice(0, 300)));
-});
-req.on(\"error\", (e) => console.log(\"ERROR: \" + e.message));
-req.setTimeout(30000, () => { req.destroy(); console.log(\"TIMEOUT\"); });
-req.write(data);
-req.end();
-"' 2>/dev/null || true)
+sl_unset=""
+if [ "$fake_slack_ready" = "1" ]; then
+  sl_unset=$(run_fake_slack_api_node_request "$FAKE_SLACK_API_PORT" "/api/auth.test" "Bearer openshell:resolve:env:DEFINITELY_NOT_SET_XYZ" || true)
+fi
 
 info "Slack auth.test (unset env) response: ${sl_unset:0:300}"
 # Empirically (verified in nightly run 25070238797): when the canonical
 # placeholder names an env var that isn't registered as a provider, the
 # OpenShell L7 proxy refuses to forward and the client sees a
 # connection-level failure ("socket hang up" / ECONNRESET / EPIPE).
-# The set-var path returns HTTP 200 invalid_auth from slack.com — these
+# The set-var path returns HTTP 200 invalid_auth from fake Slack — these
 # shapes are completely disjoint, so we assert specifically on them
 # instead of doing a fuzzy string compare (UNDICI warnings carry a PID
 # and would always make the captures differ regardless of substance).
@@ -1384,6 +1145,8 @@ if echo "$sl_unset" | grep -qE 'ERROR:.*(socket hang up|ECONNRESET|EPIPE|hang up
   pass "M-S15c: unset-var triggered connection-level failure — proxy refuses to forward unsubstituted placeholder"
 elif echo "$sl_unset" | grep -qE '^200\b'; then
   fail "M-S15c: unset-var returned HTTP 200 — proxy passed canonical placeholder through unchanged for unset env (substitution may be a no-op)"
+elif echo "$sl_unset" | grep -qE '^401\b|bad_auth|DEFINITELY_NOT_SET_XYZ'; then
+  fail "M-S15c: unset-var request reached fake Slack — unresolved placeholder escaped the proxy boundary"
 elif [ -z "$sl_unset" ] || echo "$sl_unset" | grep -q "TIMEOUT"; then
   skip "M-S15c: unset-var probe timed out or returned no output"
 else
@@ -1394,30 +1157,11 @@ fi
 # Mode opens a websocket only after this POST succeeds, so this is the
 # call that the xapp- token actually authenticates. We don't bother
 # upgrading WSS in the test — the auth check is on the HTTPS POST.
-info "Calling slack.com/api/apps.connections.open with Bolt-shape xapp- placeholder..."
-sl_app_api=$(sandbox_exec 'node -e "
-const https = require(\"https\");
-const data = \"\";
-const options = {
-  hostname: \"slack.com\",
-  path: \"/api/apps.connections.open\",
-  method: \"POST\",
-  headers: {
-    \"Authorization\": \"Bearer xapp-OPENSHELL-RESOLVE-ENV-SLACK_APP_TOKEN\",
-    \"Content-Type\": \"application/x-www-form-urlencoded\",
-    \"Content-Length\": data.length,
-  },
-};
-const req = https.request(options, (res) => {
-  let body = \"\";
-  res.on(\"data\", (d) => body += d);
-  res.on(\"end\", () => console.log(res.statusCode + \" \" + body.slice(0, 300)));
-});
-req.on(\"error\", (e) => console.log(\"ERROR: \" + e.message));
-req.setTimeout(30000, () => { req.destroy(); console.log(\"TIMEOUT\"); });
-req.write(data);
-req.end();
-"' 2>/dev/null || true)
+info "Calling fake Slack /api/apps.connections.open with Bolt-shape xapp- placeholder..."
+sl_app_api=""
+if [ "$fake_slack_ready" = "1" ]; then
+  sl_app_api=$(run_fake_slack_api_node_request "$FAKE_SLACK_API_PORT" "/api/apps.connections.open" "Bearer xapp-OPENSHELL-RESOLVE-ENV-SLACK_APP_TOKEN" || true)
+fi
 
 info "Slack apps.connections.open response: ${sl_app_api:0:300}"
 sl_app_status=$(echo "$sl_app_api" | grep -E '^[0-9]' | head -1 | awk '{print $1}')
@@ -1425,9 +1169,9 @@ sl_app_status=$(echo "$sl_app_api" | grep -E '^[0-9]' | head -1 | awk '{print $1
 if [ "$sl_app_status" = "200" ] && echo "$sl_app_api" | grep -q '"ok":true'; then
   pass "M-S16: apps.connections.open returned ok:true — real xapp token round-trip verified!"
 elif [ "$sl_app_status" = "200" ] && echo "$sl_app_api" | grep -qE 'invalid_auth|not_authed|not_allowed_token_type'; then
-  pass "M-S16: apps.connections.open auth-rejected — Socket Mode HTTPS leg verified (rewriter → L7 proxy → slack.com)"
+  pass "M-S16: apps.connections.open auth-rejected — Socket Mode HTTPS leg verified (rewriter → L7 proxy → fake Slack)"
 elif echo "$sl_app_api" | grep -q "TIMEOUT"; then
-  skip "M-S16: apps.connections.open timed out (network issue)"
+  skip "M-S16: apps.connections.open timed out"
 elif echo "$sl_app_api" | grep -qF 'OPENSHELL-RESOLVE-ENV-'; then
   fail "M-S16: rewriter did not translate xapp- placeholder — preload not loaded for Socket Mode path?"
 else
@@ -1438,57 +1182,19 @@ fi
 # rationale as M-S15b — sends the canonical placeholder directly so the
 # rewriter is a no-op and only the L7 proxy substitution is exercised.
 info "Probing L7 proxy substitution for SLACK_APP_TOKEN (canonical placeholder)..."
-sl_app_canonical=$(sandbox_exec 'node -e "
-const https = require(\"https\");
-const data = \"\";
-const options = {
-  hostname: \"slack.com\",
-  path: \"/api/apps.connections.open\",
-  method: \"POST\",
-  headers: {
-    \"Authorization\": \"Bearer openshell:resolve:env:SLACK_APP_TOKEN\",
-    \"Content-Type\": \"application/x-www-form-urlencoded\",
-    \"Content-Length\": data.length,
-  },
-};
-const req = https.request(options, (res) => {
-  let body = \"\";
-  res.on(\"data\", (d) => body += d);
-  res.on(\"end\", () => console.log(res.statusCode + \" \" + body.slice(0, 300)));
-});
-req.on(\"error\", (e) => console.log(\"ERROR: \" + e.message));
-req.setTimeout(30000, () => { req.destroy(); console.log(\"TIMEOUT\"); });
-req.write(data);
-req.end();
-"' 2>/dev/null || true)
+sl_app_canonical=""
+if [ "$fake_slack_ready" = "1" ]; then
+  sl_app_canonical=$(run_fake_slack_api_node_request "$FAKE_SLACK_API_PORT" "/api/apps.connections.open" "Bearer openshell:resolve:env:SLACK_APP_TOKEN" || true)
+fi
 
 info "Slack apps.connections.open (canonical) response: ${sl_app_canonical:0:300}"
 sl_app_canon_status=$(echo "$sl_app_canonical" | grep -E '^[0-9]' | head -1 | awk '{print $1}')
 
 info "Probing L7 proxy substitution for an unset app-token env var (negative control)..."
-sl_app_unset=$(sandbox_exec 'node -e "
-const https = require(\"https\");
-const data = \"\";
-const options = {
-  hostname: \"slack.com\",
-  path: \"/api/apps.connections.open\",
-  method: \"POST\",
-  headers: {
-    \"Authorization\": \"Bearer openshell:resolve:env:DEFINITELY_NOT_SET_SLACK_APP_TOKEN\",
-    \"Content-Type\": \"application/x-www-form-urlencoded\",
-    \"Content-Length\": data.length,
-  },
-};
-const req = https.request(options, (res) => {
-  let body = \"\";
-  res.on(\"data\", (d) => body += d);
-  res.on(\"end\", () => console.log(res.statusCode + \" \" + body.slice(0, 300)));
-});
-req.on(\"error\", (e) => console.log(\"ERROR: \" + e.message));
-req.setTimeout(30000, () => { req.destroy(); console.log(\"TIMEOUT\"); });
-req.write(data);
-req.end();
-"' 2>/dev/null || true)
+sl_app_unset=""
+if [ "$fake_slack_ready" = "1" ]; then
+  sl_app_unset=$(run_fake_slack_api_node_request "$FAKE_SLACK_API_PORT" "/api/apps.connections.open" "Bearer openshell:resolve:env:DEFINITELY_NOT_SET_SLACK_APP_TOKEN" || true)
+fi
 
 info "Slack apps.connections.open (unset env) response: ${sl_app_unset:0:300}"
 if [ "$sl_app_canon_status" = "200" ] && echo "$sl_app_canonical" | grep -qE 'invalid_auth|not_authed|not_allowed_token_type'; then
@@ -1496,6 +1202,8 @@ if [ "$sl_app_canon_status" = "200" ] && echo "$sl_app_canonical" | grep -qE 'in
     pass "M-S16b: L7 proxy substitutes openshell:resolve:env:SLACK_APP_TOKEN at egress (unset-var control diverged)"
   elif echo "$sl_app_unset" | grep -qE '^200\b'; then
     fail "M-S16b: unset app-token env returned HTTP 200 — proxy may be passing canonical placeholders through unchanged"
+  elif echo "$sl_app_unset" | grep -qE '^401\b|bad_auth|DEFINITELY_NOT_SET_SLACK_APP_TOKEN'; then
+    fail "M-S16b: unset app-token request reached fake Slack — unresolved placeholder escaped the proxy boundary"
   elif [ -z "$sl_app_unset" ] || echo "$sl_app_unset" | grep -q "TIMEOUT"; then
     skip "M-S16b: unset app-token control timed out or returned no output"
   else
@@ -1587,7 +1295,7 @@ fi
 #      (matches its prefix regex).
 #   2. The rewriter translates to canonical form on egress.
 #   3. The L7 proxy substitutes the fake xoxb-fake-… token from env.
-#   4. slack.com returns 200 OK invalid_auth.
+#   4. The Slack API rejects the fake token.
 #   5. @slack/web-api emits an unhandled rejection — the guard catches it.
 # Pre-refactor the catch happened earlier (Bolt's in-process xapp- prefix
 # check), but the observable here is the same: gateway stays up, log shows
@@ -1648,11 +1356,17 @@ fi
 section "Phase 8: Cleanup"
 
 info "Destroying sandbox '$SANDBOX_NAME'..."
-[[ "${NEMOCLAW_E2E_KEEP_SANDBOX:-}" = "1" ]] || nemoclaw "$SANDBOX_NAME" destroy --yes 2>/dev/null || true
-openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
+if [[ "${NEMOCLAW_E2E_KEEP_SANDBOX:-}" = "1" ]]; then
+  skip "Cleanup: NEMOCLAW_E2E_KEEP_SANDBOX=1 — leaving sandbox '$SANDBOX_NAME' for inspection"
+else
+  nemoclaw "$SANDBOX_NAME" destroy --yes 2>/dev/null || true
+  openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
+fi
 
 # Verify cleanup
-if openshell sandbox list 2>&1 | grep -q "$SANDBOX_NAME"; then
+if [[ "${NEMOCLAW_E2E_KEEP_SANDBOX:-}" = "1" ]]; then
+  pass "Cleanup: Sandbox '$SANDBOX_NAME' intentionally kept"
+elif openshell sandbox list 2>&1 | grep -q "$SANDBOX_NAME"; then
   fail "Cleanup: Sandbox '$SANDBOX_NAME' still present after cleanup"
 else
   pass "Cleanup: Sandbox '$SANDBOX_NAME' removed"

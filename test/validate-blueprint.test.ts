@@ -50,6 +50,7 @@ type Endpoint = {
   enforcement?: string;
   access?: string;
   tls?: string;
+  websocket_credential_rewrite?: boolean;
   rules?: Rule[];
   binaries?: Array<{ path: string }>;
 };
@@ -488,6 +489,59 @@ describe("huggingface preset", () => {
       expect(hasGet).toBe(true);
     }
   });
+});
+
+describe("messaging WebSocket presets", () => {
+  const DISCORD_PRESET_PATH = new URL(
+    "../nemoclaw-blueprint/policies/presets/discord.yaml",
+    import.meta.url,
+  );
+  const SLACK_PRESET_PATH = new URL(
+    "../nemoclaw-blueprint/policies/presets/slack.yaml",
+    import.meta.url,
+  );
+
+  const presets = [
+    {
+      name: "discord",
+      policyKey: "discord",
+      host: "gateway.discord.gg",
+      credentialRewrite: true,
+      data: loadYaml<PolicyPreset>(DISCORD_PRESET_PATH),
+    },
+    {
+      name: "slack",
+      policyKey: "slack",
+      host: "wss-primary.slack.com",
+      credentialRewrite: false,
+      data: loadYaml<PolicyPreset>(SLACK_PRESET_PATH),
+    },
+    {
+      name: "slack",
+      policyKey: "slack",
+      host: "wss-backup.slack.com",
+      credentialRewrite: false,
+      data: loadYaml<PolicyPreset>(SLACK_PRESET_PATH),
+    },
+  ];
+
+  for (const preset of presets) {
+    it(`${preset.name} ${preset.host} uses native WebSocket inspection`, () => {
+      const endpoints = preset.data.network_policies?.[preset.policyKey]?.endpoints ?? [];
+      const endpoint = endpoints.find((candidate) => candidate.host === preset.host);
+      expect(endpoint).toBeDefined();
+      expect(endpoint).toMatchObject({ protocol: "websocket", enforcement: "enforce" });
+      expect(endpoint).not.toHaveProperty("access");
+      expect(endpoint).not.toHaveProperty("tls");
+      expect(endpoint?.websocket_credential_rewrite === true).toBe(preset.credentialRewrite);
+      expect(endpoint?.rules).toEqual(
+        expect.arrayContaining([
+          { allow: { method: "GET", path: "/**" } },
+          { allow: { method: "WEBSOCKET_TEXT", path: "/**" } },
+        ]),
+      );
+    });
+  }
 });
 
 describe("npm preset", () => {

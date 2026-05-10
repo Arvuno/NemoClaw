@@ -1419,6 +1419,25 @@ function runCaptureOpenshell(
   return runCapture(openshellArgv(args, opts), opts);
 }
 
+let gatewayLifecycleCommandsSupported: boolean | null = null;
+
+function gatewayCliSupportsLifecycleCommands(): boolean {
+  if (gatewayLifecycleCommandsSupported !== null) {
+    return gatewayLifecycleCommandsSupported;
+  }
+
+  const help = runCaptureOpenshell(["gateway", "--help"], {
+    ignoreError: true,
+    suppressOutput: true,
+  });
+  const normalized = String(help || "").replace(ANSI_RE, "");
+  // Older OpenShell CLIs own the local gateway lifecycle. PR #1286 and newer
+  // package-managed CLIs expose gateway registration only.
+  gatewayLifecycleCommandsSupported =
+    !normalized.trim() || (/\bstart\b/.test(normalized) && /\bdestroy\b/.test(normalized));
+  return gatewayLifecycleCommandsSupported;
+}
+
 /**
  * Execute a shell command inside a sandbox for post-deployment verification.
  * Returns a structured result with status, stdout, stderr — or null if
@@ -3232,16 +3251,23 @@ function sleep(seconds: number): void {
 }
 
 function destroyGateway() {
-  const destroyResult = runOpenshell(["gateway", "destroy", "-g", GATEWAY_NAME], {
-    ignoreError: true,
-  });
+  const hasLifecycleCommands = gatewayCliSupportsLifecycleCommands();
+  const destroyResult = hasLifecycleCommands
+    ? runOpenshell(["gateway", "destroy", "-g", GATEWAY_NAME], {
+        ignoreError: true,
+      })
+    : runOpenshell(["gateway", "remove", GATEWAY_NAME], {
+        ignoreError: true,
+      });
   // Clear the local registry so `nemoclaw list` stays consistent with OpenShell state. (#532)
   if (destroyResult.status === 0) {
     registry.clearAll();
   }
-  // openshell gateway destroy doesn't remove Docker volumes, which leaves
-  // corrupted cluster state that breaks the next gateway start. Clean them up.
-  dockerRemoveVolumesByPrefix(`openshell-cluster-${GATEWAY_NAME}`, { ignoreError: true });
+  if (hasLifecycleCommands) {
+    // openshell gateway destroy doesn't remove Docker volumes, which leaves
+    // corrupted cluster state that breaks the next gateway start. Clean them up.
+    dockerRemoveVolumesByPrefix(`openshell-cluster-${GATEWAY_NAME}`, { ignoreError: true });
+  }
 }
 
 type FinalGatewayStartFailureOptions = {
@@ -3541,6 +3567,12 @@ async function ensureNamedCredential(
 
 function waitForSandboxReady(sandboxName: string, attempts = 10, delaySeconds = 2): boolean {
   for (let i = 0; i < attempts; i += 1) {
+    const list = runCaptureOpenshell(["sandbox", "list"], { ignoreError: true });
+    if (isSandboxReady(list, sandboxName)) return true;
+
+    // Older OpenShell gateway deployments exposed Kubernetes pod state here.
+    // Newer package-managed gateways, including the Docker driver used by
+    // native WebSocket policy support, report readiness through `sandbox list`.
     const podPhase = runCaptureOpenshell(
       [
         "doctor",
@@ -3958,9 +3990,13 @@ async function preflight(
   const gatewaySnapshot = selectNamedGatewayForReuseIfNeeded(getGatewayReuseSnapshot());
   let gatewayReuseState = gatewaySnapshot.gatewayReuseState;
 
-  // Verify the gateway container is actually running — openshell CLI metadata
-  // can be stale after a manual `docker rm`. See #2020.
-  if (gatewayReuseState === "healthy") {
+  const hasGatewayLifecycleCommands = gatewayCliSupportsLifecycleCommands();
+
+  // Verify the legacy gateway container is actually running — openshell CLI
+  // metadata can be stale after a manual `docker rm`. See #2020. Newer
+  // package-managed OpenShell gateways do not have an openshell-cluster-* Docker
+  // container, so the live CLI health check is the source of truth there.
+  if (gatewayReuseState === "healthy" && hasGatewayLifecycleCommands) {
     const containerState = verifyGatewayContainerRunning();
     if (containerState === "missing") {
       console.log("  Gateway metadata is stale (container not running). Cleaning up...");
@@ -3991,14 +4027,7 @@ async function preflight(
   if (gatewayReuseState === "stale" || gatewayReuseState === "active-unnamed") {
     console.log(`  Cleaning up previous ${cliDisplayName()} session...`);
     runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
-    const destroyResult = runOpenshell(["gateway", "destroy", "-g", GATEWAY_NAME], {
-      ignoreError: true,
-    });
-    // Sandboxes under the destroyed gateway no longer exist in OpenShell —
-    // clear the local registry so `nemoclaw list` stays consistent. (#532)
-    if (destroyResult.status === 0) {
-      registry.clearAll();
-    }
+    destroyGateway();
     console.log("  ✓ Previous session cleaned up");
   }
 
@@ -4216,6 +4245,17 @@ async function startGatewayWithOptions(
   // The retry loop below will destroy only if start genuinely fails.
   if (hasStaleGateway(gatewaySnapshot.gwInfo)) {
     console.log("  Stale gateway detected — attempting restart without destroy...");
+  }
+
+  if (!gatewayCliSupportsLifecycleCommands()) {
+    console.error("  OpenShell no longer exposes 'gateway start'.");
+    console.error("  Start and register the local OpenShell gateway service first, then retry:");
+    console.error(`    openshell gateway add http://127.0.0.1:${GATEWAY_PORT} --local --name ${GATEWAY_NAME}`);
+    console.error(`    openshell gateway select ${GATEWAY_NAME}`);
+    if (exitOnFailure) {
+      process.exit(1);
+    }
+    throw new Error("OpenShell gateway lifecycle commands are unavailable");
   }
 
   // Clear stale SSH host keys from previous gateway (fixes #768)
@@ -9859,9 +9899,13 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     const gatewaySnapshot = selectNamedGatewayForReuseIfNeeded(getGatewayReuseSnapshot());
     let gatewayReuseState = gatewaySnapshot.gatewayReuseState;
 
-    // Verify the gateway container is actually running — openshell CLI metadata
-    // can be stale after a manual `docker rm`. See #2020.
-    if (gatewayReuseState === "healthy") {
+    const hasGatewayLifecycleCommands = gatewayCliSupportsLifecycleCommands();
+
+    // Verify the legacy gateway container is actually running — openshell CLI
+    // metadata can be stale after a manual `docker rm`. See #2020. Newer
+    // package-managed OpenShell gateways do not have an openshell-cluster-* Docker
+    // container, so the live CLI health check is the source of truth there.
+    if (gatewayReuseState === "healthy" && hasGatewayLifecycleCommands) {
       const containerState = verifyGatewayContainerRunning();
       if (containerState === "missing") {
         console.log("  Gateway metadata is stale (container not running). Cleaning up...");
@@ -9894,7 +9938,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     // Verify the reusable gateway has GPU passthrough when needed. Runs for
     // both fresh-reuse and resume paths so a gateway recreated without GPU
     // between runs is caught.
-    if (canReuseHealthyGateway && gpuPassthrough) {
+    if (canReuseHealthyGateway && gpuPassthrough && hasGatewayLifecycleCommands) {
       const container = `openshell-cluster-${GATEWAY_NAME}`;
       const gpuCheck = docker.dockerInspect(
         ["--type", "container", "--format", "{{json .HostConfig.DeviceRequests}}", container],

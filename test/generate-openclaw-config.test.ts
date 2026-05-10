@@ -213,6 +213,8 @@ describe("generate-openclaw-config.py: config generation", () => {
     expect(config.channels.discord.accounts.default.token).toBe(
       "openshell:resolve:env:DISCORD_BOT_TOKEN",
     );
+    expect(config.channels.telegram.accounts.default.proxy).toBe("http://10.200.0.1:3128");
+    expect(config.channels.discord.accounts.default.proxy).toBeUndefined();
   });
 
   it("emits Bolt-shape placeholders for Slack so the SDK's prefix regex passes", () => {

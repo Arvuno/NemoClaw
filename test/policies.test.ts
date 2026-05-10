@@ -749,21 +749,61 @@ describe("policies", () => {
       expect(graphSection).toContain("method: PATCH");
     });
 
-    it("messaging WebSocket presets keep tls: skip on gateway endpoints", () => {
+    it("messaging WebSocket presets use native inspected WebSocket policy", () => {
       const cases = [
-        { preset: "discord", pattern: /host:\s*gateway\.discord\.gg[\s\S]*?tls:\s*skip/ },
-        { preset: "slack", pattern: /host:\s*wss-primary\.slack\.com[\s\S]*?tls:\s*skip/ },
-        { preset: "slack", pattern: /host:\s*wss-backup\.slack\.com[\s\S]*?tls:\s*skip/ },
+        {
+          preset: "discord",
+          host: "gateway.discord.gg",
+          credentialRewrite: true,
+        },
+        {
+          preset: "slack",
+          host: "wss-primary.slack.com",
+          credentialRewrite: false,
+        },
+        {
+          preset: "slack",
+          host: "wss-backup.slack.com",
+          credentialRewrite: false,
+        },
       ];
 
-      for (const { preset, pattern } of cases) {
+      for (const { preset, host, credentialRewrite } of cases) {
         const content = requirePresetContent(policies.loadPreset(preset));
-        expect(content).toBeTruthy();
-        expect(content).toMatch(pattern);
+        const parsed = YAML.parse(content) as {
+          network_policies?: Record<
+            string,
+            {
+              endpoints?: Array<{
+                host?: string;
+                protocol?: string;
+                access?: string;
+                tls?: string;
+                websocket_credential_rewrite?: boolean;
+                rules?: Array<{ allow?: { method?: string; path?: string } }>;
+              }>;
+            }
+          >;
+        };
+        const endpoints = Object.values(parsed.network_policies ?? {}).flatMap(
+          (policy) => policy.endpoints ?? [],
+        );
+        const endpoint = endpoints.find((candidate) => candidate.host === host);
+        expect(endpoint).toBeTruthy();
+        expect(endpoint).toMatchObject({ protocol: "websocket", enforcement: "enforce" });
+        expect(endpoint).not.toHaveProperty("access");
+        expect(endpoint).not.toHaveProperty("tls");
+        expect(endpoint?.websocket_credential_rewrite === true).toBe(credentialRewrite);
+        expect(endpoint?.rules).toEqual(
+          expect.arrayContaining([
+            { allow: { method: "GET", path: "/**" } },
+            { allow: { method: "WEBSOCKET_TEXT", path: "/**" } },
+          ]),
+        );
       }
     });
 
-    it("Hermes Discord gateway policy uses the OpenClaw L4 WebSocket tunnel shape", () => {
+    it("Hermes Discord gateway policy enables native WebSocket credential rewrite", () => {
       const policyFiles = [
         path.join(REPO_ROOT, "agents/hermes/policy-additions.yaml"),
         path.join(REPO_ROOT, "agents/hermes/policy-permissive.yaml"),
@@ -771,12 +811,39 @@ describe("policies", () => {
 
       for (const file of policyFiles) {
         const content = fs.readFileSync(file, "utf8");
-        const gatewaySection =
-          content.split("host: gateway.discord.gg")[1]?.split("- host:")[0] ?? "";
-        expect(gatewaySection).toContain("access: full");
-        expect(gatewaySection).toContain("tls: skip");
-        expect(gatewaySection).not.toContain("protocol: rest");
-        expect(gatewaySection).not.toContain("rules:");
+        const parsed = YAML.parse(content) as {
+          network_policies?: Record<
+            string,
+            {
+              endpoints?: Array<{
+                host?: string;
+                protocol?: string;
+                access?: string;
+                tls?: string;
+                websocket_credential_rewrite?: boolean;
+                rules?: Array<{ allow?: { method?: string; path?: string } }>;
+              }>;
+            }
+          >;
+        };
+        const endpoints = Object.values(parsed.network_policies ?? {}).flatMap(
+          (policy) => policy.endpoints ?? [],
+        );
+        const endpoint = endpoints.find((candidate) => candidate.host === "gateway.discord.gg");
+        expect(endpoint).toBeTruthy();
+        expect(endpoint).toMatchObject({
+          protocol: "websocket",
+          enforcement: "enforce",
+          websocket_credential_rewrite: true,
+        });
+        expect(endpoint).not.toHaveProperty("access");
+        expect(endpoint).not.toHaveProperty("tls");
+        expect(endpoint?.rules).toEqual(
+          expect.arrayContaining([
+            { allow: { method: "GET", path: "/**" } },
+            { allow: { method: "WEBSOCKET_TEXT", path: "/**" } },
+          ]),
+        );
       }
     });
 
