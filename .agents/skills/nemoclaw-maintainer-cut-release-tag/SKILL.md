@@ -199,7 +199,10 @@ for label in fixed-on-latest verify-inconclusive; do
       --jq '.comments | map(select(.body | test("nemoclaw-verify-stale v\\d+"))) | last | .body' \
       | grep -oE '`[a-zA-Z0-9_/.-]+\.(ts|js|sh|py|yaml|yml|md)`' | tr -d '`' | sort -u)
     if [ -n "$PATHS" ]; then
-      REGRESSED=$(git -C ~/NemoClaw log --since="$MARKER_DATE" origin/main --name-only --format=oneline -- $PATHS 2>/dev/null | head -1)
+      # Run from the current directory — Step 1's prerequisite already requires the maintainer
+      # to be inside the NemoClaw repo, and hardcoding ~/NemoClaw breaks anyone with a non-default
+      # checkout location.
+      REGRESSED=$(git log --since="$MARKER_DATE" origin/main --name-only --format=oneline -- $PATHS 2>/dev/null | head -1)
       if [ -n "$REGRESSED" ]; then
         gh issue edit "$n" --repo NVIDIA/NemoClaw --remove-label "$label"
         echo "[release-sweep] cleared #$n ($label) — regression risk (commits since ${MARKER_DATE} touch implicated paths)"

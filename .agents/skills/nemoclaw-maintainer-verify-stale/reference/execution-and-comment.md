@@ -49,7 +49,9 @@ if [ -n "$EXISTING" ]; then
   echo "Reusing existing verification box: $INSTANCE_NAME"
 else
   # Concurrency cap: refuse if 4+ verify-stale-* boxes are already running.
-  RUNNING=$(echo "$INSTANCES" | jq '[.[]? | select(.name | startswith("verify-stale-"))] | length')
+  # Filter on .status to match the reuse query above — counting non-running boxes
+  # would falsely block provisioning when prior boxes are stopped but not deleted.
+  RUNNING=$(echo "$INSTANCES" | jq '[.[]? | select(.name | startswith("verify-stale-")) | select(.status == "RUNNING")] | length')
   if [ "$RUNNING" -ge 4 ]; then
     echo "ERROR: 4 verify-stale boxes already running. Wait for one to finish or reuse."
     exit 1
@@ -313,8 +315,13 @@ If `./reproducer.sh` exists (verbatim from Step 6), run it. Otherwise synth on d
 If none work, route the script to Step 8c (synth-repro) so the LLM can rewrite it using non-interactive equivalents.
 
 ```bash
+# `brev exec` spawns a non-login shell, so ~/.local/bin (where the nemoclaw binary lives
+# after install) is not on PATH unless we export it. The reproducer script itself must
+# use `sg docker -c '...'` blocks for any Docker-touching command — Step 8a.5b covers
+# that requirement; double-wrapping with sg docker on the outer call breaks nested-quote
+# escaping in some bash versions.
 brev copy ./reproducer.sh "$INSTANCE_NAME":~/reproducer.sh
-brev exec "$INSTANCE_NAME" "bash ~/reproducer.sh" 2>&1 | tee ./baseline-transcript.log
+brev exec "$INSTANCE_NAME" 'export PATH="$HOME/.local/bin:$PATH" && bash ~/reproducer.sh' 2>&1 | tee ./baseline-transcript.log
 ```
 
 **Log-scraping (when `BUG_CLASS=log-only`).** Some bugs describe symptoms that show up in internal log files, not the reproducer's stdout/stderr — e.g., #1642 "see lots of error in openclaw log," #2611 "os.networkInterfaces guard errors." After running the reproducer, also pull the relevant logs from inside the sandbox and search them for the issue's symptom phrase:
@@ -386,7 +393,9 @@ case "$RESOLVED" in
 esac
 
 brev copy ./reproducer.sh "$INSTANCE_NAME":~/reproducer.sh
-brev exec "$INSTANCE_NAME" "bash ~/reproducer.sh" 2>&1 | tee ./latest-transcript.log
+# Same PATH safeguard as the baseline call — non-login shells don't pick up ~/.local/bin
+# automatically. The reproducer's internal `sg docker -c '...'` blocks cover Docker access.
+brev exec "$INSTANCE_NAME" 'export PATH="$HOME/.local/bin:$PATH" && bash ~/reproducer.sh' 2>&1 | tee ./latest-transcript.log
 ```
 
 If the install of **latest** fails (e.g. installer regression — see #3058 for a current example), this is an infra failure — see Step 11. Do not score or label the issue.
@@ -753,21 +762,44 @@ print(html.unescape(b))
 
 Transcripts and synth-repro scripts are already plain text and skip the pre-pass.
 
-**Order matters and the table below is in execution order.** Longest, most-specific patterns first; generic catchalls last. Otherwise the catchall masks specific matches and you lose track of what was actually redacted (JWT vs session blob vs random base64).
+**Order matters and the patterns below are in execution order.** Longest, most-specific patterns first; generic catchalls last. Otherwise the catchall masks specific matches and you lose track of what was actually redacted (JWT vs session blob vs random base64).
 
-| # | Pattern | Targets |
-|---|---|---|
-| 1 | `eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}` | JWT tokens |
-| 2 | `gh[pousr]_[A-Za-z0-9]{36,}` | GitHub PATs / install tokens |
-| 3 | `(?i)nvapi-[A-Za-z0-9_-]{20,}` | NVIDIA API keys (NIM / build.nvidia.com) |
-| 4 | `AKIA[0-9A-Z]{16}` | AWS access key IDs |
-| 5 | `(?i)aws_secret_access_key\s*=\s*\S+` | AWS secret keys |
-| 6 | `(?i)authorization:\s*\S+` | HTTP auth headers (often Bearer + JWT) |
-| 7 | URLs containing `@` before the host (e.g., `https://user:pw@host/...`) | Basic-auth credentials in URLs |
-| 8 | `(?i)(token\|secret\|password\|api[_-]?key\|bearer)[^\n]*[:=][^\n]*` | Inline credentials in env/config/log output |
-| 9 | `\b\w+\.(nvidia\.internal\|nv-internal\.com\|nvidia\.dev)\b` | Internal hostnames (extend list per team) |
-| 10 | `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}` | Email addresses (PII) |
-| 11 | `\b[A-Za-z0-9+/]{60,}={0,2}\b` | Long base64 blobs (likely keys/sessions; tune length to taste — too short hits legit data) |
+Patterns live in a fenced block (not a markdown table) because patterns 8 and 9 use regex alternation `|` — markdown tables would treat the literal `|` as a column delimiter, and escaping it as `\|` makes the regex match a literal pipe instead of an alternation, which silently breaks credential redaction.
+
+```regex
+1.  eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}
+    → JWT tokens
+
+2.  gh[pousr]_[A-Za-z0-9]{36,}
+    → GitHub PATs / install tokens
+
+3.  (?i)nvapi-[A-Za-z0-9_-]{20,}
+    → NVIDIA API keys (NIM / build.nvidia.com)
+
+4.  AKIA[0-9A-Z]{16}
+    → AWS access key IDs
+
+5.  (?i)aws_secret_access_key\s*=\s*\S+
+    → AWS secret keys
+
+6.  (?i)authorization:\s*\S+
+    → HTTP auth headers (often Bearer + JWT)
+
+7.  URLs containing `@` before the host (e.g., https://user:pw@host/...)
+    → Basic-auth credentials in URLs
+
+8.  (?i)(token|secret|password|api[_-]?key|bearer)[^\n]*[:=][^\n]*
+    → Inline credentials in env/config/log output
+
+9.  \b\w+\.(nvidia\.internal|nv-internal\.com|nvidia\.dev)\b
+    → Internal hostnames (extend list per team)
+
+10. [a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}
+    → Email addresses (PII)
+
+11. \b[A-Za-z0-9+/]{60,}={0,2}\b
+    → Long base64 blobs (likely keys/sessions; tune length to taste — too short hits legit data)
+```
 
 **File paths under the reporter's home directory** (`/Users/<name>/`, `/home/<name>/`) → replace with `~/`. Run last; catches incidental username PII.
 
