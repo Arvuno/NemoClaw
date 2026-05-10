@@ -1476,6 +1476,7 @@ verify_nemoclaw() {
       # hint is still emitted so future shells pick the binary up by name
       # (#3276).
       _CLI_PATH="$npm_bin/$_CLI_BIN"
+      NEMOCLAW_CURRENT_SHELL_NEEDS_PATH_REFRESH=true
       NEMOCLAW_RECOVERY_PROFILE="$(detect_shell_profile)"
       if [[ -x "$NEMOCLAW_SHIM_DIR/$_CLI_BIN" ]]; then
         NEMOCLAW_RECOVERY_EXPORT_DIR="$NEMOCLAW_SHIM_DIR"
