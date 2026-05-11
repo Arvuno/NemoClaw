@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-/* v8 ignore start -- covered by source-level unit tests; CLI coverage tracks dist integration. */
 import { spawnSync, type SpawnSyncOptions, type SpawnSyncReturns } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 import { dockerSpawnSync } from "../../adapters/docker/exec";
+import { getAgentBranding, type AgentBranding } from "../../cli/branding";
+import { sleepMs } from "../../core/wait";
 import { defaultUninstallPaths, NEMOCLAW_OLLAMA_MODELS, NEMOCLAW_PROVIDERS, type UninstallPaths } from "../../domain/uninstall/paths";
 import { buildUninstallPlan, type UninstallPlan } from "../../domain/uninstall/plan";
 import { classifyShimPath, type FileSystemDeps } from "./plan";
@@ -169,23 +170,34 @@ function buildRuntime(deps: UninstallRunDeps): UninstallRuntime {
   };
 }
 
-function printBanner(log: (message: string) => void): void {
-  log("NemoClaw Uninstaller");
-  log("This will remove all NemoClaw resources.");
+function runtimeBranding(runtime: UninstallRuntime): AgentBranding {
+  return getAgentBranding(runtime.env.NEMOCLAW_AGENT);
 }
 
-function printBye(log: (message: string) => void): void {
-  log("NemoClaw");
-  log("Claws retracted. Until next time.");
+function planStepDisplayName(stepName: string, branding: AgentBranding): string {
+  return stepName === "NemoClaw CLI" ? `${branding.display} CLI` : stepName;
+}
+
+function printBanner(runtime: UninstallRuntime): void {
+  const branding = runtimeBranding(runtime);
+  runtime.log(`${branding.display} Uninstaller`);
+  runtime.log(`This will remove all ${branding.display} resources.`);
+}
+
+function printBye(runtime: UninstallRuntime): void {
+  const branding = runtimeBranding(runtime);
+  runtime.log(branding.display);
+  runtime.log(branding.uninstallGoodbye);
 }
 
 function confirm(options: UninstallRunOptions, runtime: UninstallRuntime): boolean {
+  const branding = runtimeBranding(runtime);
   if (options.assumeYes) return true;
   runtime.log("What will be removed:");
-  runtime.log("  · All OpenShell sandboxes, gateway, and NemoClaw providers");
+  runtime.log(`  · All OpenShell sandboxes, gateway, and ${branding.display} providers`);
   runtime.log("  · Related Docker containers, images, and volumes");
   runtime.log("  · ~/.nemoclaw  ~/.config/openshell  ~/.config/nemoclaw");
-  runtime.log("  · Global nemoclaw npm package");
+  runtime.log(`  · Global ${branding.display} CLI (npm package: nemoclaw)`);
   runtime.log(options.deleteModels ? `  · Ollama models: ${NEMOCLAW_OLLAMA_MODELS.join(" ")}` : "  · Ollama models: kept");
   runtime.log("Proceed? [y/N]");
   const reply = runtime.readLine();
@@ -202,7 +214,7 @@ function runOptional(runtime: UninstallRuntime, description: string, command: st
 
 function stopHelperServices(paths: UninstallPaths, runtime: UninstallRuntime): void {
   const startServices = path.join(paths.repoRoot, "scripts", "start-services.sh");
-  if (runtime.existsSync(startServices)) runOptional(runtime, "Stopped NemoClaw helper services", startServices, ["--stop"]);
+  if (runtime.existsSync(startServices)) runOptional(runtime, `Stopped ${runtimeBranding(runtime).display} helper services`, startServices, ["--stop"]);
 }
 
 function stopMatchingPids(pattern: string, runtime: UninstallRuntime, label: string): void {
@@ -220,6 +232,133 @@ function stopMatchingPids(pattern: string, runtime: UninstallRuntime, label: str
     if (runtime.kill(pid) || runtime.kill(pid, "SIGKILL")) runtime.log(`Stopped ${label} ${pid}`);
     else runtime.warn(`Failed to stop ${label} ${pid}`);
   }
+}
+
+// Identifier we look for in `/proc/<pid>/cmdline` (via `ps -p <pid> -o args=`)
+// to confirm a candidate PID is the Ollama auth proxy and not another node
+// process that happens to be on the same port. Mirrors the
+// `isOllamaProxyProcess` check in `src/lib/onboard-ollama-proxy.ts`.
+const OLLAMA_AUTH_PROXY_CMDLINE_MARK = "ollama-auth-proxy.js";
+
+// Resolve the proxy port from runtime.env (rather than `process.env` at
+// module-load time) so a user who onboarded with NEMOCLAW_OLLAMA_PROXY_PORT
+// set to a custom value sees uninstall scan that same port. Mirrors the
+// validation in `src/lib/core/ports.ts::parsePort`; falls back silently to
+// the default (11435) on malformed input — uninstall is best-effort.
+const DEFAULT_OLLAMA_PROXY_PORT = 11435;
+
+function resolveOllamaProxyPort(runtime: UninstallRuntime): number {
+  const raw = runtime.env.NEMOCLAW_OLLAMA_PROXY_PORT;
+  if (raw === undefined || raw === "") return DEFAULT_OLLAMA_PROXY_PORT;
+  const trimmed = String(raw).trim();
+  if (!/^\d+$/.test(trimmed)) return DEFAULT_OLLAMA_PROXY_PORT;
+  const parsed = Number(trimmed);
+  if (parsed < 1024 || parsed > 65535) return DEFAULT_OLLAMA_PROXY_PORT;
+  return parsed;
+}
+
+function isOllamaAuthProxyPid(pid: number, runtime: UninstallRuntime): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  const result = runtime.run("ps", ["-p", String(pid), "-o", "args="], { env: runtime.env });
+  return result.status === 0 && result.stdout.includes(OLLAMA_AUTH_PROXY_CMDLINE_MARK);
+}
+
+// `ps -p <pid>` is preferred over `kill(pid, 0)` for existence probing here:
+// `runtime.kill()` collapses every `process.kill` error to `false`, so a foreign
+// PID throwing EPERM (process exists but caller can't signal it) would look
+// identical to ESRCH (gone) and we'd falsely log it as Stopped. `ps` reports
+// existence regardless of signalling permission.
+function pidExists(pid: number, runtime: UninstallRuntime): boolean {
+  return runtime.run("ps", ["-p", String(pid), "-o", "pid="], { env: runtime.env }).status === 0;
+}
+
+function waitForPidExit(pid: number, runtime: UninstallRuntime, timeoutMs: number): boolean {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!pidExists(pid, runtime)) return true;
+    sleepMs(50);
+  }
+  return !pidExists(pid, runtime);
+}
+
+function pidOwnedByCurrentUser(pid: number, runtime: UninstallRuntime): boolean {
+  const expected = runtime.env.SUDO_USER || runtime.env.LOGNAME || os.userInfo().username;
+  if (!expected) return true;
+  const result = runtime.run("ps", ["-p", String(pid), "-o", "user="], { env: runtime.env });
+  return result.status === 0 && result.stdout.trim() === expected;
+}
+
+function tryStopOllamaProxyPid(pid: number, runtime: UninstallRuntime): boolean {
+  // `runtime.kill()` only confirms the signal was sent; the proxy may ignore
+  // SIGTERM, take time to clean up, or linger as a zombie. Verify the PID is
+  // actually gone before claiming success — otherwise the next install fails
+  // with `Ollama auth proxy failed to start on :11435`.
+  runtime.kill(pid);
+  if (waitForPidExit(pid, runtime, 1000)) {
+    runtime.log(`Stopped Ollama auth proxy ${pid}`);
+    return true;
+  }
+  runtime.kill(pid, "SIGKILL");
+  if (waitForPidExit(pid, runtime, 1000)) {
+    runtime.log(`Stopped Ollama auth proxy ${pid}`);
+    return true;
+  }
+  runtime.warn(`Failed to stop Ollama auth proxy ${pid}`);
+  return false;
+}
+
+function stopOllamaAuthProxy(paths: UninstallPaths, runtime: UninstallRuntime): void {
+  // The auth proxy is a detached node child started by the Local Ollama
+  // onboard path that listens on `NEMOCLAW_OLLAMA_PROXY_PORT` (default
+  // 11435). Without this cleanup,
+  // uninstall + reinstall fails with `Ollama auth proxy failed to start on
+  // :11435` — the on-disk PID file is removed by the "State and binaries"
+  // step but the process keeps running. The two-prong check (persisted PID
+  // first, then port-bound listeners) mirrors `killStaleProxy()` in
+  // `src/lib/onboard-ollama-proxy.ts` and verifies cmdline on every PID, so
+  // an unrelated process on the same port (custom proxy, test setup) is
+  // never killed. See issue #2759.
+  const stopped = new Set<number>();
+
+  // 1. Try the persisted PID file. The proxy stays bound across NemoClaw
+  //    sessions; the PID file is the most reliable signal. The path mirrors
+  //    `PROXY_PID_PATH` in `src/lib/onboard-ollama-proxy.ts` (`~/.nemoclaw`).
+  const pidFile = path.join(paths.nemoclawStateDir, "ollama-auth-proxy.pid");
+  if (runtime.existsSync(pidFile)) {
+    try {
+      const raw = fs.readFileSync(pidFile, "utf-8").trim();
+      const pid = Number.parseInt(raw, 10);
+      if (Number.isFinite(pid) && pid > 0 && isOllamaAuthProxyPid(pid, runtime)) {
+        if (tryStopOllamaProxyPid(pid, runtime)) stopped.add(pid);
+      }
+    } catch {
+      /* ignore — the State step deletes the file shortly anyway */
+    }
+  }
+
+  // 2. Fall back to the configured proxy port for orphans whose PID file is
+  //    gone (e.g. a previous uninstall already wiped state but the process
+  //    survived). Filter via cmdline so we never kill unrelated listeners.
+  if (!runtime.commandExists("lsof")) {
+    if (stopped.size === 0) {
+      runtime.warn("lsof not found; skipping orphan Ollama auth proxy scan.");
+    }
+    return;
+  }
+  const proxyPort = resolveOllamaProxyPort(runtime);
+  const lsof = runtime.run("lsof", ["-ti", `:${proxyPort}`], { env: runtime.env });
+  const pids = splitNonEmptyLines(lsof.stdout).map(Number).filter(Number.isFinite);
+  for (const pid of pids) {
+    if (stopped.has(pid)) continue;
+    // Skip foreign-owned PIDs even if the cmdline matches: signalling them
+    // would either no-op under EPERM or escalate via sudo, neither of which
+    // is appropriate during a per-user uninstall.
+    if (!pidOwnedByCurrentUser(pid, runtime)) continue;
+    if (!isOllamaAuthProxyPid(pid, runtime)) continue;
+    if (tryStopOllamaProxyPid(pid, runtime)) stopped.add(pid);
+  }
+
+  if (stopped.size === 0) runtime.log("No Ollama auth proxy processes found");
 }
 
 function stopOrphanedOpenShell(runtime: UninstallRuntime): void {
@@ -268,7 +407,7 @@ function removeAliases(paths: UninstallPaths, runtime: UninstallRuntime): void {
         .replace(/^# NemoClaw CLI alias\n.*\n?/gm, "");
       if (updated !== original) {
         fs.writeFileSync(profile, updated);
-        runtime.log(`Removed NemoClaw PATH entries from ${profile}`);
+        runtime.log(`Removed ${runtimeBranding(runtime).display} PATH entries from ${profile}`);
       }
     } catch {
       runtime.warn(`Failed to update ${profile}`);
@@ -301,16 +440,17 @@ function removeNvmLeftovers(paths: UninstallPaths, runtime: UninstallRuntime): v
 }
 
 function removeNemoclawCli(paths: UninstallPaths, runtime: UninstallRuntime): void {
+  const branding = runtimeBranding(runtime);
   if (runtime.commandExists("npm")) {
     runtime.run("npm", ["unlink", "-g", "nemoclaw"], { env: runtime.env, stdio: "ignore" });
     const result = runtime.run("npm", ["uninstall", "-g", "--loglevel=error", "nemoclaw"], {
       env: runtime.env,
       stdio: "ignore",
     });
-    if (result.status === 0) runtime.log("Removed global nemoclaw npm package");
-    else runtime.warn("Global nemoclaw npm package not found or already removed");
+    if (result.status === 0) runtime.log(`Removed global ${branding.display} CLI package`);
+    else runtime.warn(`Global ${branding.display} CLI package not found or already removed`);
   } else {
-    runtime.warn("npm not found; skipping nemoclaw npm uninstall.");
+    runtime.warn(`npm not found; skipping ${branding.display} CLI uninstall.`);
   }
 
   const shim = classifyShimPath(paths.nemoclawShimPath);
@@ -340,7 +480,7 @@ function removeDockerContainers(runtime: UninstallRuntime): void {
     .filter((line) => /openshell-cluster|openshell|openclaw|nemoclaw/i.test(line))
     .map((line) => line.split(/\s+/)[0]);
   if (ids.length === 0) {
-    runtime.log("No NemoClaw/OpenShell Docker containers found");
+    runtime.log(`No ${runtimeBranding(runtime).display}/OpenShell Docker containers found`);
     return;
   }
   for (const id of [...new Set(ids)]) {
@@ -355,7 +495,7 @@ function removeDockerImages(runtime: UninstallRuntime): void {
     .filter((line) => /openshell|openclaw|nemoclaw/i.test(line))
     .map((line) => line.split(/\s+/)[0]);
   if (ids.length === 0) {
-    runtime.log("No NemoClaw/OpenShell Docker images found");
+    runtime.log(`No ${runtimeBranding(runtime).display}/OpenShell Docker images found`);
     return;
   }
   for (const id of [...new Set(ids)]) {
@@ -391,7 +531,7 @@ function removeManagedSwap(paths: UninstallPaths, runtime: UninstallRuntime): vo
     return;
   }
   if (!runtime.existsSync(paths.managedSwapMarkerPath)) {
-    runtime.warn("No NemoClaw-managed swap marker found, skipping swap cleanup.");
+    runtime.warn(`No ${runtimeBranding(runtime).display}-managed swap marker found, skipping swap cleanup.`);
     return;
   }
   if (runtime.env.NEMOCLAW_NON_INTERACTIVE === "1" || !runtime.isTty) {
@@ -409,13 +549,15 @@ function removeManagedSwap(paths: UninstallPaths, runtime: UninstallRuntime): vo
 }
 
 function executePlan(plan: UninstallPlan, paths: UninstallPaths, options: UninstallRunOptions, runtime: UninstallRuntime): void {
+  const branding = runtimeBranding(runtime);
   for (const [index, step] of plan.steps.entries()) {
-    runtime.log(`[${index + 1}/${plan.steps.length}] ${step.name}`);
+    runtime.log(`[${index + 1}/${plan.steps.length}] ${planStepDisplayName(step.name, branding)}`);
     if (step.name === "Stopping services") {
       stopHelperServices(paths, runtime);
       removeGlob(paths.helperServiceGlob, runtime);
       stopMatchingPids(`openshell.*forward.*${runtime.env.NEMOCLAW_DASHBOARD_PORT || "18789"}`, runtime, "local OpenShell forward processes");
       stopOrphanedOpenShell(runtime);
+      stopOllamaAuthProxy(paths, runtime);
     } else if (step.name === "OpenShell resources") {
       removeOpenShellResources(options, runtime);
     } else if (step.name === "NemoClaw CLI") {
@@ -461,10 +603,9 @@ export function buildRunPlan(options: UninstallRunOptions, deps: UninstallRunDep
 export function runUninstallPlan(options: UninstallRunOptions, deps: UninstallRunDeps = {}): UninstallRunOutcome {
   const runtime = buildRuntime(deps);
   const { paths, plan } = buildRunPlan(options, { ...deps, env: runtime.env });
-  printBanner(runtime.log);
+  printBanner(runtime);
   if (!confirm(options, runtime)) return { exitCode: 0, plan };
   executePlan(plan, paths, options, runtime);
-  printBye(runtime.log);
+  printBye(runtime);
   return { exitCode: 0, plan };
 }
-/* v8 ignore stop */

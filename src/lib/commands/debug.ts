@@ -3,7 +3,7 @@
 
 import { Command, Flags } from "@oclif/core";
 
-import { CLI_NAME } from "../branding";
+import { CLI_NAME } from "../cli/branding";
 import { runDebug } from "../diagnostics/debug";
 import type { DebugOptions } from "../diagnostics/debug";
 import type { RunDebugCommandDeps } from "../diagnostics/debug-command";

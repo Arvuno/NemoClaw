@@ -30,7 +30,7 @@ import { loadAgent } from "../agent/defs.js";
 import type { AgentStateFile } from "../agent/defs.js";
 import { resolveOpenshell } from "../adapters/openshell/resolve.js";
 import { captureOpenshellCommand } from "../adapters/openshell/client.js";
-import { sanitizeConfigFile, isSensitiveFile } from "../credential-filter.js";
+import { sanitizeConfigFile, isSensitiveFile } from "../security/credential-filter.js";
 import { shellQuote } from "../runner.js";
 
 const HOME_DIR = path.resolve(process.env.HOME || os.homedir());

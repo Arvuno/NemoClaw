@@ -11,7 +11,7 @@
 
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
-import { redactFull } from "../redact";
+import { redactFull } from "../security/redact";
 import { ensureConfigDir } from "../state/config-io";
 
 const AUDIT_DIR = join(process.env.HOME ?? "/tmp", ".nemoclaw", "state");

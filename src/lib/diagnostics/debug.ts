@@ -7,7 +7,7 @@ import { platform, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
 import { dockerExecFileSync } from "../adapters/docker/exec";
-import { DASHBOARD_PORT } from "../ports";
+import { DASHBOARD_PORT } from "../core/ports";
 import { listSandboxes } from "../state/registry";
 
 // ---------------------------------------------------------------------------
@@ -54,7 +54,7 @@ function section(title: string): void {
 // Secret redaction — delegates to unified redact module (#2381).
 // ---------------------------------------------------------------------------
 
-import { redactFull as redact } from "../redact";
+import { redactFull as redact } from "../security/redact";
 export { redact };
 
 // ---------------------------------------------------------------------------
@@ -389,7 +389,7 @@ function collectNetwork(collectDir: string): void {
 
 function collectOnboardSession(collectDir: string, repoDir: string): void {
   section("Onboard Session");
-  const helperPath = join(repoDir, "dist", "lib", "onboard-session.js");
+  const helperPath = join(repoDir, "dist", "lib", "state", "onboard-session.js");
   if (!existsSync(helperPath) || !commandExists("node")) {
     console.log("  (onboard session helper not available, skipping)");
     return;
