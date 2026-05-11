@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { execFileSync } from "node:child_process";
+import type { ExecFileSyncOptionsWithStringEncoding } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -17,7 +18,69 @@ const ISSUE_2603_FIX_EXPECTATIONS = [
   "chat.history contains one user turn per submitted prompt",
 ];
 
-function textFromContent(content) {
+type ChatMessage = {
+  role?: string;
+  text?: unknown;
+  content?: unknown;
+};
+
+type ChatEventPayload = {
+  runId?: string;
+  state?: string;
+  message?: ChatMessage;
+  errorMessage?: string;
+};
+
+type GatewayEvent = {
+  event?: string;
+  payload?: ChatEventPayload;
+  ts?: number;
+};
+
+type SentRun = {
+  promptToken: string;
+  replyToken: string;
+  runId: string;
+  message: string;
+};
+
+type Issue2603Trace = {
+  sentRuns: SentRun[];
+  events: GatewayEvent[];
+  historyMessages: ChatMessage[];
+};
+
+type CompactChatEvent = {
+  runId?: string;
+  state?: string;
+  text: string;
+  errorMessage?: string;
+};
+
+type UncorrelatedReply = {
+  replyToken: string;
+  expectedRunId: string;
+  actualRunId?: string;
+  state?: string;
+};
+
+type DuplicateUserTurn = {
+  promptToken: string;
+  count: number;
+};
+
+type Issue2603Analysis = {
+  chatEvents: CompactChatEvent[];
+  emptyFinalsForSubmittedRuns: CompactChatEvent[];
+  uncorrelatedReplies: UncorrelatedReply[];
+  duplicateUserTurns: DuplicateUserTurn[];
+};
+
+type LiveIssue2603Trace = Issue2603Trace & { error?: string };
+
+type ExecStringOptions = Omit<ExecFileSyncOptionsWithStringEncoding, "encoding" | "stdio">;
+
+function textFromContent(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
@@ -31,13 +94,14 @@ function textFromContent(content) {
     .join("\n");
 }
 
-function textFromMessage(message) {
+function textFromMessage(message: unknown): string {
   if (!message || typeof message !== "object") return "";
-  if (typeof message.text === "string") return message.text;
-  return textFromContent(message.content);
+  const record = message as ChatMessage;
+  if (typeof record.text === "string") return record.text;
+  return textFromContent(record.content);
 }
 
-function compactChatEvents(events) {
+function compactChatEvents(events: GatewayEvent[]): CompactChatEvent[] {
   return events
     .filter((event) => event.event === "chat")
     .map((event) => ({
@@ -48,22 +112,26 @@ function compactChatEvents(events) {
     }));
 }
 
-function countBy(values) {
-  const counts = new Map();
+function countBy(values: string[]): Map<string, number> {
+  const counts = new Map<string, number>();
   for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
   return counts;
 }
 
-function analyzeIssue2603Trace({ sentRuns, events, historyMessages }) {
+function analyzeIssue2603Trace({ sentRuns, events, historyMessages }: Issue2603Trace): Issue2603Analysis {
   const submittedRunIds = new Set(sentRuns.map((entry) => entry.runId));
   const expectedRunByReplyToken = new Map(sentRuns.map((entry) => [entry.replyToken, entry.runId]));
   const chatEvents = compactChatEvents(events);
 
   const emptyFinalsForSubmittedRuns = chatEvents.filter(
-    (event) => event.state === "final" && submittedRunIds.has(event.runId) && !event.text.trim(),
+    (event) =>
+      event.state === "final" &&
+      typeof event.runId === "string" &&
+      submittedRunIds.has(event.runId) &&
+      !event.text.trim(),
   );
 
-  const uncorrelatedReplies = [];
+  const uncorrelatedReplies: UncorrelatedReply[] = [];
   for (const [replyToken, expectedRunId] of expectedRunByReplyToken) {
     for (const event of chatEvents) {
       if (!event.text.includes(replyToken)) continue;
@@ -99,7 +167,7 @@ function analyzeIssue2603Trace({ sentRuns, events, historyMessages }) {
   };
 }
 
-function buildFailureSummary(analysis) {
+function buildFailureSummary(analysis: Issue2603Analysis): string {
   return JSON.stringify(
     {
       expectations: ISSUE_2603_FIX_EXPECTATIONS,
@@ -113,7 +181,7 @@ function buildFailureSummary(analysis) {
   );
 }
 
-const capturedIssue2603Trace = {
+const capturedIssue2603Trace: Issue2603Trace = {
   sentRuns: [
     {
       promptToken: "A2603",
@@ -215,7 +283,7 @@ const capturedIssue2603Trace = {
   ],
 };
 
-function execOpenShell(args, options = {}) {
+function execOpenShell(args: string[], options: ExecStringOptions = {}): string {
   return execFileSync("openshell", args, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
@@ -223,14 +291,14 @@ function execOpenShell(args, options = {}) {
   });
 }
 
-function execInSandbox(sandboxName, command, options = {}) {
+function execInSandbox(sandboxName: string, command: string, options: ExecStringOptions = {}): string {
   return execOpenShell(
     ["sandbox", "exec", "--name", sandboxName, "--", "sh", "-lc", command],
     options,
   );
 }
 
-function ensureGatewayRunning(sandboxName) {
+function ensureGatewayRunning(sandboxName: string): void {
   const command = [
     "curl -fsS http://127.0.0.1:18789/health >/dev/null 2>&1",
     "|| (nohup openclaw gateway run --port 18789 >/tmp/openclaw-issue2603-gateway.log 2>&1 & sleep 10)",
@@ -239,7 +307,7 @@ function ensureGatewayRunning(sandboxName) {
   execInSandbox(sandboxName, command, { timeout: 30_000 });
 }
 
-function buildLiveReproScript() {
+function buildLiveReproScript(): string {
   return (
     String.raw`
 const { randomUUID } = require("node:crypto");
@@ -366,7 +434,7 @@ ws.on("open", async () => {
   );
 }
 
-function runLiveIssue2603Repro(sandboxName) {
+function runLiveIssue2603Repro(sandboxName: string): LiveIssue2603Trace {
   ensureGatewayRunning(sandboxName);
 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-issue2603-"));
@@ -386,7 +454,7 @@ function runLiveIssue2603Repro(sandboxName) {
   );
   const resultLine = output.split(/\r?\n/).find((line) => line.startsWith("ISSUE2603_RESULT "));
   if (!resultLine) throw new Error(`live repro did not emit ISSUE2603_RESULT. Output:\n${output}`);
-  return JSON.parse(resultLine.slice("ISSUE2603_RESULT ".length));
+  return JSON.parse(resultLine.slice("ISSUE2603_RESULT ".length)) as LiveIssue2603Trace;
 }
 
 describe("OpenClaw TUI chat correlation regression (#2603)", () => {
