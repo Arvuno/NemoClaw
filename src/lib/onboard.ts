@@ -6786,6 +6786,9 @@ async function setupNim(
           model = sel.name;
 
           // Ensure Docker is logged in to NGC registry before pulling NIM images.
+          // The key is also forwarded into the NIM container at runtime (#3333),
+          // so we hoist it out of the not-logged-in branch.
+          let ngcApiKey: string | null = null;
           if (!nim.isNgcLoggedIn()) {
             if (isNonInteractive()) {
               console.error(
@@ -6813,16 +6816,27 @@ async function setupNim(
                 process.exit(1);
               }
             }
+            ngcApiKey = ngcKey;
+          } else {
+            // Docker is already logged in, but NIM still needs the key in its
+            // container env to download model manifests. Reuse an env-provided
+            // key when present; otherwise let startNimContainerByName surface
+            // the warning so we don't double-prompt or fail before the
+            // container had a chance to load.
+            ngcApiKey = getCredential("NGC_API_KEY") || getCredential("NVIDIA_API_KEY");
           }
 
           console.log(`  Pulling NIM image for ${model}...`);
           nim.pullNimImage(model);
 
           console.log("  Starting NIM container...");
-          nimContainer = nim.startNimContainerByName(nim.containerName(GATEWAY_NAME), model);
+          const nimContainerNameLocal = nim.containerName(GATEWAY_NAME);
+          nimContainer = nim.startNimContainerByName(nimContainerNameLocal, model, undefined, {
+            ngcApiKey: ngcApiKey ?? undefined,
+          });
 
           console.log("  Waiting for NIM to become healthy...");
-          if (!nim.waitForNimHealth()) {
+          if (!nim.waitForNimHealth(undefined, undefined, { container: nimContainerNameLocal })) {
             console.error("  NIM failed to start. Falling back to cloud API.");
             model = null;
             nimContainer = null;

@@ -7,6 +7,13 @@ export function dockerStop(containerName: string, opts: DockerRunOptions = {}) {
   return dockerRun(["stop", containerName], opts);
 }
 
+export function dockerLogs(
+  containerName: string,
+  { tail = 30, opts = {} }: { tail?: number; opts?: DockerCaptureOptions } = {},
+): string {
+  return dockerCapture(["logs", "--tail", String(tail), containerName], opts);
+}
+
 export function dockerRm(containerName: string, opts: DockerRunOptions = {}) {
   return dockerRun(["rm", containerName], opts);
 }
