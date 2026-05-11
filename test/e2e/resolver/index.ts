@@ -160,11 +160,32 @@ function flattenState(
  */
 function probesFromEnvOnly(): ProbeResults {
   const probes: ProbeResults = {};
+  // 1. Prefix-based overrides: E2E_PROBE_OVERRIDE_<KEY>=<value> where <KEY>
+  //    maps underscores to dots (e.g. GATEWAY_HEALTH -> gateway.health).
+  //    This works for simple keys but cannot express underscores inside a
+  //    single segment.
   const prefix = "E2E_PROBE_OVERRIDE_";
   for (const [envKey, value] of Object.entries(process.env)) {
     if (!envKey.startsWith(prefix) || value === undefined) continue;
     const key = envKey.slice(prefix.length).toLowerCase().replace(/_/g, ".");
     probes[key] = coerceProbeValue(value);
+  }
+  // 2. JSON escape hatch for keys with embedded underscores (e.g.
+  //    `security.policy_engine`). Later overrides win over (1).
+  const overridesJson = process.env.E2E_PROBE_OVERRIDES_JSON;
+  if (overridesJson) {
+    try {
+      const parsed = JSON.parse(overridesJson);
+      if (parsed && typeof parsed === "object") {
+        for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+          probes[k] = typeof v === "string" ? coerceProbeValue(v) : (v as ProbeValue);
+        }
+      }
+    } catch (err) {
+      process.stderr.write(
+        `resolver: E2E_PROBE_OVERRIDES_JSON parse error: ${(err as Error).message}\n`,
+      );
+    }
   }
   return probes;
 }

@@ -5,14 +5,20 @@
 # E2E scenario runner entrypoint.
 #
 # Usage:
-#   bash test/e2e/run-scenario.sh <scenario-id> [--plan-only] [--dry-run]
+#   bash test/e2e/run-scenario.sh <scenario-id> [--plan-only|--validate-only|--dry-run]
 #
 # Flags:
-#   --plan-only   Resolve metadata and print the plan only. Writes
-#                 ${E2E_CONTEXT_DIR:-.e2e}/plan.json for artifact upload.
-#   --dry-run     (reserved) Run orchestration with real side effects
-#                 replaced by trace-logged stubs. Sets E2E_DRY_RUN=1 for
-#                 helpers. Full dry-run orchestration lands in later phases.
+#   --plan-only      Resolve metadata and print the plan only. Writes
+#                    ${E2E_CONTEXT_DIR:-.e2e}/plan.json for artifact upload.
+#   --validate-only  Run the expected-state validator against the current
+#                    context.env without running install/onboard/suites.
+#                    Emits probe results JSON to stdout and writes
+#                    ${E2E_CONTEXT_DIR}/expected-state-report.json. Used by
+#                    the parity-compare workflow to collect per-assertion
+#                    probe results. Mutually exclusive with --plan-only.
+#   --dry-run        (reserved) Run orchestration with real side effects
+#                    replaced by trace-logged stubs. Sets E2E_DRY_RUN=1 for
+#                    helpers. Full dry-run orchestration lands in later phases.
 #
 # Environment:
 #   E2E_CONTEXT_DIR  Override the scenario artifact directory
@@ -25,11 +31,12 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 SCENARIO_ID=""
 PLAN_ONLY=0
+VALIDATE_ONLY=0
 DRY_RUN=0
 
 usage() {
   cat >&2 <<'USAGE'
-Usage: bash test/e2e/run-scenario.sh <scenario-id> [--plan-only] [--dry-run]
+Usage: bash test/e2e/run-scenario.sh <scenario-id> [--plan-only|--validate-only|--dry-run]
 USAGE
 }
 
@@ -37,6 +44,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --plan-only)
       PLAN_ONLY=1
+      shift
+      ;;
+    --validate-only)
+      VALIDATE_ONLY=1
       shift
       ;;
     --dry-run)
@@ -71,6 +82,12 @@ if [[ -z "${SCENARIO_ID}" ]]; then
   exit 2
 fi
 
+if [[ "${PLAN_ONLY}" -eq 1 && "${VALIDATE_ONLY}" -eq 1 ]]; then
+  echo "run-scenario: --plan-only and --validate-only are mutually exclusive" >&2
+  usage
+  exit 2
+fi
+
 export E2E_CONTEXT_DIR="${E2E_CONTEXT_DIR:-${REPO_ROOT}/.e2e}"
 mkdir -p "${E2E_CONTEXT_DIR}"
 
@@ -100,6 +117,20 @@ run_resolver() {
 run_resolver plan "${SCENARIO_ID}" --context-dir "${E2E_CONTEXT_DIR}"
 
 if [[ "${PLAN_ONLY}" -eq 1 ]]; then
+  exit 0
+fi
+
+# --validate-only: assume setup has already completed. Skip install /
+# onboard / suite execution and dispatch the expected-state validator
+# using probes resolved from E2E_PROBE_OVERRIDE_* env vars. Emits the
+# probe results JSON report to stdout and writes it to
+# ${E2E_CONTEXT_DIR}/expected-state-report.json.
+if [[ "${VALIDATE_ONLY}" -eq 1 ]]; then
+  validate_args=("${SCENARIO_ID}" --context-dir "${E2E_CONTEXT_DIR}")
+  if ! run_resolver validate-state "${validate_args[@]}"; then
+    echo "run-scenario: --validate-only: expected-state validation failed" >&2
+    exit 3
+  fi
   exit 0
 fi
 

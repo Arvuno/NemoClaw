@@ -204,13 +204,15 @@ describe("Phase 1.B sandbox-exec helper", () => {
   });
 
   it("sandbox_exec_should_dry_run_short_circuit_when_e2e_dry_run_set", () => {
+    // Use a PATH that has bash itself but no nemoclaw — dry-run must
+    // short-circuit before the CLI lookup.
     const r = runBash(
       `
         set -euo pipefail
         . "${LIB}/sandbox-exec.sh"
         e2e_sandbox_exec sb1 -- rm -rf /
       `,
-      { E2E_DRY_RUN: "1", PATH: "/does-not-exist" },
+      { E2E_DRY_RUN: "1", PATH: "/usr/bin:/bin" },
     );
     expect(r.status, r.stderr).toBe(0);
     expect(r.stdout + r.stderr).toMatch(/dry[- ]run/i);

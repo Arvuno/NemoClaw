@@ -7,6 +7,16 @@
 # Applies the same defaults historically set ad-hoc at the top of each
 # `test/e2e/test-*.sh` script. Safe to source from any scenario runner.
 
+# Auto-source the logging helpers so every consumer of env.sh gets
+# e2e_section / e2e_info / e2e_pass / e2e_fail for free. Scenario runner
+# and every suite step script sources env.sh — this keeps the logging
+# contract DRY (reuse category #1).
+_E2E_ENV_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${_E2E_ENV_LIB_DIR}/logging.sh" ]]; then
+  # shellcheck source=logging.sh
+  . "${_E2E_ENV_LIB_DIR}/logging.sh"
+fi
+
 e2e_env_apply_noninteractive() {
   export NEMOCLAW_NON_INTERACTIVE=1
   export DEBIAN_FRONTEND=noninteractive

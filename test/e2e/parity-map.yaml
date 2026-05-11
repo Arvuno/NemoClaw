@@ -1,0 +1,138 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Parity map: legacy `pass "..."` / `fail "..."` strings → scenario-side
+# assertion ids. Drives `scripts/e2e/compare-parity.sh` in the
+# `e2e-parity-compare` workflow.
+#
+# Schema (per-script):
+#   scripts:
+#     <legacy-script-name>.sh:
+#       scenario: <migrated-scenario-id>
+#       assertions:
+#         - legacy: "<exact pass/fail string from the legacy script>"
+#           id: <scenario.side.assertion.id>
+#           flaky: true   # optional; treats divergence as both-pass-or-both-fail
+#
+# Seeded with one entry per legacy script (Phase 1). Each migration phase
+# (2–12) appends its per-assertion mappings. Phase 13 gate-checks that
+# every legacy `pass`/`fail` string has a mapping.
+
+scripts:
+  test-cloud-inference-e2e.sh:
+    scenario: ""
+    assertions: []
+  test-cloud-onboard-e2e.sh:
+    scenario: ""
+    assertions: []
+  test-credential-migration.sh:
+    scenario: ""
+    assertions: []
+  test-credential-sanitization.sh:
+    scenario: ""
+    assertions: []
+  test-deployment-services.sh:
+    scenario: ""
+    assertions: []
+  test-device-auth-health.sh:
+    scenario: ""
+    assertions: []
+  test-diagnostics.sh:
+    scenario: ""
+    assertions: []
+  test-docs-validation.sh:
+    scenario: ""
+    assertions: []
+  test-double-onboard.sh:
+    scenario: ""
+    assertions: []
+  test-full-e2e.sh:
+    scenario: ""
+    assertions: []
+  test-gpu-double-onboard.sh:
+    scenario: ""
+    assertions: []
+  test-gpu-e2e.sh:
+    scenario: ""
+    assertions: []
+  test-hermes-discord-e2e.sh:
+    scenario: ""
+    assertions: []
+  test-hermes-e2e.sh:
+    scenario: ""
+    assertions: []
+  test-hermes-slack-e2e.sh:
+    scenario: ""
+    assertions: []
+  test-inference-routing.sh:
+    scenario: ""
+    assertions: []
+  test-issue-2478-crash-loop-recovery.sh:
+    scenario: ""
+    assertions: []
+  test-kimi-inference-compat.sh:
+    scenario: ""
+    assertions: []
+  test-launchable-smoke.sh:
+    scenario: ""
+    assertions: []
+  test-messaging-compatible-endpoint.sh:
+    scenario: ""
+    assertions: []
+  test-messaging-providers.sh:
+    scenario: ""
+    assertions: []
+  test-network-policy.sh:
+    scenario: ""
+    assertions: []
+  test-ollama-auth-proxy-e2e.sh:
+    scenario: ""
+    assertions: []
+  test-onboard-repair.sh:
+    scenario: ""
+    assertions: []
+  test-onboard-resume.sh:
+    scenario: ""
+    assertions: []
+  test-overlayfs-autofix.sh:
+    scenario: ""
+    assertions: []
+  test-rebuild-hermes.sh:
+    scenario: ""
+    assertions: []
+  test-rebuild-openclaw.sh:
+    scenario: ""
+    assertions: []
+  test-runtime-overrides.sh:
+    scenario: ""
+    assertions: []
+  test-sandbox-operations.sh:
+    scenario: ""
+    assertions: []
+  test-sandbox-rebuild.sh:
+    scenario: ""
+    assertions: []
+  test-sandbox-survival.sh:
+    scenario: ""
+    assertions: []
+  test-shields-config.sh:
+    scenario: ""
+    assertions: []
+  test-skill-agent-e2e.sh:
+    scenario: ""
+    assertions: []
+  test-snapshot-commands.sh:
+    scenario: ""
+    assertions: []
+  test-spark-install.sh:
+    scenario: ""
+    assertions: []
+  test-telegram-injection.sh:
+    scenario: ""
+    assertions: []
+  test-token-rotation.sh:
+    scenario: ""
+    assertions: []
+  test-upgrade-stale-sandbox.sh:
+    scenario: ""
+    assertions: []

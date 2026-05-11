@@ -197,6 +197,11 @@ describe("run-scenario --validate-only flag", () => {
             E2E_PROBE_OVERRIDE_INFERENCE_MODE: "gateway-routed",
             E2E_PROBE_OVERRIDE_CREDENTIALS_EXPECTED: "present",
             E2E_PROBE_OVERRIDE_CREDENTIALS_STORAGE: "gateway-managed",
+            E2E_PROBE_OVERRIDE_SECURITY_SHIELDS: "supported",
+            // `security.policy_engine` has an embedded underscore, which the
+            // E2E_PROBE_OVERRIDE_* convention cannot express. Use the
+            // JSON escape hatch for this one.
+            E2E_PROBE_OVERRIDES_JSON: JSON.stringify({ "security.policy_engine": "supported" }),
           },
           encoding: "utf8",
           timeout: Number(process.env.E2E_SPAWN_TIMEOUT_MS ?? 60_000),
