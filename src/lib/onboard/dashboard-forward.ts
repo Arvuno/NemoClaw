@@ -30,6 +30,12 @@ export type DashboardForwardDeps = {
 };
 
 const CONTROL_UI_PORT = DASHBOARD_PORT;
+const ANSI_RE = /\x1B(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\)|[@-_])/g;
+
+function stripAnsi(value: string): string {
+  return value.replace(ANSI_RE, "");
+}
+
 
 // Parses `openshell forward list` output and returns the sandbox currently
 // owning `portToStop`, or null. Exported for unit testing — see #2169.
@@ -54,7 +60,8 @@ export function findForwardEntry(
   port: string,
 ): ForwardEntry | null {
   if (!forwardListOutput) return null;
-  for (const line of forwardListOutput.split("\n")) {
+  for (const rawLine of forwardListOutput.split("\n")) {
+    const line = stripAnsi(rawLine);
     if (/^\s*SANDBOX\s/i.test(line)) continue;
     const parts = line.trim().split(/\s+/);
     if (parts.length < 3 || parts[2] !== port) continue;
@@ -73,7 +80,8 @@ export function isLiveForwardStatus(status: string): boolean {
 export function getRunningForwardPorts(forwardListOutput: string | null | undefined): string[] {
   const ports = new Set<string>();
   if (!forwardListOutput) return [];
-  for (const line of forwardListOutput.split("\n")) {
+  for (const rawLine of forwardListOutput.split("\n")) {
+    const line = stripAnsi(rawLine);
     if (/^\s*SANDBOX\s/i.test(line)) continue;
     const parts = line.trim().split(/\s+/);
     if (parts.length < 5 || !/^\d+$/.test(parts[2])) continue;
@@ -93,7 +101,8 @@ export function getRunningForwardPorts(forwardListOutput: string | null | undefi
 export function getOccupiedPorts(forwardListOutput: string | null): Map<string, string> {
   const occupied = new Map<string, string>();
   if (!forwardListOutput) return occupied;
-  for (const line of forwardListOutput.split("\n")) {
+  for (const rawLine of forwardListOutput.split("\n")) {
+    const line = stripAnsi(rawLine);
     if (/^\s*SANDBOX\s/i.test(line)) continue;
     const parts = line.trim().split(/\s+/);
     if (parts.length < 3 || !/^\d+$/.test(parts[2])) continue;
