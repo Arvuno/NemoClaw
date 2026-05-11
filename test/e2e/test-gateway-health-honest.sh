@@ -34,7 +34,7 @@
 #
 # Related: #3111, PR #3001
 
-set -uo pipefail
+set -euo pipefail
 
 LOG_FILE="/tmp/nemoclaw-e2e-gateway-health-honest.log"
 START_LOG="/tmp/nemoclaw-e2e-gateway-health-honest-start.log"
@@ -97,7 +97,9 @@ cleanup_pid() {
 
 cleanup() {
   set +e
-  [ -f "$PID_FILE" ] && CHILD_PID="$(tr -d '[:space:]' <"$PID_FILE")"
+  if [ -f "$PID_FILE" ]; then
+    CHILD_PID="$(tr -d '[:space:]' <"$PID_FILE")"
+  fi
   cleanup_pid "$CHILD_PID"
   openshell gateway remove nemoclaw >/dev/null 2>&1 || true
   rm -f "$PID_FILE" "$SABOTAGE_BIN"
@@ -166,6 +168,16 @@ set -e
 
 info "node exit code: ${NODE_EXIT}"
 
+# ── Pre-assertion: prove the sabotage path was actually exercised ───
+# Without this guard, an unrelated setup failure (module-not-found,
+# missing env, stale dist/, etc.) could produce a log that happens to
+# lack the 'healthy' string and thereby false-green the primary
+# assertion. We require positive evidence that the sabotage shim ran.
+if ! grep -qE 'GLIBC_2\.3(8|9)|openshell-gateway-sabotage' "$START_LOG"; then
+  fail "Sabotage markers (GLIBC_2.38/2.39 or 'openshell-gateway-sabotage') not observed in start log — the test may have failed before the sabotaged gateway was invoked, so the assertions below cannot be trusted. Inspect the start log above for the real cause."
+fi
+pass "Sabotage shim was invoked as expected (GLIBC/sabotage markers present in log)"
+
 # ── Primary assertion ────────────────────────────────────────────────
 # This is the bug from #3111. Onboard printed "healthy" while the child
 # process was a crashed zombie and had never served a real connection.
@@ -185,7 +197,11 @@ fi
 pass "startGateway() did not resolve successfully with a crashed binary (node exit=${NODE_EXIT})"
 
 # ── Corroborating assertion 2: user-visible failure surfaced ─────────
-if ! grep -qiE "failed to start|gateway.*(crash|exit|error)|not found|__onboard_startGateway_threw__" "$START_LOG"; then
+# Deliberately narrow: excludes generic 'not found' because an unrelated
+# module-not-found (e.g. stale dist/) would satisfy the match without
+# proving the gateway-failure code path was exercised. The Pre-assertion
+# above already proves the sabotage ran, but this stays narrow anyway.
+if ! grep -qiE "failed to start|gateway.*(crash|exit|error)|__onboard_startGateway_threw__" "$START_LOG"; then
   fail "Onboard did not surface any gateway failure indicator to the user"
 fi
 pass "Onboard surfaced a user-visible gateway failure message"
