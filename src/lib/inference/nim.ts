@@ -440,7 +440,7 @@ export function waitForNimHealth(
       });
       if (state && state !== "running" && state !== "created" && state !== "restarting") {
         console.error(`  NIM container ${container} is ${state}; aborting health wait.`);
-        const tail = dockerLogs(container, { tail: 30, opts: { ignoreError: true } });
+        const tail = dockerLogs(container, { tail: 30 });
         if (tail) {
           console.error("  Last container output:");
           for (const line of tail.split("\n")) {
