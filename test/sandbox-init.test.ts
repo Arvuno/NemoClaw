@@ -405,6 +405,66 @@ EOF
     });
   });
 
+  describe("init_step_down_prefixes", () => {
+    it("falls back to gosu when setpriv is unavailable", () => {
+      // Source-time init runs before our test body, so re-run it with a
+      // PATH that hides setpriv and capsh to exercise the fallback.
+      const { stdout, stderr } = runWithLib(
+        [
+          "export PATH=/nonexistent",
+          "init_step_down_prefixes 2>&1",
+          "printf '%s\\n' \"${STEP_DOWN_PREFIX_SANDBOX[@]}\"",
+          'echo "--"',
+          "printf '%s\\n' \"${STEP_DOWN_PREFIX_GATEWAY[@]}\"",
+        ].join("\n"),
+      );
+      const combined = `${stdout}\n${stderr}`;
+      expect(combined).toContain("falling back to gosu");
+      expect(stdout).toContain("gosu\nsandbox");
+      expect(stdout).toContain("gosu\ngateway");
+    });
+
+    it("uses setpriv with the issue-3280 bounding-set drop when available", () => {
+      const { stdout } = runWithLib(
+        [
+          "TMP=$(mktemp -d)",
+          'cat >"$TMP/setpriv" <<\'STUB\'',
+          "#!/bin/sh",
+          "exit 0",
+          "STUB",
+          'cat >"$TMP/capsh" <<\'STUB\'',
+          "#!/bin/sh",
+          '[ "$1" = "--has-p=cap_setpcap" ] && exit 0',
+          "exit 1",
+          "STUB",
+          'chmod +x "$TMP/setpriv" "$TMP/capsh"',
+          'export PATH="$TMP:$PATH"',
+          "init_step_down_prefixes",
+          "printf '%s\\n' \"${STEP_DOWN_PREFIX_SANDBOX[@]}\"",
+          'echo "--"',
+          "printf '%s\\n' \"${STEP_DOWN_PREFIX_GATEWAY[@]}\"",
+          'rm -rf "$TMP"',
+        ].join("\n"),
+      );
+      // setpriv prefix must include --reuid/--regid for the user and the
+      // bounding-set drop covering the five load-bearing caps from #3280.
+      expect(stdout).toContain("setpriv");
+      expect(stdout).toContain("--reuid=sandbox");
+      expect(stdout).toContain("--regid=sandbox");
+      expect(stdout).toContain("--reuid=gateway");
+      expect(stdout).toContain("--regid=gateway");
+      // setpriv expects unprefixed cap names (per `setpriv --list`),
+      // unlike capsh which uses cap_*. Keep these in sync with the
+      // STEP_DOWN_PREFIX_* arrays in sandbox-init.sh.
+      expect(stdout).toContain("--bounding-set=-setuid,-setgid,-fowner,-chown,-kill");
+      // Each prefix array must end with '--' so setpriv stops parsing
+      // its own flags before the caller's target command. printf splits
+      // array elements onto separate lines, so each prefix's last element
+      // is a line containing just '--'.
+      expect(stdout.match(/^--$/gm)?.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
   describe("validate_config_symlinks", () => {
     let workDir: string;
 
@@ -606,6 +666,8 @@ EOF
       const src = readFileSync(join(import.meta.dirname, "../agents/hermes/start.sh"), "utf-8");
       expect(src).toContain('HERMES_HOME="${HERMES_DIR}"');
       expect(src).toContain("Messaging egress goes directly through OpenShell");
+      expect(src).toContain('"${STEP_DOWN_PREFIX_GATEWAY[@]}" sh -c');
+      expect(src).not.toContain("gosu gateway sh -c");
       expect(src).not.toContain("DECODE_PROXY_PORT=3129");
       expect(src).not.toContain("/usr/local/bin/nemoclaw-decode-proxy");
       expect(src).not.toContain('HTTPS_PROXY="http://127.0.0.1:${DECODE_PROXY_PORT}"');

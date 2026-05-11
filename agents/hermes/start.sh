@@ -626,7 +626,7 @@ if [ "$(id -u)" -ne 0 ]; then
   exit $?
 fi
 
-# ── Root path (full privilege separation via gosu) ─────────────
+# ── Root path (full privilege separation via setpriv) ──────────
 
 verify_config_integrity "${HERMES_DIR}" "${HERMES_HASH_FILE}"
 refresh_hermes_provider_placeholders
@@ -634,7 +634,7 @@ install_configure_guard
 configure_messaging_channels
 
 if [ ${#NEMOCLAW_CMD[@]} -gt 0 ]; then
-  exec gosu sandbox "${NEMOCLAW_CMD[@]}"
+  exec "${STEP_DOWN_PREFIX_SANDBOX[@]}" "${NEMOCLAW_CMD[@]}"
 fi
 
 # SECURITY: Protect gateway log from sandbox user tampering
@@ -646,7 +646,7 @@ validate_tmp_permissions
 
 # Start Hermes gateway. Messaging egress goes directly through OpenShell.
 HERMES_HOME="${HERMES_DIR}" \
-  nohup gosu gateway sh -c 'umask 0007; exec "$@" >/tmp/gateway.log 2>&1' sh "$HERMES" gateway run &
+  nohup "${STEP_DOWN_PREFIX_GATEWAY[@]}" sh -c 'umask 0007; exec "$@" >/tmp/gateway.log 2>&1' sh "$HERMES" gateway run &
 GATEWAY_PID=$!
 echo "[gateway] hermes gateway launched as 'gateway' user (pid $GATEWAY_PID)" >&2
 start_gateway_log_stream

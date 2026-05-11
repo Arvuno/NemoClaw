@@ -1674,6 +1674,95 @@ run_onboard() {
   fi
 }
 
+# Make sure Docker is installed and the current user can run it without
+# sudo. If we install Docker or add the user to the docker group, exit with
+# instructions to relogin/newgrp — Linux only loads group membership at
+# login, so the rest of this script (onboard, etc.) would fail otherwise.
+# Skipped on macOS (Docker Desktop) and inside WSL (host-managed Docker).
+ensure_docker() {
+  case "$(uname -s)" in
+    Darwin | MINGW* | MSYS*) return 0 ;;
+  esac
+  if [ -n "${WSL_DISTRO_NAME:-}" ] || [ -n "${WSL_INTEROP:-}" ]; then
+    return 0
+  fi
+  # Fast path: docker info works → already set up (root, or already-active group).
+  if docker info >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local needs_group_refresh=0
+
+  if ! command -v docker >/dev/null 2>&1; then
+    info "Docker is not installed."
+    info "The next step uses sudo to install Docker system-wide via the official convenience script. You may be prompted for your password."
+    local docker_tmp
+    docker_tmp="$(mktemp)"
+    if ! curl -fsSL https://get.docker.com -o "$docker_tmp"; then
+      rm -f "$docker_tmp"
+      error "Failed to download the Docker convenience script from https://get.docker.com"
+    fi
+    verify_downloaded_script "$docker_tmp" "Docker installer"
+    if ! sudo sh "$docker_tmp"; then
+      rm -f "$docker_tmp"
+      error "Docker install failed. Install Docker manually and re-run."
+    fi
+    rm -f "$docker_tmp"
+  fi
+
+  if command -v systemctl >/dev/null 2>&1 \
+    && ! sudo -n systemctl is-active --quiet docker 2>/dev/null \
+    && ! systemctl is-active --quiet docker 2>/dev/null; then
+    info "The Docker daemon is not running."
+    info "The next step uses sudo to enable and start the docker.service unit. You may be prompted for your password."
+    if ! sudo systemctl enable --now docker 2>/dev/null; then
+      warn "Could not enable docker.service — will verify daemon accessibility below."
+    fi
+  fi
+
+  # Root can use the docker socket without being in the docker group, so
+  # skip the group setup entirely and just verify the daemon is reachable.
+  if [ "$(id -u)" -eq 0 ]; then
+    if ! docker info >/dev/null 2>&1; then
+      error "Docker is installed but not reachable. Try: systemctl start docker"
+    fi
+    return 0
+  fi
+
+  # Use the effective UID's account name rather than $USER, which can be
+  # unset, stale, or overridden by env wrappers.
+  local current_user
+  current_user="$(id -un)"
+
+  # Persisted group membership (NSS / /etc/group). Determines whether we
+  # need to run usermod.
+  if ! id -nG "$current_user" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+    info "Your user '$current_user' is not in the docker group."
+    info "The next step uses sudo to add you to the group so docker works without sudo. You may be prompted for your password."
+    sudo usermod -aG docker "$current_user"
+    needs_group_refresh=1
+  fi
+
+  # Active group list of the current shell (set at login, refreshed only by
+  # new login or `newgrp`). If docker isn't here yet, this session can't
+  # talk to /var/run/docker.sock even though NSS says we're a member.
+  if ! id -nG 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+    needs_group_refresh=1
+  fi
+
+  if [ "$needs_group_refresh" = "1" ]; then
+    printf "\n"
+    info "Docker group membership is not active in this shell yet. To finish:"
+    info "  1) Run: newgrp docker   (or log out and log back in)"
+    info "  2) Re-run: curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash"
+    exit 0
+  fi
+
+  if ! docker info >/dev/null 2>&1; then
+    error "Docker is installed but not reachable. Try: sudo systemctl start docker"
+  fi
+}
+
 # Detect DGX Spark / DGX Station from firmware (DMI first, devicetree fallback).
 # Echoes "DGX Spark", "DGX Station", or empty. Used to gate the express
 # install prompt; only platforms with a known sensible default are offered.
@@ -1813,6 +1902,8 @@ main() {
   # a real terminal are different: stdin is the script pipe, but /dev/tty can
   # still collect acceptance before Node.js or the CLI are installed.
   preflight_usage_notice_prompt
+
+  ensure_docker
 
   # Offer express install on supported platforms (DGX Spark / Station). Runs
   # AFTER the third-party notice so the user has explicitly accepted the
