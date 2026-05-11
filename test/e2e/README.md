@@ -1,164 +1,74 @@
 <!-- SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved. -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# E2E Setup Scenario Matrix
+# NemoClaw E2E
 
-This directory hosts NemoClaw's end-to-end tests, organized around
-**setup scenarios** rather than per-workflow shell scripts.
-
-## Core model
+End-to-end tests organized around **setup scenarios** rather than
+one-off shell scripts. A scenario declares *how you got to a working
+NemoClaw* (platform + install + runtime + onboarding); a scenario
+resolves to an **expected state** contract; once that state validates,
+one or more **suites** run functional assertions against it.
 
 ```text
-setup scenario → expected state config → suite sequence
+setup scenario → expected state → suite sequence
 ```
 
-- A **setup scenario** describes how a user reaches a completed NemoClaw
-  environment: platform, install method, runtime prerequisites, and
-  onboarding choices. Defined in [`scenarios.yaml`](scenarios.yaml).
-- An **expected state config** describes the observable contract the
-  completed environment should satisfy. Defined in
-  [`expected-states.yaml`](expected-states.yaml). Multiple scenarios can
-  share one expected state.
-- A **functional suite** is an ordered list of validation scripts run
-  after setup completes and the expected state validates. Defined in
-  [`suites.yaml`](suites.yaml). Suites consume `.e2e/context.env` and do
-  not re-run install or onboarding.
+The declarative sources of truth live in three files — read these
+first, they are short and deliberately not redundant with prose:
 
-## Scenario catalog (current)
+- [`scenarios.yaml`](scenarios.yaml) — platforms, installs, runtimes,
+  onboarding choices, and the concrete scenarios that combine them.
+- [`expected-states.yaml`](expected-states.yaml) — reusable structural
+  contracts (gateway health, sandbox status, inference routing, etc.).
+- [`suites.yaml`](suites.yaml) — ordered validation steps, each with a
+  `requires_state` predicate.
 
-| Scenario | Platform | Install | Runtime | Onboarding | Expected state |
-|---|---|---|---|---|---|
-| `ubuntu-repo-cloud-openclaw` | `ubuntu-local` | `repo-current` | `docker-running` | `cloud-openclaw` | `cloud-openclaw-ready` |
-| `ubuntu-repo-cloud-hermes` | `ubuntu-local` | `repo-current` | `docker-running` | `cloud-hermes` | `cloud-hermes-ready` |
-| `gpu-repo-local-ollama-openclaw` | `gpu-runner` | `repo-current` | `gpu-docker-cdi` | `local-ollama-openclaw` | `local-ollama-openclaw-ready` |
-| `macos-repo-cloud-openclaw` | `macos-local` | `repo-current` | `docker-running` | `cloud-openclaw` | `cloud-openclaw-ready` |
-| `wsl-repo-cloud-openclaw` | `wsl-local` | `repo-current` | `docker-running` | `cloud-openclaw` | `cloud-openclaw-ready` |
-| `brev-launchable-cloud-openclaw` | `brev-launchable` | `launchable` | `docker-running` | `cloud-openclaw` | `cloud-openclaw-ready` |
-| `ubuntu-no-docker-preflight-negative` | `ubuntu-local` | `repo-current` | `docker-missing` | `cloud-openclaw` | `preflight-failure-no-sandbox` |
+## How to run
 
-The matrix is deliberately not Cartesian — each scenario exists because a
-real current coverage path needs it. Additional scenarios (e.g. onboard
-resume, rebuild-preserves-presets) land incrementally; see
-[`suites/*/README.md`](suites) for the roadmap informed by the UAT / NV QA
-bug hotspot analysis.
+```bash
+bash test/e2e/run-scenario.sh <id> --plan-only       # resolve + print plan, no side effects
+bash test/e2e/run-scenario.sh <id> --dry-run         # helpers short-circuit with trace
+bash test/e2e/run-scenario.sh <id> --validate-only   # assume setup done; validate expected state
+bash test/e2e/run-scenario.sh <id>                   # full live run
+bash test/e2e/run-suites.sh <suite-id> [<suite-id>…]
+bash test/e2e/coverage-report.sh                     # Markdown matrix of scenario × suite
+```
 
-## File layout
+Override the runtime context dir with `E2E_CONTEXT_DIR=<path>` (default
+`.e2e/`, gitignored). The scenario runner and suites communicate only
+through `$E2E_CONTEXT_DIR/context.env` — suites do not rediscover
+setup state.
+
+## Where things live
 
 ```text
 test/e2e/
-  scenarios.yaml          # platforms, installs, runtimes, onboarding, scenarios
-  expected-states.yaml    # reusable expected state contracts
-  suites.yaml             # ordered suite definitions
-  README.md               # this file
-
-  run-scenario.sh         # main entry; resolve → plan → setup → validate
-  run-suites.sh           # suite step runner
-  coverage-report.sh      # Markdown coverage matrix
-
-  resolver/               # TypeScript plan + validator + coverage
-    index.ts load.ts plan.ts schema.ts validator.ts coverage.ts
-    js-yaml.d.ts
-
-  lib/                    # shared shell scaffolding, organized by role
-    artifacts.sh          # best-effort artifact collection
-    cleanup.sh            # trap helpers (wraps sandbox-teardown.sh)
-    context.sh            # .e2e/context.env key/value store
-    emit-context-from-plan.sh
-    env.sh                # non-interactive env + trace + dry-run
-    install-path-refresh.sh   # (existing helper; preserved)
-    sandbox-teardown.sh       # (existing helper; preserved)
-
-    setup/                # dimension dispatchers
-      install.sh          # e2e_install: repo-checkout | curl-install-script | ...
-      onboard.sh          # e2e_onboard: cloud-openclaw | cloud-hermes | ...
-
-    assert/               # outcome assertions
-      gateway-alive.sh
-      sandbox-alive.sh
-      # (fixtures for inference-works, no-credentials-leaked, policy-preset-applied
-      #  land with their first consuming suite.)
-
-    fixtures/             # reusable scenario fixtures (see README for roadmap)
-
-  suites/                 # functional suites, grouped by scenario area
-    smoke/                # baseline: cli, gateway, sandbox, shell
-    onboarding/           # onboarding lifecycle (Hermes today; more on the way)
-    inference/            # cloud, ollama-gpu, ollama-auth-proxy
-    security/             # credentials today; shields / rebuild-preserves-presets planned
-    platform/             # macos, wsl (spark planned)
-    # lifecycle/ sandbox/ messaging/ — dir + README committed; suites to land
+  scenarios.yaml / expected-states.yaml / suites.yaml   # declarative inputs
+  run-scenario.sh / run-suites.sh / coverage-report.sh  # entry points
+  resolver/        # TypeScript: load, plan, validate, coverage (invoked via tsx)
+  lib/             # shared shell helpers: context, env, cleanup, sandbox-exec, logging
+    setup/         # install + onboard dispatchers (one file per dimension value)
+    assert/        # outcome assertions (inference, credentials, policy, messaging)
+    fixtures/      # reusable stubs (fake-openai, fake-{telegram,discord,slack}, older-base-image)
+  suites/          # functional suites grouped by concern (smoke, onboarding, inference, …)
+  parity-map.yaml  # legacy test-*.sh → migrated-suite mapping (per-assertion)
+  MIGRATION.md     # wave-by-wave migration tracker
 ```
 
-## Runner contracts
+The CI entry points are `.github/workflows/e2e-scenarios.yaml`
+(manual dispatch) and `.github/workflows/e2e-parity-compare.yaml`
+(runs new vs. legacy and reports divergence). Existing workflows
+(`nightly-e2e.yaml`, `macos-e2e.yaml`, `wsl-e2e.yaml`, etc.) are
+unchanged during the migration.
 
-- `run-scenario.sh <id> [--plan-only|--dry-run]`
-  - `--plan-only`: resolve and print plan, write
-    `${E2E_CONTEXT_DIR:-.e2e}/plan.json`. No install/onboard/suites.
-  - `--dry-run` (`E2E_DRY_RUN=1`): helpers short-circuit; each one writes a
-    trace line to `$E2E_TRACE_FILE` if set. The expected-state validator
-    runs with `--probes-from-state` so the declared state acts as a fake
-    probe source; targeted probe failures are simulated with
-    `E2E_PROBE_OVERRIDE_<KEY>=value`.
-  - Live mode (no flags): runs the full setup path. The validator requires
-    real probe values; it fails closed rather than self-validating against
-    the declared state.
-- `run-suites.sh <suite-id> ...`: reads `.e2e/context.env`, runs one or
-  more suites' ordered step scripts, fails fast on the first non-zero
-  step, prints a PASS/FAIL summary.
-- `coverage-report.sh`: prints a Markdown coverage report. The
-  `e2e-scenarios` workflow appends the same report to
-  `GITHUB_STEP_SUMMARY`.
+## Adding to the matrix
 
-The TypeScript resolver is invoked via
-`tsx resolver/index.ts {plan|validate-state|coverage}`. Shell wrappers
-call it so runners and CI need only `bash` + a lockfile-pinned `tsx`.
+Add-a-scenario, add-a-state, and add-a-suite are short edits to the
+three YAML files above, plus shell scripts under `lib/setup/`,
+`lib/assert/`, or `suites/<category>/`. The schemas in
+[`resolver/schema.ts`](resolver/schema.ts) describe the required
+shape; `run-scenario.sh <id> --plan-only` validates your change
+without running anything destructive.
 
-Override the artifact directory with `E2E_CONTEXT_DIR=<path>` so local
-runs and tests do not clobber the repo-root `.e2e/`. The directory is
-gitignored.
-
-## Adding a new setup scenario
-
-1. Pick (or add) profiles for platform, install, runtime, and onboarding
-   in `scenarios.yaml`. Reuse existing profiles when possible.
-2. Add a scenario entry under `setup_scenarios:` with a kebab-case ID that
-   encodes the distinguishing dimensions. **The first segment must be the
-   platform prefix** (e.g. `ubuntu-`, `macos-`, `wsl-`, `gpu-`, `brev-`)
-   so the `e2e-scenarios.yaml` workflow can route the run to the correct
-   runner.
-3. Reference exactly one `expected_state` (singular; string key).
-4. List the `suites` to run, in execution order.
-5. If an appropriate expected state does not exist, add one to
-   `expected-states.yaml`. Keep keys structural, not behavioral.
-6. If an appropriate suite does not exist, add one to `suites.yaml` and
-   land its scripts under `suites/<category>/<suite>/`. Suites must
-   consume `.e2e/context.env`, not rediscover scenario state.
-7. Validate references with `bash test/e2e/run-scenario.sh <id> --plan-only`.
-
-## Adding a new expected state
-
-Add a new key under `expected_states:` in `expected-states.yaml`. Use
-structural keys (e.g. `gateway.health`, `sandbox.status`, `inference.route`)
-that suites can reference via `requires_state`. Negative / preflight states
-are introduced only when a concrete scenario consumes them.
-
-## Adding a new suite
-
-Add a new key under `suites:` in `suites.yaml`:
-
-- `requires_state`: dotted paths into an expected state that must be
-  satisfied for the suite to run.
-- `steps`: ordered list of `{ id, script }` entries with paths relative to
-  this directory.
-
-Keep suites narrowly scoped and idempotent. Suites must not install,
-onboard, or otherwise mutate setup state.
-
-## Roadmap (from UAT / NV QA bug hotspot analysis)
-
-Placeholder READMEs under `lib/{setup,assert,fixtures}/` and
-`suites/{onboarding,sandbox,lifecycle,security,messaging}/` track the
-scenarios that migrate in next, informed by the 446 UAT / NV QA issues
-traced during planning. Each README names the originating bug class and
-the legacy script (where one exists) so rewiring and coverage gaps remain
-visible in the repo.
+New legacy-style `test-*.sh` scripts are blocked by
+`scripts/e2e/lint-conventions.ts` — migrate into the matrix instead.
