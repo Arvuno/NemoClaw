@@ -1397,14 +1397,24 @@ describe("NC-2227-01: legacy migration behavior", () => {
 describe("seed_default_workspace_templates (#3240)", () => {
   const src = fs.readFileSync(START_SCRIPT, "utf-8");
 
-  function runSeed(workspaceDir: string, templatesDir: string, scriptPath: string) {
+  function runSeed(
+    workspaceDir: string,
+    templatesDir: string,
+    scriptPath: string,
+    options: { skipBootstrap?: boolean } = {},
+  ) {
+    const configPath = path.join(path.dirname(scriptPath), "openclaw.json");
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({ agents: { defaults: { skipBootstrap: options.skipBootstrap ?? true } } }),
+    );
     fs.writeFileSync(
       scriptPath,
       [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
         extractShellFunctionFromSource(src, "seed_default_workspace_templates"),
-        `seed_default_workspace_templates ${JSON.stringify(workspaceDir)} ${JSON.stringify(templatesDir)}`,
+        `seed_default_workspace_templates ${JSON.stringify(workspaceDir)} ${JSON.stringify(templatesDir)} ${JSON.stringify(configPath)}`,
       ].join("\n"),
       { mode: 0o700 },
     );
@@ -1426,7 +1436,10 @@ describe("seed_default_workspace_templates (#3240)", () => {
       "HEARTBEAT.md",
       "BOOTSTRAP.md",
     ]) {
-      fs.writeFileSync(path.join(templatesDir, name), `# ${name} template content\n`);
+      fs.writeFileSync(
+        path.join(templatesDir, name),
+        `---\nsummary: "${name} template"\n---\n# ${name} template content\n`,
+      );
     }
     try {
       const result = runSeed(workspaceDir, templatesDir, path.join(tmpDir, "seed.sh"));
@@ -1445,6 +1458,27 @@ describe("seed_default_workspace_templates (#3240)", () => {
       // interactive identity-setup turn that skipBootstrap=true is meant
       // to suppress.
       expect(fs.existsSync(path.join(workspaceDir, "BOOTSTRAP.md"))).toBe(false);
+      expect(fs.readFileSync(path.join(workspaceDir, "SOUL.md"), "utf-8")).toBe(
+        "# SOUL.md template content\n",
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not seed unless OpenClaw bootstrap is explicitly skipped", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-seed-bootstrap-on-"));
+    const workspaceDir = path.join(tmpDir, "workspace");
+    const templatesDir = path.join(tmpDir, "templates");
+    fs.mkdirSync(workspaceDir, { recursive: true });
+    fs.mkdirSync(templatesDir, { recursive: true });
+    fs.writeFileSync(path.join(templatesDir, "SOUL.md"), "soul template");
+    try {
+      const result = runSeed(workspaceDir, templatesDir, path.join(tmpDir, "seed.sh"), {
+        skipBootstrap: false,
+      });
+      expect(result.status).toBe(0);
+      expect(fs.existsSync(path.join(workspaceDir, "SOUL.md"))).toBe(false);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

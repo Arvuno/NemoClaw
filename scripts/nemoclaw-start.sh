@@ -1486,6 +1486,23 @@ migrate_legacy_layout() {
 seed_default_workspace_templates() {
   local workspace_dir="${1:-/sandbox/.openclaw/workspace}"
   local templates_dir="${2:-}"
+  local config_file="${3:-/sandbox/.openclaw/openclaw.json}"
+
+  if [ ! -f "$config_file" ]; then
+    return 0
+  fi
+  if ! command -v node >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! node - "$config_file" <<'NODE' >/dev/null 2>&1; then
+const fs = require("fs");
+const configPath = process.argv[2];
+const cfg = JSON.parse(fs.readFileSync(configPath, "utf8"));
+process.exit(cfg?.agents?.defaults?.skipBootstrap === true ? 0 : 1);
+NODE
+    return 0
+  fi
+
   [ -e "$workspace_dir" ] || return 0
   if [ -L "$workspace_dir" ]; then
     echo "[SECURITY] refusing to seed symlinked workspace dir: $workspace_dir" >&2
@@ -1506,13 +1523,20 @@ seed_default_workspace_templates() {
     echo "[setup] openclaw templates dir not found at ${templates_dir}; skipping workspace seed" >&2
     return 0
   fi
-  local file src dst seeded=0
+  local file src dst tmp seeded=0
   for file in AGENTS.md SOUL.md IDENTITY.md USER.md TOOLS.md HEARTBEAT.md; do
     src="$templates_dir/$file"
     dst="$workspace_dir/$file"
     if [ -f "$src" ] && [ ! -e "$dst" ]; then
-      if cp "$src" "$dst" 2>/dev/null; then
+      tmp="${dst}.tmp.$$"
+      if awk '
+        NR == 1 && $0 == "---" { in_frontmatter = 1; next }
+        in_frontmatter && $0 == "---" { in_frontmatter = 0; next }
+        !in_frontmatter { print }
+      ' "$src" >"$tmp" 2>/dev/null && mv "$tmp" "$dst" 2>/dev/null; then
         seeded=$((seeded + 1))
+      else
+        rm -f "$tmp" 2>/dev/null || true
       fi
     fi
   done
