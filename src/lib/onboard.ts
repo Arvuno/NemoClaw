@@ -106,7 +106,7 @@ const {
   DASHBOARD_PORT_RANGE_START,
   DASHBOARD_PORT_RANGE_END,
 } = require("./core/ports");
-const localInference: typeof import("./local-inference") = require("./local-inference");
+const localInference: typeof import("./inference/local") = require("./inference/local");
 const {
   findReachableOllamaHost,
   resetOllamaHostCache,
@@ -130,15 +130,15 @@ const {
   killStaleProxy,
   persistProxyToken,
   startOllamaAuthProxy,
-} = require("./onboard-ollama-proxy");
+} = require("./inference/ollama/proxy");
 const {
   installOllamaOnWindowsHost,
   awaitWindowsOllamaReady,
   setupWindowsOllamaWith0000Binding,
   switchToWindowsOllamaHost,
-} = require("./onboard-windows-ollama");
-const { detectVllmProfile, installVllm } = require("./onboard-vllm");
-const inferenceConfig: typeof import("./inference-config") = require("./inference-config");
+} = require("./inference/ollama/windows");
+const { detectVllmProfile, installVllm } = require("./inference/vllm");
+const inferenceConfig: typeof import("./inference/config") = require("./inference/config");
 const {
   DEFAULT_CLOUD_MODEL,
   INFERENCE_ROUTE_URL,
@@ -147,7 +147,7 @@ const {
   parseGatewayInference,
 } = inferenceConfig;
 
-const onboardProviders = require("./onboard-providers");
+const onboardProviders = require("./onboard/providers");
 
 const CUSTOM_BUILD_CONTEXT_WARN_BYTES = 100_000_000;
 const CUSTOM_BUILD_CONTEXT_IGNORES = new Set([
@@ -276,13 +276,13 @@ const {
   cleanupStaleHostFiles,
 }: typeof import("./host-artifact-cleanup") = require("./host-artifact-cleanup");
 const registry: typeof import("./state/registry") = require("./state/registry");
-const nim: typeof import("./nim") = require("./nim");
-const onboardSession: typeof import("./onboard-session") = require("./onboard-session");
+const nim: typeof import("./inference/nim") = require("./inference/nim");
+const onboardSession: typeof import("./state/onboard-session") = require("./state/onboard-session");
 const policies: typeof import("./policies") = require("./policies");
 const shields = require("./shields");
 const tiers: typeof import("./tiers") = require("./tiers");
-const { ensureUsageNoticeConsent } = require("./usage-notice");
-const preflightUtils: typeof import("./preflight") = require("./preflight");
+const { ensureUsageNoticeConsent } = require("./onboard/usage-notice");
+const preflightUtils: typeof import("./onboard/preflight") = require("./onboard/preflight");
 const clusterImagePatch: typeof import("./cluster-image-patch") = require("./cluster-image-patch");
 const {
   assessHost,
@@ -303,16 +303,16 @@ const urlUtils: typeof import("./core/url-utils") = require("./core/url-utils");
 const buildContext = require("./build-context");
 const dashboardContract: typeof import("./dashboard/contract") = require("./dashboard/contract");
 const httpProbe: typeof import("./http-probe") = require("./http-probe");
-const modelPrompts: typeof import("./model-prompts") = require("./model-prompts");
-const providerModels: typeof import("./provider-models") = require("./provider-models");
+const modelPrompts: typeof import("./inference/model-prompts") = require("./inference/model-prompts");
+const providerModels: typeof import("./inference/provider-models") = require("./inference/provider-models");
 const sandboxCreateStream: typeof import("./sandbox-create-stream") = require("./sandbox-create-stream");
 const validationRecovery: typeof import("./validation-recovery") = require("./validation-recovery");
-const webSearch: typeof import("./web-search") = require("./web-search");
+const webSearch: typeof import("./inference/web-search") = require("./inference/web-search");
 
 import type { AgentDefinition } from "./agent/defs";
 import type { CurlProbeResult } from "./http-probe";
-import type { GatewayInference, ProviderSelectionConfig } from "./inference-config";
-import type { GpuInfo, ValidationResult } from "./local-inference";
+import type { GatewayInference, ProviderSelectionConfig } from "./inference/config";
+import type { GpuInfo, ValidationResult } from "./inference/local";
 import {
   hydrateMessagingChannelConfig,
   type MessagingChannelConfig,
@@ -321,14 +321,14 @@ import {
   readMessagingChannelConfigFromEnv,
   sanitizeMessagingChannelConfig,
 } from "./messaging-channel-config";
-import type { Session, SessionUpdates } from "./onboard-session";
+import type { ContainerRuntime } from "./platform";
+import type { Session, SessionUpdates } from "./state/onboard-session";
 import type {
   ModelCatalogFetchResult,
   ModelValidationResult,
   ProbeResult,
   ValidationFailureLike,
-} from "./onboard-types";
-import type { ContainerRuntime } from "./platform";
+} from "./onboard/types";
 import { listChannels } from "./sandbox-channels";
 import type { StreamSandboxCreateResult } from "./sandbox-create-stream";
 import type { SandboxEntry } from "./state/registry";
@@ -336,7 +336,7 @@ import type { BackupResult } from "./state/sandbox";
 import type { TierDefinition, TierPreset } from "./tiers";
 import type { SandboxCreateFailure, ValidationClassification } from "./validation";
 import type { ProbeRecovery } from "./validation-recovery";
-import type { WebSearchConfig } from "./web-search";
+import type { WebSearchConfig } from "./inference/web-search";
 
 /**
  * Create a temp file inside a directory with a cryptographically random name.
@@ -2846,15 +2846,17 @@ function patchStagedDockerfile(
   fs.writeFileSync(dockerfilePath, dockerfile);
 }
 
-// Inference probes — moved to onboard-inference-probes.ts
+// Inference probes — moved to inference/onboard-probes.ts
 const {
   hasResponsesToolCall,
+  hasChatCompletionsToolCall,
+  hasChatCompletionsToolCallLeak,
   shouldRequireResponsesToolCalling,
   getProbeAuthMode,
   getValidationProbeCurlArgs,
   probeOpenAiLikeEndpoint,
   probeAnthropicEndpoint,
-} = require("./onboard-inference-probes");
+} = require("./inference/onboard-probes");
 
 // shouldSkipResponsesProbe and isNvcfFunctionNotFoundForAccount /
 // nvcfFunctionNotFoundMessage — see validation import above. They live in
@@ -2870,6 +2872,7 @@ async function validateOpenAiLikeSelection(
   options: {
     authMode?: "bearer" | "query-param";
     requireResponsesToolCalling?: boolean;
+    requireChatCompletionsToolCalling?: boolean;
     skipResponsesProbe?: boolean;
     probeStreaming?: boolean;
   } = {},
@@ -3013,16 +3016,16 @@ const { shouldIncludeBuildContextPath, copyBuildContextDir, printSandboxCreateRe
 // classifySandboxCreateFailure — see validation import above
 
 // ---------------------------------------------------------------------------
-// Ollama model prompt/pull/prepare functions — from onboard-ollama-proxy.ts
+// Ollama model prompt/pull/prepare functions — from inference/ollama/proxy.ts
 // (proxy lifecycle functions already imported at the top of this file)
 const {
   promptOllamaModel,
   printOllamaExposureWarning,
   pullOllamaModel,
   prepareOllamaModel,
-} = require("./onboard-ollama-proxy");
+} = require("./inference/ollama/proxy");
 
-const ollamaModelSize: typeof import("./ollama-model-size") = require("./ollama-model-size");
+const ollamaModelSize: typeof import("./inference/ollama/model-size") = require("./inference/ollama/model-size");
 
 function getRequestedSandboxNameHint(opts: { sandboxName?: string | null } = {}): string | null {
   const raw =
@@ -4541,6 +4544,7 @@ const RESERVED_SANDBOX_NAMES = new Set([
   "status",
   "debug",
   "uninstall",
+  "update",
   "credentials",
   "help",
   "sandbox",
@@ -6043,6 +6047,11 @@ async function selectAndValidateOllamaModel(
       selectedModel,
       null,
       "Choose a different Ollama model or select Other.",
+      null,
+      {
+        skipResponsesProbe: true,
+        requireChatCompletionsToolCalling: true,
+      },
     );
     if (validation.retry === "selection") return { outcome: "back-to-selection" };
     if (!validation.ok) continue;
@@ -6082,14 +6091,14 @@ async function setupNim(
   // (#2674).
   const localProbeCurlArgs = ["--connect-timeout", "2", "--max-time", "5"] as const;
   const hasOllama = hostCommandExists("ollama");
-  // run and consumed by the Ollama lifecycle helpers in local-inference.ts.
+  // run and consumed by the Ollama lifecycle helpers in inference/local.ts.
   const ollamaHost = findReachableOllamaHost();
   const ollamaRunning = ollamaHost !== null;
   const vllmRunning = !!runCapture(
     ["curl", "-sf", ...localProbeCurlArgs, `http://127.0.0.1:${VLLM_PORT}/v1/models`],
     { ignoreError: true },
   );
-  // Pick a vLLM install recipe for this host. Profiles live in onboard-vllm.ts;
+  // Pick a vLLM install recipe for this host. Profiles live in inference/vllm.ts;
   // null means "no supported platform" (vLLM stays behind EXPERIMENTAL).
   const vllmProfile = detectVllmProfile(gpu);
   // If the profile's image is already cached, the install path is really a
@@ -6195,7 +6204,7 @@ async function setupNim(
   if (EXPERIMENTAL && gpu && gpu.nimCapable) {
     options.push({ key: "nim-local", label: "Local NVIDIA NIM [experimental]" });
   }
-  // vLLM: profiles in onboard-vllm.ts surface as menu entries only when
+  // vLLM: profiles in inference/vllm.ts surface as menu entries only when
   // the user explicitly opts in via NEMOCLAW_PROVIDER, or when
   // NEMOCLAW_EXPERIMENTAL=1 is set.
   // Read NEMOCLAW_PROVIDER directly so interactive runs with an explicit
@@ -7189,7 +7198,7 @@ async function setupNim(
         }
         provider = bp.provider_name || "nvidia-router";
         model = bp.model;
-        const { HOST_GATEWAY_URL } = require("./local-inference");
+        const { HOST_GATEWAY_URL } = require("./inference/local");
         const routerEndpointUrl = bp.endpoint || "";
         endpointUrl = routerEndpointUrl;
         if (routerEndpointUrl.match(/localhost|127\.0\.0\.1/)) {
@@ -8533,12 +8542,19 @@ function computeSetupPresetSuggestions(
     webSearchConfig?: WebSearchConfig | null;
     provider?: string | null;
     knownPresetNames?: string[] | null;
+    webSearchSupported?: boolean | null;
   } = {},
 ): string[] {
   const { enabledChannels = null, webSearchConfig = null, provider = null } = options;
   const known = Array.isArray(options.knownPresetNames) ? new Set(options.knownPresetNames) : null;
-  const suggestions = tiers.resolveTierPresets(tierName).map((p) => p.name);
+  const supportOptions = { webSearchSupported: options.webSearchSupported };
+  const suggestions = tiers
+    .resolveTierPresets(tierName)
+    .map((p) => p.name)
+    .filter((name) => policies.setupPolicyPresetSupported(name, supportOptions))
+    .filter((name) => !known || known.has(name));
   const add = (name: string) => {
+    if (!policies.setupPolicyPresetSupported(name, supportOptions)) return;
     if (suggestions.includes(name)) return;
     if (known && !known.has(name)) return;
     suggestions.push(name);
@@ -8560,6 +8576,7 @@ async function setupPoliciesWithSelection(
     enabledChannels?: string[] | null;
     provider?: string | null;
     knownPresetNames?: string[];
+    webSearchSupported?: boolean | null;
   } = {},
 ) {
   const selectedPresets = Array.isArray(options.selectedPresets) ? options.selectedPresets : null;
@@ -8570,20 +8587,43 @@ async function setupPoliciesWithSelection(
 
   step(8, 8, "Policy presets");
 
-  const allPresets = policies.listPresets();
-  const applied = policies.getAppliedPresets(sandboxName);
-  let chosen = selectedPresets;
+  const supportOptions = { webSearchSupported: options.webSearchSupported };
+  const allPresets = policies.listSetupPolicyPresets(sandboxName, supportOptions);
+  const knownPresets = new Set(allPresets.map((p) => p.name));
+  const customPresetNames = new Set(
+    policies.listCustomPresets(sandboxName).map((p: { name: string }) => p.name),
+  );
+  const currentAppliedPresets = policies.getAppliedPresets(sandboxName);
+  const selectablePresets = [
+    ...allPresets,
+    ...currentAppliedPresets.map((name) => ({ name })),
+  ];
+  const applied = policies.clampSetupPolicyPresetNames(
+    currentAppliedPresets,
+    selectablePresets,
+    supportOptions,
+    customPresetNames,
+  );
+  let chosen = selectedPresets
+    ? policies.clampSetupPolicyPresetNames(
+        selectedPresets,
+        selectablePresets,
+        supportOptions,
+        customPresetNames,
+      )
+    : null;
 
   // Resume path: caller supplies the preset list from a previous run.
-  if (chosen && chosen.length > 0) {
-    if (onSelection) onSelection(chosen);
+  if (selectedPresets && selectedPresets.length > 0) {
+    const resumeSelection = chosen || [];
+    if (onSelection) onSelection(resumeSelection);
     if (!waitForSandboxReady(sandboxName)) {
       console.error(`  Sandbox '${sandboxName}' was not ready for policy application.`);
       process.exit(1);
     }
-    note(`  [resume] Reapplying policy presets: ${chosen.join(", ")}`);
-    syncPresetSelection(sandboxName, applied, chosen);
-    return chosen;
+    note(`  [resume] Reapplying policy presets: ${resumeSelection.join(", ")}`);
+    syncPresetSelection(sandboxName, currentAppliedPresets, resumeSelection);
+    return resumeSelection;
   }
 
   // Tier selection — determines the default preset list for this install.
@@ -8594,6 +8634,7 @@ async function setupPoliciesWithSelection(
     webSearchConfig,
     provider,
     knownPresetNames: allPresets.map((p) => p.name),
+    webSearchSupported: options.webSearchSupported,
   });
 
   if (isNonInteractive()) {
@@ -8632,7 +8673,6 @@ async function setupPoliciesWithSelection(
       console.warn(`  Falling back to suggested presets for tier '${tierName}'.`);
     }
 
-    const knownPresets = new Set(allPresets.map((p) => p.name));
     const invalidPresets = chosen.filter((name) => !knownPresets.has(name));
     if (invalidPresets.length > 0) {
       console.error(`  Unknown policy preset(s): ${invalidPresets.join(", ")}`);
@@ -8667,7 +8707,7 @@ async function setupPoliciesWithSelection(
       process.exit(1);
     }
     note(`  [non-interactive] Applying policy presets: ${chosen.join(", ")}`);
-    syncPresetSelection(sandboxName, applied, chosen);
+    syncPresetSelection(sandboxName, currentAppliedPresets, chosen);
     return chosen;
   }
 
@@ -8691,7 +8731,7 @@ async function setupPoliciesWithSelection(
 
   const accessByName: Record<string, string> = {};
   for (const p of resolvedPresets) accessByName[p.name] = p.access;
-  syncPresetSelection(sandboxName, applied, interactiveChoice, accessByName);
+  syncPresetSelection(sandboxName, currentAppliedPresets, interactiveChoice, accessByName);
   return interactiveChoice;
 }
 
@@ -9341,6 +9381,17 @@ function toOptionalString(value: string | null | undefined): string | undefined 
   return value ?? undefined;
 }
 
+// Preserve the nullable contract end-to-end: `null` means "clear this
+// field on the persisted session", `undefined` means "leave unchanged".
+// Collapsing `null`→`undefined` (as toOptionalString does) silently drops
+// explicit clears such as the credentialEnv reset during a remote→local
+// provider switch — the exact bug in GH #2625.
+function toNullableString(value: string | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return value;
+}
+
 function toSessionUpdates(
   updates: {
     sandboxName?: string | null;
@@ -9358,18 +9409,18 @@ function toSessionUpdates(
 ): SessionUpdates {
   const normalized: SessionUpdates = {};
   if (updates.sandboxName !== undefined)
-    normalized.sandboxName = toOptionalString(updates.sandboxName);
-  if (updates.provider !== undefined) normalized.provider = toOptionalString(updates.provider);
-  if (updates.model !== undefined) normalized.model = toOptionalString(updates.model);
+    normalized.sandboxName = toNullableString(updates.sandboxName);
+  if (updates.provider !== undefined) normalized.provider = toNullableString(updates.provider);
+  if (updates.model !== undefined) normalized.model = toNullableString(updates.model);
   if (updates.endpointUrl !== undefined)
-    normalized.endpointUrl = toOptionalString(updates.endpointUrl);
+    normalized.endpointUrl = toNullableString(updates.endpointUrl);
   if (updates.credentialEnv !== undefined)
-    normalized.credentialEnv = toOptionalString(updates.credentialEnv);
+    normalized.credentialEnv = toNullableString(updates.credentialEnv);
   if (updates.preferredInferenceApi !== undefined) {
-    normalized.preferredInferenceApi = toOptionalString(updates.preferredInferenceApi);
+    normalized.preferredInferenceApi = toNullableString(updates.preferredInferenceApi);
   }
   if (updates.nimContainer !== undefined)
-    normalized.nimContainer = toOptionalString(updates.nimContainer);
+    normalized.nimContainer = toNullableString(updates.nimContainer);
   if (updates.webSearchConfig !== undefined) normalized.webSearchConfig = updates.webSearchConfig;
   if (updates.policyPresets) normalized.policyPresets = updates.policyPresets;
   if (updates.messagingChannels) normalized.messagingChannels = updates.messagingChannels;
@@ -10031,7 +10082,8 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     }
 
     const webSearchSupportProbePath = fromDockerfile ? path.resolve(fromDockerfile) : null;
-    if (webSearchConfig && !agentSupportsWebSearch(agent, webSearchSupportProbePath)) {
+    const webSearchSupported = agentSupportsWebSearch(agent, webSearchSupportProbePath);
+    if (webSearchConfig && !webSearchSupported) {
       note(
         `  Web search is not yet supported by ${agent?.displayName ?? "this sandbox image"}. Clearing stale config.`,
       );
@@ -10247,17 +10299,29 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       messagingChannels: Array.isArray(activeMessagingChannels) ? activeMessagingChannels : [],
       agent,
     });
+    const policyPresetSupportOptions = { webSearchSupported };
+    const recordedPolicyPresetsForSupport = policies.clampSetupPolicyPresetNames(
+      recordedPolicyPresets || [],
+      [
+        ...policies.listSetupPolicyPresets(sandboxName, policyPresetSupportOptions),
+        ...policies.getAppliedPresets(sandboxName).map((name) => ({ name })),
+      ],
+      policyPresetSupportOptions,
+      new Set(
+        policies.listCustomPresets(sandboxName).map((p: { name: string }) => p.name),
+      ),
+    );
     const resumePolicies =
-      resume && sandboxName && arePolicyPresetsApplied(sandboxName, recordedPolicyPresets || []);
+      resume && sandboxName && arePolicyPresetsApplied(sandboxName, recordedPolicyPresetsForSupport);
     if (resumePolicies) {
-      skippedStepMessage("policies", (recordedPolicyPresets || []).join(", "));
+      skippedStepMessage("policies", recordedPolicyPresetsForSupport.join(", "));
       onboardSession.markStepComplete(
         "policies",
         toSessionUpdates({
           sandboxName,
           provider,
           model,
-          policyPresets: recordedPolicyPresets || [],
+          policyPresets: recordedPolicyPresetsForSupport,
         }),
       );
     } else {
@@ -10265,12 +10329,12 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         sandboxName,
         provider,
         model,
-        policyPresets: recordedPolicyPresets || [],
+        policyPresets: recordedPolicyPresetsForSupport,
       });
       const appliedPolicyPresets = await setupPoliciesWithSelection(sandboxName, {
         selectedPresets:
-          Array.isArray(recordedPolicyPresets) && recordedPolicyPresets.length > 0
-            ? recordedPolicyPresets
+          recordedPolicyPresetsForSupport.length > 0
+            ? recordedPolicyPresetsForSupport
             : null,
         enabledChannels:
           selectedMessagingChannels.length > 0
@@ -10278,6 +10342,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
             : recordedMessagingChannels,
         webSearchConfig,
         provider,
+        webSearchSupported,
         onSelection: (policyPresets) => {
           onboardSession.updateSession((current: Session) => {
             current.policyPresets = policyPresets;
@@ -10448,6 +10513,7 @@ module.exports = {
   arePolicyPresetsApplied,
   getSuggestedPolicyPresets,
   computeSetupPresetSuggestions,
+  filterSetupPolicyPresets: policies.filterSetupPolicyPresets,
   LOCAL_INFERENCE_PROVIDERS,
   presetsCheckboxSelector,
   selectPolicyTier,
@@ -10456,6 +10522,8 @@ module.exports = {
   summarizeCurlFailure,
   summarizeProbeFailure,
   hasResponsesToolCall,
+  hasChatCompletionsToolCall,
+  hasChatCompletionsToolCallLeak,
   upsertProvider,
   hashCredential,
   detectMessagingCredentialRotation,
