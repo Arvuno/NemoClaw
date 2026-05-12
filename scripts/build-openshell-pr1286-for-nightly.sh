@@ -18,6 +18,8 @@ OPEN_SHELL_REPO_URL="https://github.com/ericksoa/OpenShell.git"
 OPEN_SHELL_BRANCH="fix/872-websocket-credential-rewrite"
 OPEN_SHELL_PR_URL="https://github.com/NVIDIA/OpenShell/pull/1286"
 OPEN_SHELL_CI_IMAGE="ghcr.io/nvidia/openshell/ci:latest"
+Z3_REPO_URL="https://github.com/Z3Prover/z3.git"
+Z3_COMMIT="ddb49568d3520e99799e364fb22f35fc67d887b1"
 
 requested_commit="${OPENSHELL_PR1286_COMMIT:-$PINNED_COMMIT}"
 if [ "$requested_commit" != "$PINNED_COMMIT" ]; then
@@ -74,6 +76,8 @@ docker run --rm --privileged \
   -e "OPEN_SHELL_BRANCH=$OPEN_SHELL_BRANCH" \
   -e "OPEN_SHELL_PR_URL=$OPEN_SHELL_PR_URL" \
   -e "PINNED_COMMIT=$PINNED_COMMIT" \
+  -e "Z3_REPO_URL=$Z3_REPO_URL" \
+  -e "Z3_COMMIT=$Z3_COMMIT" \
   -e "RUST_MUSL_TARGET=$rust_musl_target" \
   -e "RUST_GNU_TARGET=$rust_gnu_target" \
   -e "ZIG_TARGET=$zig_target" \
@@ -136,6 +140,15 @@ docker run --rm --privileged \
     export "CARGO_TARGET_${target_env_upper}_LINKER=/tmp/zig-musl/cc"
     export "CARGO_TARGET_${target_env_upper}_RUSTFLAGS=-Clink-self-contained=no"
     export CXXSTDLIB=c++
+
+    export Z3_SYS_BUNDLED_DIR_OVERRIDE="${clone_dir}/z3-source"
+    log "Fetching bundled Z3 source ${Z3_COMMIT}"
+    git init "$Z3_SYS_BUNDLED_DIR_OVERRIDE"
+    git -C "$Z3_SYS_BUNDLED_DIR_OVERRIDE" remote add origin "$Z3_REPO_URL"
+    git -C "$Z3_SYS_BUNDLED_DIR_OVERRIDE" fetch --depth 1 origin "$Z3_COMMIT"
+    git -C "$Z3_SYS_BUNDLED_DIR_OVERRIDE" checkout --detach FETCH_HEAD
+    z3_actual_commit="$(git -C "$Z3_SYS_BUNDLED_DIR_OVERRIDE" rev-parse HEAD)"
+    [ "$z3_actual_commit" = "$Z3_COMMIT" ] || fail "checked out Z3 $z3_actual_commit, expected $Z3_COMMIT"
 
     cargo_version="$(uv run python tasks/scripts/release.py get-version --cargo)"
     [ -n "$cargo_version" ] || fail "release.py returned an empty cargo version"
