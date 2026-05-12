@@ -7,6 +7,7 @@ import {
   classifyForwardHealthWithReachability,
   classifySandboxForwardHealth,
   resolveSandboxDashboardPort,
+  type SandboxForwardListEntry,
 } from "../dist/lib/actions/sandbox/process-recovery.js";
 
 describe("resolveSandboxDashboardPort", () => {
@@ -89,21 +90,18 @@ describe("classifyForwardHealthWithReachability", () => {
   // local port still answers, the forward is functionally healthy and the
   // probe must not trigger spurious "missing or dead" + "Failed to
   // re-establish" log pairs.
-  it("treats a stale dead entry as healthy when the local port answers", () => {
-    expect(
-      classifyForwardHealthWithReachability(
-        [{ sandboxName: "beta", port: "18790", status: "dead" }],
-        "beta",
-        "18790",
-        () => true,
-      ),
-    ).toBe(true);
-  });
-
-  it("treats a missing entry as healthy when the local port answers", () => {
-    expect(
-      classifyForwardHealthWithReachability([], "beta", "18790", () => true),
-    ).toBe(true);
+  it("treats a non-running entry as healthy when the local port answers", () => {
+    // Covers both branches that produce `false` from the underlying classifier:
+    // a missing entry, and an entry whose status is anything but "running".
+    const inputs: SandboxForwardListEntry[][] = [
+      [],
+      [{ sandboxName: "beta", port: "18790", status: "dead" }],
+    ];
+    for (const entries of inputs) {
+      expect(
+        classifyForwardHealthWithReachability(entries, "beta", "18790", () => true),
+      ).toBe(true);
+    }
   });
 
   it("returns false when forward list says dead and the port does not answer", () => {
