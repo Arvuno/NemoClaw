@@ -222,6 +222,7 @@ function sshEnv(
     `export NEMOCLAW_NON_INTERACTIVE=1`,
     `export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1`,
     `export NEMOCLAW_SANDBOX_NAME=e2e-test`,
+    `export NEMOCLAW_RECREATE_SANDBOX=1`,
   ];
   // Forward optional messaging tokens for the messaging-providers test
   for (const key of [
@@ -612,9 +613,15 @@ function bootstrapLaunchable(elapsed: () => string): { remoteDir: string; needsO
   console.log(`[${elapsed()}] Dependencies synced`);
 
   // When TEST_SUITE=full, test-full-e2e.sh runs install.sh which handles
-  // plugin build, npm link, and onboard from scratch. Skip those steps
-  // to avoid ~8 min of redundant work.
+  // plugin build, npm link, and onboard from scratch. Stop any launchable-baked
+  // OpenShell gateway first so install.sh can own port 8080 instead of failing
+  // on stale docker-proxy listeners, then skip the redundant setup work.
   if (TEST_SUITE === "full") {
+    console.log(`[${elapsed()}] Stopping pre-baked gateway before full install test...`);
+    ssh(
+      `openshell gateway stop --name nemoclaw >/dev/null 2>&1 || openshell gateway stop >/dev/null 2>&1 || true`,
+      { timeout: 60_000, stream: true },
+    );
     console.log(
       `[${elapsed()}] Skipping plugin build, npm link, and onboard (TEST_SUITE=full — install.sh handles it)`,
     );
