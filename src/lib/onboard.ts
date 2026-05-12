@@ -7441,29 +7441,23 @@ async function setupNim(
   if (EXPERIMENTAL && gpu && gpu.nimCapable) {
     options.push({ key: "nim-local", label: "Local NVIDIA NIM [experimental]" });
   }
-  // vLLM: profiles in inference/vllm.ts surface as menu entries only when
-  // the user explicitly opts in via NEMOCLAW_PROVIDER, or when
-  // NEMOCLAW_EXPERIMENTAL=1 is set.
+  // vLLM: an already-running local server is safe to offer in-place because
+  // selecting it is an explicit user action. Managed install/start remains
+  // gated by NEMOCLAW_PROVIDER or NEMOCLAW_EXPERIMENTAL because it pulls images
+  // and starts containers.
   // Read NEMOCLAW_PROVIDER directly so interactive runs with an explicit
   // env-var opt-in surface the menu entry too — requestedProvider is null
   // outside non-interactive mode.
   const explicitProvider = (process.env.NEMOCLAW_PROVIDER || "").trim().toLowerCase();
   const userChoseVllm = explicitProvider === "vllm" || explicitProvider === "install-vllm";
-  if (vllmProfile && (userChoseVllm || EXPERIMENTAL)) {
-    if (vllmRunning) {
-      options.push({
-        key: "vllm",
-        label: `Local vLLM (localhost:${VLLM_PORT}) — running (suggested)`,
-      });
-    } else {
-      const verb = hasVllmImage ? "Start" : "Install";
-      options.push({ key: "install-vllm", label: `${verb} vLLM (${vllmProfile.name})` });
-    }
-  } else if (EXPERIMENTAL && vllmRunning) {
+  if (vllmRunning) {
     options.push({
       key: "vllm",
-      label: "Local vLLM [experimental] — running",
+      label: `Local vLLM [experimental] (localhost:${VLLM_PORT}) — running (suggested)`,
     });
+  } else if (vllmProfile && (userChoseVllm || EXPERIMENTAL)) {
+    const verb = hasVllmImage ? "Start" : "Install";
+    options.push({ key: "install-vllm", label: `${verb} vLLM (${vllmProfile.name})` });
   }
   // Skipped when Windows-host already won the cache: the running entry
   // above already covers that case.
