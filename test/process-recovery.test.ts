@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  classifyForwardHealthWithReachability,
   classifySandboxForwardHealth,
   resolveSandboxDashboardPort,
 } from "../dist/lib/actions/sandbox/process-recovery.js";
@@ -79,5 +80,68 @@ describe("classifySandboxForwardHealth", () => {
         "18790",
       ),
     ).toBe(false);
+  });
+});
+
+describe("classifyForwardHealthWithReachability", () => {
+  // Regression coverage for #3334: `openshell forward list` STATUS can lag the
+  // real state of the forward. When it shows a non-running entry but the
+  // local port still answers, the forward is functionally healthy and the
+  // probe must not trigger spurious "missing or dead" + "Failed to
+  // re-establish" log pairs.
+  it("treats a stale dead entry as healthy when the local port answers", () => {
+    expect(
+      classifyForwardHealthWithReachability(
+        [{ sandboxName: "beta", port: "18790", status: "dead" }],
+        "beta",
+        "18790",
+        () => true,
+      ),
+    ).toBe(true);
+  });
+
+  it("treats a missing entry as healthy when the local port answers", () => {
+    expect(
+      classifyForwardHealthWithReachability([], "beta", "18790", () => true),
+    ).toBe(true);
+  });
+
+  it("returns false when forward list says dead and the port does not answer", () => {
+    expect(
+      classifyForwardHealthWithReachability(
+        [{ sandboxName: "beta", port: "18790", status: "dead" }],
+        "beta",
+        "18790",
+        () => false,
+      ),
+    ).toBe(false);
+  });
+
+  it("returns true without probing when forward list already reports running", () => {
+    let probed = false;
+    const result = classifyForwardHealthWithReachability(
+      [{ sandboxName: "beta", port: "18790", status: "running" }],
+      "beta",
+      "18790",
+      () => {
+        probed = true;
+        return false;
+      },
+    );
+    expect(result).toBe(true);
+    expect(probed).toBe(false);
+  });
+
+  it("returns occupied even when the port answers if another sandbox owns it", () => {
+    // Reachability says yes, but the entry belongs to a different sandbox —
+    // we must not silently take over someone else's forward.
+    expect(
+      classifyForwardHealthWithReachability(
+        [{ sandboxName: "alpha", port: "18790", status: "running" }],
+        "beta",
+        "18790",
+        () => true,
+      ),
+    ).toBe("occupied");
   });
 });
