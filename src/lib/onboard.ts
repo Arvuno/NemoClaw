@@ -5310,9 +5310,13 @@ async function startDockerDriverGateway({
     const drift = getDockerDriverGatewayRuntimeDrift(pidFileGatewayPid, gatewayEnv, gatewayBin);
     if (drift) {
       restartDockerDriverGatewayProcessForDrift(pidFileGatewayPid, drift.reason);
-    } else if (registerDockerDriverGatewayEndpoint()) {
+    } else if (registerDockerDriverGatewayEndpoint() && (await isGatewayHttpReady())) {
       console.log("  ✓ Reusing existing Docker-driver gateway");
       return;
+    } else {
+      console.log(
+        `  Docker-driver gateway metadata reports healthy but http://127.0.0.1:${GATEWAY_PORT}/ is not responding. Starting a fresh gateway...`,
+      );
     }
   }
 
@@ -5334,7 +5338,10 @@ async function startDockerDriverGateway({
       const adoptedActiveGatewayInfo = runCaptureOpenshell(["gateway", "info"], {
         ignoreError: true,
       });
-      if (isGatewayHealthy(adoptedStatus, adoptedGwInfo, adoptedActiveGatewayInfo)) {
+      if (
+        isGatewayHealthy(adoptedStatus, adoptedGwInfo, adoptedActiveGatewayInfo) &&
+        (await isGatewayHttpReady())
+      ) {
         console.log(`  ✓ Reusing existing Docker-driver gateway process (PID ${portListenerPid})`);
         return;
       }
@@ -5399,7 +5406,7 @@ async function startDockerDriverGateway({
       ignoreError: true,
     });
     const currentInfo = runCaptureOpenshell(["gateway", "info"], { ignoreError: true });
-    if (isGatewayHealthy(status, namedInfo, currentInfo)) {
+    if (isGatewayHealthy(status, namedInfo, currentInfo) && (await isGatewayHttpReady())) {
       console.log("  ✓ Docker-driver gateway is healthy");
       return;
     }

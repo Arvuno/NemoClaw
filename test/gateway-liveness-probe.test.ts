@@ -113,6 +113,21 @@ describe("gateway liveness probe (#2020)", () => {
     expect(branchBody).not.toMatch(/gatewayReuseState\s*=\s*"missing"/);
   });
 
+  it("Docker-driver gateway startup requires live HTTP before reporting healthy (#3111)", () => {
+    const dockerStart = content.indexOf("async function startDockerDriverGateway(");
+    const dockerEnd = content.indexOf("\nasync function startGateway(", dockerStart);
+    expect(dockerStart).toBeGreaterThanOrEqual(0);
+    expect(dockerEnd).toBeGreaterThan(dockerStart);
+    const dockerSection = content.slice(dockerStart, dockerEnd);
+
+    expect(dockerSection).toMatch(
+      /isGatewayHealthy\(status, namedInfo, currentInfo\) && \(await isGatewayHttpReady\(\)\)[\s\S]*?Docker-driver gateway is healthy/,
+    );
+    expect(dockerSection).toMatch(
+      /registerDockerDriverGatewayEndpoint\(\) && \(await isGatewayHttpReady\(\)\)[\s\S]*?Reusing existing Docker-driver gateway/,
+    );
+  });
+
   it("does not modify isGatewayHealthy() in src/lib/state/gateway.ts", () => {
     // isGatewayHealthy() must remain a pure function — no I/O.
     // Scope the check to the function body so unrelated helpers don't cause false failures.
