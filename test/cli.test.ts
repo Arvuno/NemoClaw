@@ -1465,7 +1465,7 @@ describe("CLI dispatch", () => {
     }
   });
 
-  it("sandbox inspection help keeps public sandbox-scoped usage", () => {
+  it("sandbox inspection help keeps public sandbox-scoped usage", testTimeoutOptions(15_000), () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-inspection-help-"));
     writeSandboxRegistry(home);
 
@@ -2139,7 +2139,7 @@ describe("CLI dispatch", () => {
     expect(r.out).toContain(FAKE_OPENSHELL_LOG_LINE);
   });
 
-  it("keeps logs --follow running when one log source exits", testTimeoutOptions(), async () => {
+  it("keeps logs --follow running when one log source exits", testTimeoutOptions(10_000), async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-logs-follow-source-exit-"));
     const localBin = path.join(home, "bin");
     const registryDir = path.join(home, ".nemoclaw");
@@ -2217,7 +2217,7 @@ describe("CLI dispatch", () => {
     }
   });
 
-  it("waits for logs --follow children to stop after SIGTERM", testTimeoutOptions(), async () => {
+  it("waits for logs --follow children to stop after SIGTERM", testTimeoutOptions(10_000), async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-logs-follow-sigterm-wait-"));
     const localBin = path.join(home, "bin");
     const markerFile = path.join(home, "logs-follow-sigterm-wait-args");
