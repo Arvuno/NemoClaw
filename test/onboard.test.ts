@@ -2483,7 +2483,7 @@ const { loadAgent } = require(${agentDefsPath});
 
   it("fails closed when gateway lifecycle support is not proven", () => {
     const source = fs.readFileSync(
-      path.join(import.meta.dirname, "..", "src", "lib", "onboard.ts"),
+      path.join(import.meta.dirname, "..", "src", "lib", "onboard", "gateway-lifecycle.ts"),
       "utf-8",
     );
 

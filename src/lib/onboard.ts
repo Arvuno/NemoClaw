@@ -21,6 +21,17 @@ const {
   secureTempFile,
 }: typeof import("./onboard/temp-files") = require("./onboard/temp-files");
 const {
+  CUSTOM_BUILD_CONTEXT_WARN_BYTES,
+  isInsideIgnoredCustomBuildContextPath,
+  shouldIncludeCustomBuildContextPath,
+}: typeof import("./onboard/custom-build-context") = require("./onboard/custom-build-context");
+const {
+  buildCompatibleEndpointSandboxSmokeCommand,
+  buildCompatibleEndpointSandboxSmokeScript,
+  shouldRunCompatibleEndpointSandboxSmoke,
+  spawnOutputToString,
+}: typeof import("./onboard/compatible-endpoint-smoke") = require("./onboard/compatible-endpoint-smoke");
+const {
   buildDirectGpuPolicyYaml,
   buildDirectSandboxGpuProofCommands,
   prepareInitialSandboxCreatePolicy,
@@ -142,60 +153,6 @@ const {
 const onboardProviders = require("./onboard/providers");
 const hermesProviderAuth = require("./hermes-provider-auth");
 
-const CUSTOM_BUILD_CONTEXT_WARN_BYTES = 100_000_000;
-const CUSTOM_BUILD_CONTEXT_IGNORES = new Set([
-  "node_modules",
-  ".git",
-  ".venv",
-  "__pycache__",
-  ".aws",
-  ".credentials",
-  ".direnv",
-  ".netrc",
-  ".npmrc",
-  ".pypirc",
-  ".ssh",
-  "credentials.json",
-  "key.json",
-  "secrets",
-  "secrets.json",
-  "secrets.yaml",
-  "token.json",
-]);
-
-function isIgnoredCustomBuildContextName(name: string): boolean {
-  const lowerName = name.toLowerCase();
-  return (
-    CUSTOM_BUILD_CONTEXT_IGNORES.has(lowerName) ||
-    lowerName === ".env" ||
-    lowerName === ".envrc" ||
-    lowerName.startsWith(".env.") ||
-    lowerName.endsWith(".key") ||
-    lowerName.endsWith(".pem") ||
-    lowerName.endsWith(".pfx") ||
-    lowerName.endsWith(".p12") ||
-    lowerName.endsWith(".jks") ||
-    lowerName.endsWith(".keystore") ||
-    lowerName.endsWith(".tfvars") ||
-    lowerName.endsWith("_ecdsa") ||
-    lowerName.endsWith("_ed25519") ||
-    lowerName.endsWith("_rsa") ||
-    (lowerName.startsWith("service-account") && lowerName.endsWith(".json"))
-  );
-}
-
-function shouldIncludeCustomBuildContextPath(src: string): boolean {
-  return !isIgnoredCustomBuildContextName(path.basename(src));
-}
-
-function isInsideIgnoredCustomBuildContextPath(src: string): boolean {
-  return path
-    .normalize(src)
-    .split(path.sep)
-    .filter(Boolean)
-    .some((part: string) => isIgnoredCustomBuildContextName(part));
-}
-
 type RemoteProviderConfigEntry = {
   label: string;
   providerName: string;
@@ -276,11 +233,24 @@ const shields = require("./shields");
 const tiers: typeof import("./policy/tiers") = require("./policy/tiers");
 const { ensureUsageNoticeConsent } = require("./onboard/usage-notice");
 const {
+  destroyGatewayForReuse,
+  warnIfGatewayDestroyFails,
+} = require("./onboard/gateway-cleanup") as typeof import("./onboard/gateway-cleanup");
+const {
+  gatewayCliSupportsLifecycleCommands,
+} = require("./onboard/gateway-lifecycle") as typeof import("./onboard/gateway-lifecycle");
+const {
   getGatewayReuseHealthWaitConfig,
   isDockerDriverGatewayHttpReady,
   isGatewayHttpReady,
   waitForGatewayHttpReady,
 } = require("./onboard/gateway-http-readiness") as typeof import("./onboard/gateway-http-readiness");
+const { isGatewayTcpReady } =
+  require("./onboard/gateway-tcp-readiness") as typeof import("./onboard/gateway-tcp-readiness");
+const { trackChildExit } =
+  require("./onboard/child-exit-tracker") as typeof import("./onboard/child-exit-tracker");
+const { reportDockerDriverGatewayStartFailure } =
+  require("./onboard/docker-driver-gateway-failure") as typeof import("./onboard/docker-driver-gateway-failure");
 const preflightUtils: typeof import("./onboard/preflight") = require("./onboard/preflight");
 const clusterImagePatch: typeof import("./cluster-image-patch") = require("./cluster-image-patch");
 const {
@@ -1630,27 +1600,6 @@ function runCaptureOpenshell(
   return runCapture(openshellArgv(args, opts), opts);
 }
 
-let gatewayLifecycleCommandsSupported: boolean | null = null;
-
-function gatewayCliSupportsLifecycleCommands(): boolean {
-  if (gatewayLifecycleCommandsSupported !== null) {
-    return gatewayLifecycleCommandsSupported;
-  }
-
-  const help = runCaptureOpenshell(["gateway", "--help"], {
-    ignoreError: true,
-    suppressOutput: true,
-  });
-  const normalized = String(help || "").replace(ANSI_RE, "");
-  // Older OpenShell CLIs own the local gateway lifecycle. Package-managed
-  // OpenShell CLIs expose gateway registration only.
-  gatewayLifecycleCommandsSupported =
-    normalized.trim().length > 0 &&
-    /\bstart\b/.test(normalized) &&
-    /\bdestroy\b/.test(normalized);
-  return gatewayLifecycleCommandsSupported;
-}
-
 /**
  * Execute a shell command inside a sandbox for post-deployment verification.
  * Returns a structured result with status, stdout, stderr — or null if
@@ -2261,144 +2210,6 @@ function isInferenceRouteReady(provider: string, model: string): boolean {
     runCaptureOpenshell(["inference", "get"], { ignoreError: true }),
   );
   return Boolean(live && live.provider === provider && live.model === model);
-}
-
-function shouldRunCompatibleEndpointSandboxSmoke(
-  provider: string | null | undefined,
-  messagingChannels: string[] | null | undefined,
-  agent: AgentDefinition | null | undefined = null,
-): boolean {
-  const agentName = agent?.name || "openclaw";
-  return (
-    agentName === "openclaw" &&
-    provider === "compatible-endpoint" &&
-    Array.isArray(messagingChannels) &&
-    messagingChannels.length > 0
-  );
-}
-
-function spawnOutputToString(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (Buffer.isBuffer(value)) return value.toString("utf-8");
-  if (value == null) return "";
-  return String(value);
-}
-
-function buildCompatibleEndpointSandboxSmokeScript(model: string): string {
-  return `
-set -eu
-MODEL=${shellQuote(model)}
-CONFIG=/sandbox/.openclaw/openclaw.json
-
-python3 - "$CONFIG" "$MODEL" <<'PYCFG'
-import json
-import sys
-
-path = sys.argv[1]
-model = sys.argv[2]
-
-def die(message):
-    print(message, file=sys.stderr)
-    sys.exit(1)
-
-try:
-    with open(path, "r", encoding="utf-8") as f:
-        cfg = json.load(f)
-except Exception as exc:
-    die("could not read openclaw.json: %s" % exc)
-
-providers = cfg.get("models", {}).get("providers", {})
-if not isinstance(providers, dict):
-    die("openclaw.json models.providers is not an object")
-if "deepinfra" in providers:
-    die("openclaw.json contains a direct deepinfra provider; expected managed inference provider")
-
-provider = providers.get("${MANAGED_PROVIDER_ID}")
-if not isinstance(provider, dict):
-    die("openclaw.json missing models.providers.${MANAGED_PROVIDER_ID}")
-if provider.get("baseUrl") != "${INFERENCE_ROUTE_URL}":
-    die("models.providers.${MANAGED_PROVIDER_ID}.baseUrl is %r; expected ${INFERENCE_ROUTE_URL}" % provider.get("baseUrl"))
-if provider.get("apiKey") != "unused":
-    die("models.providers.${MANAGED_PROVIDER_ID}.apiKey must remain the non-secret placeholder 'unused'")
-
-primary = cfg.get("agents", {}).get("defaults", {}).get("model", {}).get("primary")
-expected_primary = "${MANAGED_PROVIDER_ID}/" + model
-if primary != expected_primary:
-    die("agents.defaults.model.primary is %r; expected %r" % (primary, expected_primary))
-
-print("OPENCLAW_CONFIG_OK")
-PYCFG
-
-payload_file="$(mktemp)"
-response_file="$(mktemp)"
-error_file="$(mktemp)"
-trap 'rm -f "$payload_file" "$response_file" "$error_file"' EXIT
-
-python3 - "$MODEL" >"$payload_file" <<'PYPAYLOAD'
-import json
-import sys
-
-model = sys.argv[1]
-print(json.dumps({
-    "model": model,
-    "messages": [
-        {"role": "user", "content": "Reply with exactly: PONG"}
-    ],
-    "max_tokens": 32,
-}))
-PYPAYLOAD
-
-curl -sS --connect-timeout 10 --max-time 60 \
-    "${INFERENCE_ROUTE_URL}/chat/completions" \
-    -H "Content-Type: application/json" \
-    -d "@$payload_file" >"$response_file" 2>"$error_file" || {
-  rc=$?
-  printf 'curl exit %s: ' "$rc" >&2
-  cat "$error_file" >&2
-  exit "$rc"
-}
-
-python3 - "$response_file" <<'PYRESP'
-import json
-import sys
-
-path = sys.argv[1]
-try:
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-except Exception as exc:
-    body = ""
-    try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            body = f.read(1000)
-    except Exception:
-        pass
-    print("inference.local returned non-JSON response: %s; body=%s" % (exc, body), file=sys.stderr)
-    sys.exit(1)
-
-content = (
-    data.get("choices", [{}])[0]
-    .get("message", {})
-    .get("content")
-)
-if not isinstance(content, str) or not content.strip():
-    print("inference.local response did not contain choices[0].message.content: %s" % json.dumps(data)[:1000], file=sys.stderr)
-    sys.exit(1)
-
-print("INFERENCE_SMOKE_OK " + content.strip()[:200])
-PYRESP
-`.trim();
-}
-
-function buildCompatibleEndpointSandboxSmokeCommand(model: string): string {
-  const script = buildCompatibleEndpointSandboxSmokeScript(model);
-  const encoded = Buffer.from(script, "utf8").toString("base64");
-  return [
-    'tmp="$(mktemp)"',
-    'trap \'rm -f "$tmp"\' EXIT',
-    `python3 -c 'import base64, pathlib, sys; pathlib.Path(sys.argv[1]).write_bytes(base64.b64decode(sys.argv[2]))' "$tmp" ${shellQuote(encoded)}`,
-    'sh "$tmp"',
-  ].join("; ");
 }
 
 function verifyCompatibleEndpointSandboxSmoke(options: {
@@ -3644,7 +3455,7 @@ function destroyGateway(): boolean {
     stopDockerDriverGatewayProcess();
   }
 
-  const hasLifecycleCommands = gatewayCliSupportsLifecycleCommands();
+  const hasLifecycleCommands = gatewayCliSupportsLifecycleCommands(runCaptureOpenshell);
   const gatewayRemoved = dockerDriver
     ? removeDockerDriverGatewayRegistration()
     : hasLifecycleCommands
@@ -3801,6 +3612,20 @@ function hostCommandExists(commandName: string): boolean {
   return !!runCapture(["sh", "-c", 'command -v "$1"', "--", commandName], {
     ignoreError: true,
   });
+}
+
+function ensureOllamaLinuxExtractionDependencies(): void {
+  if (hostCommandExists("zstd")) return;
+  console.log(
+    "  The Ollama Linux installer requires zstd for archive extraction. " +
+      "The next step uses sudo to install zstd; you may be prompted for your password.",
+  );
+  runShell(`if ! command -v apt-get >/dev/null 2>&1; then
+  echo "ERROR: Ollama requires zstd for extraction, and only apt-based Linux is supported here." >&2
+  echo "Install zstd manually (for example, sudo dnf install zstd or sudo pacman -S zstd), then rerun ${cliName()} onboard." >&2
+  exit 1
+fi
+sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends zstd`);
 }
 
 function captureProcessArgs(pid: number): string {
@@ -4905,18 +4730,16 @@ async function preflight(
   // metadata can be stale after a manual `docker rm`. See #2020. Newer
   // package-managed OpenShell gateways do not have an openshell-cluster-*
   // Docker container, so the live CLI health check is the source of truth.
-  if (gatewayReuseState === "healthy" && gatewayCliSupportsLifecycleCommands()) {
+  if (gatewayReuseState === "healthy" && gatewayCliSupportsLifecycleCommands(runCaptureOpenshell)) {
     const containerState = verifyGatewayContainerRunning();
     if (containerState === "missing") {
       console.log("  Gateway metadata is stale (container not running). Cleaning up...");
       runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
-      if (destroyGateway()) {
-        gatewayReuseState = "missing";
-        console.log("  ✓ Stale gateway metadata cleaned up");
-      } else {
-        gatewayReuseState = "stale";
-        console.warn("  ! Stale gateway metadata cleanup failed; leaving registry state intact.");
-      }
+      gatewayReuseState = destroyGatewayForReuse(
+        destroyGateway,
+        "  ✓ Stale gateway metadata cleaned up",
+        "  ! Stale gateway metadata cleanup failed; leaving registry state intact.",
+      );
     } else if (containerState === "unknown") {
       // Docker probe failed but cached metadata says healthy. Try the host-level
       // HTTP probe — it doesn't depend on Docker, so it can confirm the gateway
@@ -4946,13 +4769,11 @@ async function preflight(
         `  Gateway container is running but http://127.0.0.1:${GATEWAY_PORT}/ is not responding. Recreating...`,
       );
       runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
-      if (destroyGateway()) {
-        gatewayReuseState = "missing";
-        console.log("  ✓ Stale gateway cleaned up");
-      } else {
-        gatewayReuseState = "stale";
-        console.warn("  ! Stale gateway cleanup failed; leaving registry state intact.");
-      }
+      gatewayReuseState = destroyGatewayForReuse(
+        destroyGateway,
+        "  ✓ Stale gateway cleaned up",
+        "  ! Stale gateway cleanup failed; leaving registry state intact.",
+      );
     } else {
       const imageDrift = getGatewayClusterImageDrift();
       if (imageDrift) {
@@ -4960,13 +4781,11 @@ async function preflight(
           `  Gateway image ${imageDrift.currentVersion} does not match openshell ${imageDrift.expectedVersion}. Recreating...`,
         );
         stopAllDashboardForwards();
-        if (destroyGateway()) {
-          gatewayReuseState = "missing";
-          console.log("  ✓ Previous gateway cleaned up");
-        } else {
-          gatewayReuseState = "stale";
-          console.warn("  ! Previous gateway cleanup failed; leaving registry state intact.");
-        }
+        gatewayReuseState = destroyGatewayForReuse(
+          destroyGateway,
+          "  ✓ Previous gateway cleaned up",
+          "  ! Previous gateway cleanup failed; leaving registry state intact.",
+        );
       }
     }
   }
@@ -4974,11 +4793,11 @@ async function preflight(
   if (gatewayReuseState === "stale" || gatewayReuseState === "active-unnamed") {
     console.log(`  Cleaning up previous ${cliDisplayName()} session...`);
     runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
-    if (destroyGateway()) {
-      console.log("  ✓ Previous session cleaned up");
-    } else {
-      console.warn("  ! Previous session cleanup failed; continuing with existing gateway state.");
-    }
+    warnIfGatewayDestroyFails(
+      destroyGateway,
+      "  ✓ Previous session cleaned up",
+      "  ! Previous session cleanup failed; continuing with existing gateway state.",
+    );
   }
 
   // Clean up orphaned Docker containers from interrupted onboard (e.g. Ctrl+C
@@ -5469,6 +5288,7 @@ async function startDockerDriverGateway({
       ...gatewayEnv,
     },
   });
+  const childExit = trackChildExit(child); // #3111 zombie-safe liveness
   child.unref();
   const childPid = child.pid ?? 0;
   if (childPid <= 0) {
@@ -5479,7 +5299,7 @@ async function startDockerDriverGateway({
   const pollCount = envInt("NEMOCLAW_HEALTH_POLL_COUNT", 30);
   const pollInterval = envInt("NEMOCLAW_HEALTH_POLL_INTERVAL", 2);
   for (let i = 0; i < pollCount; i += 1) {
-    if (!isPidAlive(childPid)) {
+    if (childExit.exited || !isPidAlive(childPid)) {
       break;
     }
     if (!registerDockerDriverGatewayEndpoint()) {
@@ -5491,9 +5311,11 @@ async function startDockerDriverGateway({
       ignoreError: true,
     });
     const currentInfo = runCaptureOpenshell(["gateway", "info"], { ignoreError: true });
+    // #3111: gate the healthy log on a real TCP probe. See
+    // ./onboard/gateway-tcp-readiness for why TCP, not HTTP. TODO(#3213).
     if (
       isGatewayHealthy(status, namedInfo, currentInfo) &&
-      (await isDockerDriverGatewayHttpReady())
+      (await isGatewayTcpReady())
     ) {
       console.log("  ✓ Docker-driver gateway is healthy");
       return;
@@ -5501,25 +5323,7 @@ async function startDockerDriverGateway({
     if (i < pollCount - 1) sleep(pollInterval);
   }
 
-  const tail = fs.existsSync(logPath)
-    ? fs
-        .readFileSync(logPath, "utf-8")
-        .split("\n")
-        .filter(Boolean)
-        .slice(-20)
-        .join("\n")
-    : "";
-  if (exitOnFailure) {
-    console.error("  Docker-driver gateway failed to start.");
-    if (tail) {
-      console.error("  Gateway log tail:");
-      for (const line of tail.split("\n")) console.error(`    ${redact(line)}`);
-    }
-    console.error("  Troubleshooting:");
-    console.error(`    tail -100 ${logPath}`);
-    console.error("    docker info --format '{{json .CDISpecDirs}}'");
-    process.exit(1);
-  }
+  reportDockerDriverGatewayStartFailure(logPath, childExit, { exitOnFailure });
   throw new Error("Docker-driver gateway failed to start");
 }
 
@@ -8389,7 +8193,11 @@ async function setupNim(
           });
           sleep(2);
         } else {
-          console.log("  Installing Ollama via official installer...");
+          ensureOllamaLinuxExtractionDependencies();
+          console.log(
+            "  The Ollama installer creates a system user, a systemd service, and writes to /usr/local. " +
+              "It uses sudo for those steps; you may be prompted for your password.",
+          );
           runShell("set -o pipefail; curl -fsSL https://ollama.com/install.sh | sh");
           // Give the just-started ollama.service a moment to bind port
           // 11434 before we probe or apply the systemd drop-in override.
@@ -8414,6 +8222,11 @@ async function setupNim(
           // start: manual launch with the loopback binding.
           if (!isWsl() && hasOllamaSystemdUnit) {
             console.log("  Configuring Ollama systemd loopback override...");
+            console.log(
+              `  Applying an Ollama systemd override (OLLAMA_HOST=127.0.0.1:${OLLAMA_PORT}). ` +
+                "The next steps use sudo to write the drop-in, reload systemd, and restart the service; " +
+                "you may be prompted for your password.",
+            );
             const dropInBody = `[Service]\nEnvironment="OLLAMA_HOST=127.0.0.1:${OLLAMA_PORT}"\n`;
             const tmpDropIn = secureTempFile("nemoclaw-ollama-override", ".conf");
             fs.writeFileSync(tmpDropIn, dropInBody, { mode: 0o644 });
@@ -10079,7 +9892,12 @@ async function setupPoliciesWithSelection(
     supportOptions,
     customPresetNames,
   );
-  let chosen = selectedPresets
+  const filterSupportedPresetNames = (presetNames: string[]) =>
+    presetNames.filter(
+      (name) =>
+        customPresetNames.has(name) || policies.setupPolicyPresetSupported(name, supportOptions),
+    );
+  let chosen = selectedPresets !== null
     ? policies.clampSetupPolicyPresetNames(
         selectedPresets,
         selectablePresets,
@@ -10089,7 +9907,7 @@ async function setupPoliciesWithSelection(
     : null;
 
   // Resume path: caller supplies the preset list from a previous run.
-  if (selectedPresets && selectedPresets.length > 0) {
+  if (selectedPresets !== null) {
     const resumeSelection = chosen || [];
     if (onSelection) onSelection(resumeSelection);
     if (!waitForSandboxReady(sandboxName)) {
@@ -10123,15 +9941,16 @@ async function setupPoliciesWithSelection(
     }
 
     if (policyMode === "custom" || policyMode === "list") {
-      chosen = parsePolicyPresetEnv(process.env.NEMOCLAW_POLICY_PRESETS || "");
-      if (chosen.length === 0) {
+      const envPresets = parsePolicyPresetEnv(process.env.NEMOCLAW_POLICY_PRESETS || "");
+      if (envPresets.length === 0) {
         console.error("  NEMOCLAW_POLICY_PRESETS is required when NEMOCLAW_POLICY_MODE=custom.");
         process.exit(1);
       }
+      chosen = filterSupportedPresetNames(envPresets);
       isAuthoritative = true;
     } else if (policyMode === "suggested" || policyMode === "default" || policyMode === "auto") {
       const envPresets = parsePolicyPresetEnv(process.env.NEMOCLAW_POLICY_PRESETS || "");
-      if (envPresets.length > 0) chosen = envPresets;
+      if (envPresets.length > 0) chosen = filterSupportedPresetNames(envPresets);
     } else {
       // #2429: step 8/8 runs after the sandbox is created. Exiting here left
       // the sandbox with no presets. Warn, optionally suggest the intended
@@ -11355,18 +11174,16 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     // metadata can be stale after a manual `docker rm`. See #2020. Newer
     // package-managed OpenShell gateways do not have an openshell-cluster-*
     // Docker container, so the live CLI health check is the source of truth.
-    if (gatewayReuseState === "healthy" && gatewayCliSupportsLifecycleCommands()) {
+    if (gatewayReuseState === "healthy" && gatewayCliSupportsLifecycleCommands(runCaptureOpenshell)) {
       const containerState = verifyGatewayContainerRunning();
       if (containerState === "missing") {
         console.log("  Gateway metadata is stale (container not running). Cleaning up...");
         runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
-        if (destroyGateway()) {
-          gatewayReuseState = "missing";
-          console.log("  ✓ Stale gateway metadata cleaned up");
-        } else {
-          gatewayReuseState = "stale";
-          console.warn("  ! Stale gateway metadata cleanup failed; leaving registry state intact.");
-        }
+        gatewayReuseState = destroyGatewayForReuse(
+          destroyGateway,
+          "  ✓ Stale gateway metadata cleaned up",
+          "  ! Stale gateway metadata cleanup failed; leaving registry state intact.",
+        );
       } else if (containerState === "unknown") {
         // Docker probe failed but cached metadata says healthy. Try the host-level
         // HTTP probe — it doesn't depend on Docker, so it can confirm the gateway
@@ -11401,13 +11218,11 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
           `  Gateway container is running but http://127.0.0.1:${GATEWAY_PORT}/ is not responding. Recreating...`,
         );
         runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
-        if (destroyGateway()) {
-          gatewayReuseState = "missing";
-          console.log("  ✓ Stale gateway cleaned up");
-        } else {
-          gatewayReuseState = "stale";
-          console.warn("  ! Stale gateway cleanup failed; leaving registry state intact.");
-        }
+        gatewayReuseState = destroyGatewayForReuse(
+          destroyGateway,
+          "  ✓ Stale gateway cleaned up",
+          "  ! Stale gateway cleanup failed; leaving registry state intact.",
+        );
       } else {
         const imageDrift = getGatewayClusterImageDrift();
         if (imageDrift) {
@@ -11415,13 +11230,11 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
             `  Gateway image ${imageDrift.currentVersion} does not match openshell ${imageDrift.expectedVersion}. Recreating...`,
           );
           stopAllDashboardForwards();
-          if (destroyGateway()) {
-            gatewayReuseState = "missing";
-            console.log("  ✓ Previous gateway cleaned up");
-          } else {
-            gatewayReuseState = "stale";
-            console.warn("  ! Previous gateway cleanup failed; leaving registry state intact.");
-          }
+          gatewayReuseState = destroyGatewayForReuse(
+            destroyGateway,
+            "  ✓ Previous gateway cleaned up",
+            "  ! Previous gateway cleanup failed; leaving registry state intact.",
+          );
         }
       }
     }
@@ -11895,8 +11708,14 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         policies.listCustomPresets(sandboxName).map((p: { name: string }) => p.name),
       ),
     );
+    const recordedPolicyPresetsHaveUnsupported =
+      Array.isArray(recordedPolicyPresets) &&
+      recordedPolicyPresetsForSupport.length !== recordedPolicyPresets.length;
     const resumePolicies =
-      resume && sandboxName && arePolicyPresetsApplied(sandboxName, recordedPolicyPresetsForSupport);
+      resume &&
+      sandboxName &&
+      !recordedPolicyPresetsHaveUnsupported &&
+      arePolicyPresetsApplied(sandboxName, recordedPolicyPresetsForSupport);
     if (resumePolicies) {
       skippedStepMessage("policies", recordedPolicyPresetsForSupport.join(", "));
       onboardSession.markStepComplete(
@@ -11917,7 +11736,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       });
       const appliedPolicyPresets = await setupPoliciesWithSelection(sandboxName, {
         selectedPresets:
-          recordedPolicyPresetsForSupport.length > 0
+          Array.isArray(recordedPolicyPresets)
             ? recordedPolicyPresetsForSupport
             : null,
         enabledChannels:

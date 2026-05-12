@@ -36,7 +36,7 @@ describe("gateway liveness probe (#2020)", () => {
     expect(preflightEnd).toBeGreaterThan(preflightStart);
     const preflightSection = content.slice(preflightStart, preflightEnd);
     const preflightProbe = preflightSection.match(
-      /let gatewayReuseState = gatewaySnapshot\.gatewayReuseState[\s\S]*?verifyGatewayContainerRunning\(\)[\s\S]*?gatewayReuseState = "missing"/,
+      /let gatewayReuseState = gatewaySnapshot\.gatewayReuseState[\s\S]*?verifyGatewayContainerRunning\(\)[\s\S]*?destroyGatewayForReuse\(/,
     );
     expect(preflightProbe).toBeTruthy();
   });
@@ -78,13 +78,18 @@ describe("gateway liveness probe (#2020)", () => {
   });
 
   it("does not keep stale or drifted gateways reusable when cleanup fails", () => {
+    const cleanupHelper = fs.readFileSync(
+      path.join(ROOT, "src/lib/onboard/gateway-cleanup.ts"),
+      "utf-8",
+    );
     const failedStaleCleanup = content.match(
-      /else \{\s*gatewayReuseState = "stale";\s*console\.warn\("  ! Stale gateway metadata cleanup failed; leaving registry state intact\."\);/g,
+      /destroyGatewayForReuse\(\s*destroyGateway,\s*"  ✓ Stale gateway metadata cleaned up",\s*"  ! Stale gateway metadata cleanup failed; leaving registry state intact\."/g,
     );
     const failedDriftCleanup = content.match(
-      /else \{\s*gatewayReuseState = "stale";\s*console\.warn\("  ! Previous gateway cleanup failed; leaving registry state intact\."\);/g,
+      /destroyGatewayForReuse\(\s*destroyGateway,\s*"  ✓ Previous gateway cleaned up",\s*"  ! Previous gateway cleanup failed; leaving registry state intact\."/g,
     );
 
+    expect(cleanupHelper).toMatch(/return "stale"/);
     expect(failedStaleCleanup?.length).toBeGreaterThanOrEqual(2);
     expect(failedDriftCleanup?.length).toBeGreaterThanOrEqual(2);
   });
@@ -113,7 +118,7 @@ describe("gateway liveness probe (#2020)", () => {
     expect(branchBody).not.toMatch(/gatewayReuseState\s*=\s*"missing"/);
   });
 
-  it("Docker-driver gateway startup requires live HTTP before reporting healthy (#3111)", () => {
+  it("Docker-driver gateway startup requires a live probe before reporting healthy (#3111)", () => {
     const dockerStart = content.indexOf("async function startDockerDriverGateway(");
     const dockerEnd = content.indexOf("\nasync function startGateway(", dockerStart);
     expect(dockerStart).toBeGreaterThanOrEqual(0);
@@ -121,7 +126,7 @@ describe("gateway liveness probe (#2020)", () => {
     const dockerSection = content.slice(dockerStart, dockerEnd);
 
     expect(dockerSection).toMatch(
-      /isGatewayHealthy\(status, namedInfo, currentInfo\)[\s\S]*?await isDockerDriverGatewayHttpReady\(\)[\s\S]*?Docker-driver gateway is healthy/,
+      /isGatewayHealthy\(status, namedInfo, currentInfo\)[\s\S]*?await isGatewayTcpReady\(\)[\s\S]*?Docker-driver gateway is healthy/,
     );
     expect(dockerSection).toMatch(
       /registerDockerDriverGatewayEndpoint\(\)[\s\S]*?await isDockerDriverGatewayHttpReady\(\)[\s\S]*?Reusing existing Docker-driver gateway/,
