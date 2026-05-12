@@ -122,9 +122,13 @@ async function main(): Promise<void> {
       }
     }
   } catch (error: unknown) {
+    // Do not write exception details to artifacts. This catch can include
+    // network-layer failures from the GitHub API dispatch path, and those
+    // messages are not needed in uploaded advisor artifacts.
+    console.error(`E2E advisor dispatch failed: ${error instanceof Error ? error.message : String(error)}`);
     output = {
       status: "failed",
-      reason: error instanceof Error ? error.message : String(error),
+      reason: "E2E advisor dispatch failed; see workflow logs for details",
       workflow: targetWorkflow,
     };
   }
@@ -361,6 +365,9 @@ async function dispatchWorkflow({
   const safeInputs = validateDispatchInputs(inputs);
   const dispatchUrl = `https://api.github.com/repos/${safeRepo}/actions/workflows/${encodeURIComponent(safeWorkflow)}/dispatches`;
 
+  // lgtm[js/file-access-to-http] The request body is constructed only after
+  // same-repository/OWNER-or-MEMBER gating and strict validation of the target
+  // workflow, ref, PR number, and comma-separated E2E job names.
   const response = await fetch(dispatchUrl, {
     method: "POST",
     headers: {
