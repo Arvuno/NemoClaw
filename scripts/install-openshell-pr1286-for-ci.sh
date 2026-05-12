@@ -83,7 +83,8 @@ gnu_target="$2"
 zig_target="$3"
 
 git config --global --add safe.directory /work
-git fetch --tags --force
+git fetch origin 'refs/tags/v*:refs/tags/v*' --force
+mise trust /work/mise.toml
 mise install --locked
 mise x -- rustup target add "$cli_target" "$gnu_target"
 
