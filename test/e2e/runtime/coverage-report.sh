@@ -5,12 +5,12 @@
 # Render the E2E scenario coverage report as Markdown to stdout.
 #
 # Usage:
-#   bash test/e2e/coverage-report.sh > coverage.md
+#   bash test/e2e/runtime/coverage-report.sh > coverage.md
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 TSX_BIN="${REPO_ROOT}/node_modules/.bin/tsx"
 if [[ -x "${TSX_BIN}" ]]; then

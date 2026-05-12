@@ -5,7 +5,7 @@
 # E2E scenario runner entrypoint.
 #
 # Usage:
-#   bash test/e2e/run-scenario.sh <scenario-id> [--plan-only|--validate-only|--dry-run]
+#   bash test/e2e/runtime/run-scenario.sh <scenario-id> [--plan-only|--validate-only|--dry-run]
 #
 # Flags:
 #   --plan-only      Resolve metadata and print the plan only. Writes
@@ -27,7 +27,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+E2E_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 SCENARIO_ID=""
 PLAN_ONLY=0
@@ -36,7 +37,7 @@ DRY_RUN=0
 
 usage() {
   cat >&2 <<'USAGE'
-Usage: bash test/e2e/run-scenario.sh <scenario-id> [--plan-only|--validate-only|--dry-run]
+Usage: bash test/e2e/runtime/run-scenario.sh <scenario-id> [--plan-only|--validate-only|--dry-run]
 USAGE
 }
 
@@ -141,14 +142,14 @@ fi
 . "${SCRIPT_DIR}/lib/env.sh"
 # shellcheck source=lib/context.sh
 . "${SCRIPT_DIR}/lib/context.sh"
-# shellcheck source=lib/setup/install.sh
-. "${SCRIPT_DIR}/lib/setup/install.sh"
-# shellcheck source=lib/setup/onboard.sh
-. "${SCRIPT_DIR}/lib/setup/onboard.sh"
-# shellcheck source=lib/assert/gateway-alive.sh
-. "${SCRIPT_DIR}/lib/assert/gateway-alive.sh"
-# shellcheck source=lib/assert/sandbox-alive.sh
-. "${SCRIPT_DIR}/lib/assert/sandbox-alive.sh"
+# shellcheck source=../nemoclaw_scenarios/install/dispatch.sh
+. "${E2E_ROOT}/nemoclaw_scenarios/install/dispatch.sh"
+# shellcheck source=../nemoclaw_scenarios/onboard/dispatch.sh
+. "${E2E_ROOT}/nemoclaw_scenarios/onboard/dispatch.sh"
+# shellcheck source=../validation_suites/assert/gateway-alive.sh
+. "${E2E_ROOT}/validation_suites/assert/gateway-alive.sh"
+# shellcheck source=../validation_suites/assert/sandbox-alive.sh
+. "${E2E_ROOT}/validation_suites/assert/sandbox-alive.sh"
 
 # Apply standard non-interactive env (and trace it).
 e2e_env_apply_noninteractive
@@ -156,7 +157,7 @@ e2e_env_trace "env:noninteractive"
 
 # Emit normalized context from the resolved plan.
 e2e_context_init
-"${SCRIPT_DIR}/lib/emit-context-from-plan.sh" "${E2E_CONTEXT_DIR}/plan.json"
+"${E2E_ROOT}/nemoclaw_scenarios/helpers/emit-context-from-plan.sh" "${E2E_CONTEXT_DIR}/plan.json"
 
 # Extract the install method and onboarding profile from the plan so we can
 # dispatch to the right helpers.

@@ -121,10 +121,44 @@ function validateSuites(doc: Record<string, unknown>, file: string): SuitesFile 
   return doc as unknown as SuitesFile;
 }
 
+/**
+ * Resolve the concrete on-disk locations of the three metadata files
+ * given the E2E root directory (`test/e2e/`).
+ *
+ * Post-restructure layout:
+ *   <e2e-root>/nemoclaw_scenarios/scenarios.yaml
+ *   <e2e-root>/nemoclaw_scenarios/expected-states.yaml
+ *   <e2e-root>/validation_suites/suites.yaml
+ *
+ * For backward compatibility (and for tests that synthesise a flat
+ * fixture directory) we also accept a directory that already contains
+ * all three YAML files side by side.
+ */
+function resolveMetadataPaths(dir: string): {
+  scenarios: string;
+  states: string;
+  suites: string;
+} {
+  const flatScenarios = path.join(dir, "scenarios.yaml");
+  const flatStates = path.join(dir, "expected-states.yaml");
+  const flatSuites = path.join(dir, "suites.yaml");
+  if (
+    fs.existsSync(flatScenarios) &&
+    fs.existsSync(flatStates) &&
+    fs.existsSync(flatSuites)
+  ) {
+    return { scenarios: flatScenarios, states: flatStates, suites: flatSuites };
+  }
+  return {
+    scenarios: path.join(dir, "nemoclaw_scenarios", "scenarios.yaml"),
+    states: path.join(dir, "nemoclaw_scenarios", "expected-states.yaml"),
+    suites: path.join(dir, "validation_suites", "suites.yaml"),
+  };
+}
+
 export function loadMetadataFromDir(dir: string): ResolverInput {
-  const scenariosPath = path.join(dir, "scenarios.yaml");
-  const statesPath = path.join(dir, "expected-states.yaml");
-  const suitesPath = path.join(dir, "suites.yaml");
+  const { scenarios: scenariosPath, states: statesPath, suites: suitesPath } =
+    resolveMetadataPaths(dir);
   const scenarios = validateScenarios(
     ensureObject(readYaml(scenariosPath), scenariosPath),
     scenariosPath,

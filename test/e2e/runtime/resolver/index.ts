@@ -5,7 +5,7 @@
  * CLI entrypoint for the E2E scenario resolver.
  *
  * Usage:
- *   tsx test/e2e/resolver/index.ts plan <scenario-id> [--context-dir <path>]
+ *   tsx test/e2e/runtime/resolver/index.ts plan <scenario-id> [--context-dir <path>]
  *
  * Writes `plan.json` under the context dir (default `.e2e/`) and prints a
  * human-readable plan to stdout. Exits non-zero on any resolution error.
@@ -38,8 +38,10 @@ function parseArgs(argv: string[]): {
   let contextDir = process.env.E2E_CONTEXT_DIR ?? ".e2e";
   let probesFromState = false;
   const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-  // resolver/ lives under test/e2e/, so metadata dir is one level up.
-  let metadataDir = path.resolve(scriptDir, "..");
+  // resolver/ lives under test/e2e/runtime/, so the E2E metadata root
+  // (which loadMetadataFromDir resolves further into nemoclaw_scenarios/
+  // and validation_suites/) is two levels up.
+  let metadataDir = path.resolve(scriptDir, "..", "..");
   while (args.length > 0) {
     const a = args.shift();
     if (a === "--context-dir") {

@@ -5,17 +5,18 @@
 # Run one or more functional suites against a completed E2E environment.
 #
 # Usage:
-#   bash test/e2e/run-suites.sh <suite-id> [<suite-id> ...]
+#   bash test/e2e/runtime/run-suites.sh <suite-id> [<suite-id> ...]
 #
-# Reads suite metadata from test/e2e/suites.yaml (or $E2E_SUITES_FILE).
-# Each suite script receives .e2e/context.env via E2E_CONTEXT_DIR and is
-# expected to source lib/context.sh if it needs specific keys.
+# Reads suite metadata from test/e2e/validation_suites/suites.yaml
+# (or $E2E_SUITES_FILE). Each suite script receives .e2e/context.env
+# via E2E_CONTEXT_DIR and is expected to source runtime/lib/context.sh if
+# it needs specific keys.
 #
 # Environment:
 #   E2E_CONTEXT_DIR   Directory containing context.env (default: <repo>/.e2e)
 #   E2E_SUITES_FILE   Override suites metadata file (for tests)
 #   E2E_SUITES_DIR    Override the directory that suite scripts are resolved
-#                     against (default: test/e2e/)
+#                     against (default: test/e2e/validation_suites/)
 #   E2E_DRY_RUN       When 1, suite scripts run in dry-run mode themselves.
 #
 # Exit code: 0 if all steps pass; non-zero at the first failing step.
@@ -23,17 +24,19 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+E2E_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+VALIDATION_SUITES_DIR="${E2E_ROOT}/validation_suites"
 
 if (($# == 0)); then
   echo "run-suites: at least one suite id required" >&2
-  echo "Usage: bash test/e2e/run-suites.sh <suite-id> [<suite-id> ...]" >&2
+  echo "Usage: bash test/e2e/runtime/run-suites.sh <suite-id> [<suite-id> ...]" >&2
   exit 2
 fi
 
 export E2E_CONTEXT_DIR="${E2E_CONTEXT_DIR:-${REPO_ROOT}/.e2e}"
-SUITES_FILE="${E2E_SUITES_FILE:-${SCRIPT_DIR}/suites.yaml}"
-SUITES_DIR="${E2E_SUITES_DIR:-${SCRIPT_DIR}}"
+SUITES_FILE="${E2E_SUITES_FILE:-${VALIDATION_SUITES_DIR}/suites.yaml}"
+SUITES_DIR="${E2E_SUITES_DIR:-${VALIDATION_SUITES_DIR}}"
 
 CTX_FILE="${E2E_CONTEXT_DIR}/context.env"
 if [[ ! -f "${CTX_FILE}" ]]; then
