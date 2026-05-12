@@ -85,6 +85,7 @@ type OnboardTestInternals = {
   getBlueprintMinOpenshellVersion: (rootDir?: string) => string | null;
   getBlueprintMaxOpenshellVersion: (rootDir?: string) => string | null;
   getDockerDriverGatewayEnv: (versionOutput?: string | null) => Record<string, string>;
+  areRequiredDockerDriverBinariesPresent: (platform?: NodeJS.Platform) => boolean;
   getDockerDriverGatewayRuntimeDriftFromSnapshot: (snapshot: {
     processEnv: Record<string, string> | null;
     processExe: string | null;
@@ -207,6 +208,7 @@ function isOnboardTestInternals(
     typeof value.buildDirectSandboxGpuProofCommands === "function" &&
     typeof value.classifySandboxCreateFailure === "function" &&
     typeof value.getDockerDriverGatewayEnv === "function" &&
+    typeof value.areRequiredDockerDriverBinariesPresent === "function" &&
     typeof value.getDockerDriverGatewayRuntimeDriftFromSnapshot === "function" &&
     typeof value.isLinuxDockerDriverGatewayEnabled === "function" &&
     typeof value.isDockerDriverGatewayPortListener === "function" &&
@@ -263,6 +265,7 @@ const {
   getBlueprintMinOpenshellVersion,
   getBlueprintMaxOpenshellVersion,
   getDockerDriverGatewayEnv,
+  areRequiredDockerDriverBinariesPresent,
   getDockerDriverGatewayRuntimeDriftFromSnapshot,
   isLinuxDockerDriverGatewayEnabled,
   isDockerDriverGatewayPortListener,
@@ -403,14 +406,43 @@ network_policies:
     ]);
   });
 
-  it("models the Linux OpenShell Docker-driver gateway environment", () => {
+  it("models the OpenShell Docker-driver gateway environment", () => {
     expect(isLinuxDockerDriverGatewayEnabled("linux")).toBe(true);
-    expect(isLinuxDockerDriverGatewayEnabled("darwin")).toBe(false);
+    expect(isLinuxDockerDriverGatewayEnabled("darwin")).toBe(true);
+    expect(isLinuxDockerDriverGatewayEnabled("win32")).toBe(false);
     const env = getDockerDriverGatewayEnv("openshell 0.0.37");
     expect(env.OPENSHELL_DRIVERS).toBe("docker");
     expect(env.OPENSHELL_GRPC_ENDPOINT).toBe("http://127.0.0.1:8080");
     expect(env.OPENSHELL_CLUSTER_IMAGE).toBeUndefined();
     expect(env.OPENSHELL_DOCKER_SUPERVISOR_IMAGE).toContain(":0.0.37");
+  });
+
+  it("requires platform-specific Docker-driver binaries", () => {
+    const oldGateway = process.env.NEMOCLAW_OPENSHELL_GATEWAY_BIN;
+    const oldSandbox = process.env.NEMOCLAW_OPENSHELL_SANDBOX_BIN;
+    try {
+      process.env.NEMOCLAW_OPENSHELL_GATEWAY_BIN = "/tmp/openshell-gateway";
+      delete process.env.NEMOCLAW_OPENSHELL_SANDBOX_BIN;
+      expect(areRequiredDockerDriverBinariesPresent("darwin")).toBe(true);
+      expect(areRequiredDockerDriverBinariesPresent("linux")).toBe(false);
+
+      process.env.NEMOCLAW_OPENSHELL_SANDBOX_BIN = "/tmp/openshell-sandbox";
+      expect(areRequiredDockerDriverBinariesPresent("linux")).toBe(true);
+
+      delete process.env.NEMOCLAW_OPENSHELL_GATEWAY_BIN;
+      expect(areRequiredDockerDriverBinariesPresent("darwin")).toBe(false);
+    } finally {
+      if (oldGateway === undefined) {
+        delete process.env.NEMOCLAW_OPENSHELL_GATEWAY_BIN;
+      } else {
+        process.env.NEMOCLAW_OPENSHELL_GATEWAY_BIN = oldGateway;
+      }
+      if (oldSandbox === undefined) {
+        delete process.env.NEMOCLAW_OPENSHELL_SANDBOX_BIN;
+      } else {
+        process.env.NEMOCLAW_OPENSHELL_SANDBOX_BIN = oldSandbox;
+      }
+    }
   });
 
   it("detects stale Docker-driver gateway runtime state before reuse", () => {
@@ -479,6 +511,12 @@ network_policies:
       isDockerDriverGatewayPortListener(
         { ok: false, process: "openshell", pid: 1234 },
         { ...opts, platform: "darwin" },
+      ),
+    ).toBe(true);
+    expect(
+      isDockerDriverGatewayPortListener(
+        { ok: false, process: "openshell", pid: 1234 },
+        { ...opts, platform: "win32" },
       ),
     ).toBe(false);
     expect(
@@ -2484,7 +2522,7 @@ mod._load = function(req, parent, isMain) {
   }
   return origLoad.call(this, req, parent, isMain);
 };
-Object.defineProperty(process, "platform", { value: "darwin" });
+Object.defineProperty(process, "platform", { value: "freebsd" });
 const { startGateway } = require(${onboardPath});
 startGateway(null).catch(() => {});
 `;

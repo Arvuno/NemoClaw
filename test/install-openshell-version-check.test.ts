@@ -22,7 +22,7 @@ function writeExecutable(target: string, contents: string) {
 function runWithInstalledVersion(
   version: string,
   extraEnv: NodeJS.ProcessEnv = {},
-  options: { driverBins?: boolean; os?: string; arch?: string } = {},
+  options: { driverBins?: boolean | "gateway"; os?: string; arch?: string } = {},
 ) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-openshell-ver-"));
   try {
@@ -51,6 +51,8 @@ exit 99`,
         `#!/usr/bin/env bash
 exit 0`,
       );
+    }
+    if (options.driverBins !== false && options.driverBins !== "gateway") {
       writeExecutable(
         path.join(fakeBin, "openshell-sandbox"),
         `#!/usr/bin/env bash
@@ -99,6 +101,33 @@ describe("install-openshell.sh version check", { timeout: 15_000 }, () => {
     expect(result.status).not.toBe(0);
     expect(result.stdout).toMatch(/missing Docker-driver binaries/);
     expect(result.stdout).toMatch(/Installing OpenShell from release 'v0\.0\.37'/);
+  });
+
+  it("accepts macOS openshell 0.0.37 when the gateway binary is installed", () => {
+    const result = runWithInstalledVersion("0.0.37", {}, {
+      driverBins: "gateway",
+      os: "Darwin",
+      arch: "arm64",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toMatch(/already installed.*0\.0\.37/);
+  });
+
+  it("triggers reinstall when macOS openshell 0.0.37 is missing the gateway binary", () => {
+    const result = runWithInstalledVersion("0.0.37", {}, {
+      driverBins: false,
+      os: "Darwin",
+      arch: "arm64",
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stdout).toMatch(/missing Docker-driver binaries/);
+    expect(result.stdout).toMatch(/Installing OpenShell from release 'v0\.0\.37'/);
+  });
+
+  it("declares the macOS arm64 gateway helper asset", () => {
+    const source = fs.readFileSync(SCRIPT, "utf-8");
+    expect(source).toContain("openshell-gateway-aarch64-apple-darwin.tar.gz");
+    expect(source).toContain("openshell-gateway-checksums-sha256.txt");
   });
 
   it("triggers upgrade when openshell 0.0.36 is installed (below current floor)", () => {

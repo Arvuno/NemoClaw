@@ -3787,7 +3787,7 @@ function getGatewayLocalEndpoint(): string {
 function isLinuxDockerDriverGatewayEnabled(
   platform: NodeJS.Platform = process.platform,
 ): boolean {
-  return platform === "linux";
+  return platform === "linux" || platform === "darwin";
 }
 
 function getDockerDriverGatewayEndpoint(): string {
@@ -3840,6 +3840,15 @@ function resolveOpenShellSandboxBinary(): string | null {
     if (fs.existsSync(candidate)) return candidate;
   }
   return null;
+}
+
+function areRequiredDockerDriverBinariesPresent(
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  if (!isLinuxDockerDriverGatewayEnabled(platform)) return true;
+  if (!resolveOpenShellGatewayBinary()) return false;
+  if (platform === "linux" && !resolveOpenShellSandboxBinary()) return false;
+  return true;
 }
 
 function getOpenShellDockerSupervisorImage(versionOutput: string | null = null): string {
@@ -4685,8 +4694,7 @@ async function preflight(
         shouldUseOpenshellDevChannel() &&
         !isOpenshellDevVersion(currentVersionOutput);
       const needsDockerDriverBinaries =
-        isLinuxDockerDriverGatewayEnabled() &&
-        (!resolveOpenShellGatewayBinary() || !resolveOpenShellSandboxBinary());
+        isLinuxDockerDriverGatewayEnabled() && !areRequiredDockerDriverBinariesPresent();
       const needsUpgrade =
         !versionGte(currentVersion, minOpenshellVersion) ||
         needsDevChannel ||
@@ -4695,8 +4703,9 @@ async function preflight(
         if (needsDevChannel) {
           console.log("  OpenShell Docker-driver onboarding requires the dev channel. Upgrading...");
         } else if (needsDockerDriverBinaries) {
+          const required = process.platform === "linux" ? "gateway and sandbox" : "gateway";
           console.log(
-            "  OpenShell Docker-driver onboarding requires the gateway and sandbox binaries. Reinstalling...",
+            `  OpenShell Docker-driver onboarding requires the ${required} binaries. Reinstalling...`,
           );
         } else {
           console.log(
@@ -11888,6 +11897,7 @@ module.exports = {
   ensureValidatedBraveSearchCredential,
   formatEnvAssignment,
   getFutureShellPathHint,
+  areRequiredDockerDriverBinariesPresent,
   getGatewayBootstrapRepairPlan,
   getGatewayLocalEndpoint,
   getGatewayStartEnv,
