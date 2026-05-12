@@ -9327,7 +9327,6 @@ const {
 } = dashboardForward;
 const {
   stopAllDashboardForwards,
-  isPortBoundOnHost,
   findAvailableDashboardPort,
   ensureDashboardForward,
   ensureAgentDashboardForward,
