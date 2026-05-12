@@ -149,8 +149,7 @@ function parseArgs(argv: string[]): { root: string } {
         process.stderr.write("lint-conventions: --root requires a path\n");
         process.exit(2);
       }
-    }
-    else if (a === "-h" || a === "--help") {
+    } else if (a === "-h" || a === "--help") {
       process.stdout.write("tsx scripts/e2e/lint-conventions.ts [--root <repo-root>]\n");
       process.exit(0);
     } else {
