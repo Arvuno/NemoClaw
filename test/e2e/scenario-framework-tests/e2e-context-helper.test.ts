@@ -11,9 +11,22 @@ const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const CONTEXT_LIB = path.join(REPO_ROOT, "test/e2e/runtime/lib/context.sh");
 const RUN_SCENARIO = path.join(REPO_ROOT, "test/e2e/runtime/run-scenario.sh");
 
+function testEnv(env: Record<string, string> = {}): NodeJS.ProcessEnv {
+  return {
+    PATH: process.env.PATH ?? "/usr/bin:/bin",
+    HOME: process.env.HOME,
+    TMPDIR: process.env.TMPDIR,
+    TEMP: process.env.TEMP,
+    TMP: process.env.TMP,
+    CI: process.env.CI,
+    E2E_SPAWN_TIMEOUT_MS: process.env.E2E_SPAWN_TIMEOUT_MS,
+    ...env,
+  };
+}
+
 function runBash(script: string, env: Record<string, string> = {}): SpawnSyncReturns<string> {
   return spawnSync("bash", ["-c", script], {
-    env: { ...process.env, ...env },
+    env: testEnv(env),
     encoding: "utf8",
     timeout: Number(process.env.E2E_SPAWN_TIMEOUT_MS ?? 60_000),
     cwd: REPO_ROOT,
@@ -93,7 +106,7 @@ describe("E2E context helper (runtime/lib/context.sh)", () => {
         "bash",
         [RUN_SCENARIO, "ubuntu-repo-cloud-openclaw", "--dry-run"],
         {
-          env: { ...process.env, E2E_CONTEXT_DIR: tmp },
+          env: testEnv({ E2E_CONTEXT_DIR: tmp }),
           encoding: "utf8",
     timeout: Number(process.env.E2E_SPAWN_TIMEOUT_MS ?? 60_000),
           cwd: REPO_ROOT,
