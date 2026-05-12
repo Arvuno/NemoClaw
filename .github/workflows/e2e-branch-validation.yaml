@@ -153,7 +153,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: e2e-branch-validation-${{ inputs.pr_number || github.run_id }}
+  group: e2e-branch-validation-${{ inputs.pr_number || github.run_id }}-${{ inputs.test_suite }}
   cancel-in-progress: true
 
 jobs:
