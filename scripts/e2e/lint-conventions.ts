@@ -81,8 +81,8 @@ const STEP_RULES: Rule[] = [
       for (const raw of lines) {
         const line = raw.replace(/^\s+/, "");
         if (line.startsWith("#")) continue;
-        if (/^section\s+["']/.test(line)) {
-          return "calls section; filename carries the phase label";
+        if (/^(e2e_)?section(\s|$)/.test(line)) {
+          return "calls section/e2e_section; filename carries the phase label";
         }
       }
       return null;
@@ -143,7 +143,13 @@ function parseArgs(argv: string[]): { root: string } {
   const args = argv.slice(2);
   while (args.length > 0) {
     const a = args.shift()!;
-    if (a === "--root") root = args.shift();
+    if (a === "--root") {
+      root = args.shift();
+      if (!root) {
+        process.stderr.write("lint-conventions: --root requires a path\n");
+        process.exit(2);
+      }
+    }
     else if (a === "-h" || a === "--help") {
       process.stdout.write("tsx scripts/e2e/lint-conventions.ts [--root <repo-root>]\n");
       process.exit(0);
