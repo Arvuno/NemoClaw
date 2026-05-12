@@ -19,7 +19,7 @@ on:
       plan_only:
         description: "Resolve and print plan only (no install/onboard/suites)"
         required: false
-        default: "false"
+        default: "true"
         type: choice
         options:
           - "true"

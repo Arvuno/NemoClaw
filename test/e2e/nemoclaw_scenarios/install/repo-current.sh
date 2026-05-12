@@ -23,7 +23,8 @@ e2e_install_repo() {
   local repo_root
   repo_root="$(cd "${_E2E_INST_REPO_DIR}/../../../.." && pwd)"
   (
-    cd "${repo_root}" || exit
+    set -euo pipefail
+    cd "${repo_root}"
     npm install
     npm link
   )

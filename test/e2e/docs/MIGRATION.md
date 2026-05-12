@@ -3,15 +3,14 @@
 
 # E2E Migration Tracker
 
-This PR migrates all existing `test/e2e/test-*.sh` scripts into the
-scenario-based runner introduced by PR #3290. Full deep migration
-(Strategy B). Legacy scripts remain in the repo during this PR and run
-in parallel for 1–2 nightly cycles after merge; a follow-up PR retires
-them once parity is verified.
+This PR introduces the scenario-based E2E runner and Phase 1 migration
+infrastructure for gradually moving existing `test/e2e/test-*.sh` scripts into
+the matrix introduced by PR #3290. Legacy scripts remain in the repo while each
+wave is ported and verified; follow-up PRs retire them once parity is proven.
 
-**Merge gate:** All 40 legacy entry points must have a scenario-based
-equivalent that produces the same PASS/FAIL outcomes as the legacy
-script in a side-by-side CI run.
+**Merge gate for each migration wave:** every touched legacy entry point must
+have a scenario-based equivalent that produces the same PASS/FAIL outcomes as
+the legacy script in a side-by-side CI run.
 
 ## Reuse being absorbed
 
@@ -43,7 +42,7 @@ again, it's a 1-file change instead of a 24-file change.
 
 | Bucket | Legacy LOC | Status |
 |---|---:|---|
-| Wave 0 — fixtures, asserts, setup splits, conventions, parity workflow | — | ⬜ not started |
+| Wave 0 — fixtures, asserts, setup splits, conventions, parity workflow | — | 🟨 in progress |
 | Wave 1 — onboarding baseline | 1,101 | ⬜ |
 | Wave 2 — onboarding lifecycle | 2,013 | ⬜ |
 | Wave 3 — sandbox lifecycle | 2,891 | ⬜ |
