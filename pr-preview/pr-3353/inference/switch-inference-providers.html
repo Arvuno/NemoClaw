@@ -517,8 +517,11 @@ No restart is required.</p>
 <section id="switch-to-a-different-model">
 <h2>Switch to a Different Model<a class="headerlink" href="#switch-to-a-different-model" title="Link to this heading">#</a></h2>
 <p>Use <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">inference</span> <span class="pre">set</span></code> with the provider and model that match the upstream you want to use.
-The command updates the OpenShell inference route and synchronizes the running OpenClaw config so <code class="docutils literal notranslate"><span class="pre">agents.defaults.model.primary</span></code> continues to match the routed model.</p>
-<p>Pass <code class="docutils literal notranslate"><span class="pre">--sandbox</span> <span class="pre">&lt;name&gt;</span></code> when you do not want to use the default registered sandbox.</p>
+The command updates the OpenShell inference route and synchronizes the running agent config.
+For OpenClaw, it updates <code class="docutils literal notranslate"><span class="pre">agents.defaults.model.primary</span></code> and the matching provider namespace.
+For Hermes, it updates <code class="docutils literal notranslate"><span class="pre">/sandbox/.hermes/config.yaml</span></code> (<code class="docutils literal notranslate"><span class="pre">model.default</span></code>, <code class="docutils literal notranslate"><span class="pre">model.base_url</span></code>, and <code class="docutils literal notranslate"><span class="pre">model.provider:</span> <span class="pre">custom</span></code>) without rebuilding or restarting Hermes.</p>
+<p>Pass <code class="docutils literal notranslate"><span class="pre">--sandbox</span> <span class="pre">&lt;name&gt;</span></code> when you do not want to use the default registered sandbox.
+Under <code class="docutils literal notranslate"><span class="pre">nemohermes</span></code>, pass <code class="docutils literal notranslate"><span class="pre">--sandbox</span> <span class="pre">&lt;name&gt;</span></code> when more than one Hermes sandbox is registered.</p>
 <section id="nvidia-endpoints">
 <h3>NVIDIA Endpoints<a class="headerlink" href="#nvidia-endpoints" title="Link to this heading">#</a></h3>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>inference<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--provider<span class="w"> </span>nvidia-prod<span class="w"> </span>--model<span class="w"> </span>nvidia/nemotron-3-super-120b-a12b
@@ -550,6 +553,13 @@ The command updates the OpenShell inference route and synchronizes the running O
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>inference<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--provider<span class="w"> </span>compatible-anthropic-endpoint<span class="w"> </span>--model<span class="w"> </span>&lt;model-name&gt;
+</pre></div>
+</div>
+</section>
+<section id="hermes-provider">
+<h3>Hermes Provider<a class="headerlink" href="#hermes-provider" title="Link to this heading">#</a></h3>
+<p>For a NemoClaw-managed Hermes sandbox, use the Hermes alias with the registered Hermes Provider route:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemohermes<span class="w"> </span>inference<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--provider<span class="w"> </span>hermes-provider<span class="w"> </span>--model<span class="w"> </span>openai/gpt-5.4-mini
 </pre></div>
 </div>
 <section id="switching-from-responses-api-to-chat-completions">
@@ -678,7 +688,7 @@ If you change them on an existing sandbox, recreate the sandbox so the new value
 <ul class="simple">
 <li><p>The host keeps provider credentials.</p></li>
 <li><p>The sandbox continues to use <code class="docutils literal notranslate"><span class="pre">inference.local</span></code>.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">inference</span> <span class="pre">set</span></code> patches the selected running OpenClaw sandbox config and recomputes its config hash.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">inference</span> <span class="pre">set</span></code> patches the selected running OpenClaw or Hermes sandbox config and recomputes its config hash.</p></li>
 <li><p>Use <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span> <span class="pre">--resume</span> <span class="pre">--recreate-sandbox</span></code> for build-time settings such as context window, max tokens, reasoning mode, heartbeat cadence, or image contents.</p></li>
 <li><p>Local Ollama and local vLLM routes use local provider tokens rather than <code class="docutils literal notranslate"><span class="pre">OPENAI_API_KEY</span></code>. Rebuilds of older local-inference sandboxes clear the stale OpenAI credential requirement automatically.</p></li>
 </ul>
@@ -746,7 +756,8 @@ If you change them on an existing sandbox, recreate the sandbox so the new value
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#openai">OpenAI</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#anthropic">Anthropic</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#google-gemini">Google Gemini</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#compatible-endpoints">Compatible Endpoints</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#compatible-endpoints">Compatible Endpoints</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#hermes-provider">Hermes Provider</a><ul class="nav section-nav flex-column">
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#switching-from-responses-api-to-chat-completions">Switching from Responses API to Chat Completions</a></li>
 </ul>
 </li>
