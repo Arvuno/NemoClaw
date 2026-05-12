@@ -7,11 +7,12 @@
 # Splits out of lib/setup/install.sh to keep dispatcher logic flat and to
 # make the per-profile code discoverable by grep. Honors E2E_DRY_RUN.
 
-_E2E_INST_REPO_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck source=../env.sh
-. "${_E2E_INST_REPO_LIB_DIR}/env.sh"
-# shellcheck source=../install-path-refresh.sh
-. "${_E2E_INST_REPO_LIB_DIR}/install-path-refresh.sh"
+_E2E_INST_REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_E2E_INST_REPO_RUNTIME_LIB="$(cd "${_E2E_INST_REPO_DIR}/../../runtime/lib" && pwd)"
+# shellcheck source=../../runtime/lib/env.sh
+. "${_E2E_INST_REPO_RUNTIME_LIB}/env.sh"
+# shellcheck source=helpers/install-path-refresh.sh
+. "${_E2E_INST_REPO_DIR}/helpers/install-path-refresh.sh"
 
 e2e_install_repo() {
   e2e_env_trace "install-repo"
@@ -20,7 +21,7 @@ e2e_install_repo() {
     return 0
   fi
   local repo_root
-  repo_root="$(cd "${_E2E_INST_REPO_LIB_DIR}/../../.." && pwd)"
+  repo_root="$(cd "${_E2E_INST_REPO_DIR}/../../../.." && pwd)"
   (
     cd "${repo_root}" || exit
     npm install

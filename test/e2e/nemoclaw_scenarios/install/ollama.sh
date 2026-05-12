@@ -8,11 +8,12 @@
 # itself. E2E_OLLAMA_INSTALL_URL overrides the Ollama installer source
 # (useful for offline / mirror runners).
 
-_E2E_INST_OL_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck source=../env.sh
-. "${_E2E_INST_OL_LIB_DIR}/env.sh"
-# shellcheck source=install-curl.sh
-. "${_E2E_INST_OL_LIB_DIR}/setup/install-curl.sh"
+_E2E_INST_OL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_E2E_INST_OL_RUNTIME_LIB="$(cd "${_E2E_INST_OL_DIR}/../../runtime/lib" && pwd)"
+# shellcheck source=../../runtime/lib/env.sh
+. "${_E2E_INST_OL_RUNTIME_LIB}/env.sh"
+# shellcheck source=public-curl.sh
+. "${_E2E_INST_OL_DIR}/public-curl.sh"
 
 e2e_install_ollama() {
   e2e_env_trace "install-ollama"

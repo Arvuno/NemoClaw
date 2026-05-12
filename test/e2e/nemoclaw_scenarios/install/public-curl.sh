@@ -7,11 +7,12 @@
 # Pins the installer source via E2E_INSTALLER_URL; can verify the download
 # against E2E_INSTALLER_SHA256 when provided.
 
-_E2E_INST_CURL_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck source=../env.sh
-. "${_E2E_INST_CURL_LIB_DIR}/env.sh"
-# shellcheck source=../install-path-refresh.sh
-. "${_E2E_INST_CURL_LIB_DIR}/install-path-refresh.sh"
+_E2E_INST_CURL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_E2E_INST_CURL_RUNTIME_LIB="$(cd "${_E2E_INST_CURL_DIR}/../../runtime/lib" && pwd)"
+# shellcheck source=../../runtime/lib/env.sh
+. "${_E2E_INST_CURL_RUNTIME_LIB}/env.sh"
+# shellcheck source=helpers/install-path-refresh.sh
+. "${_E2E_INST_CURL_DIR}/helpers/install-path-refresh.sh"
 
 e2e_install_curl() {
   e2e_env_trace "install-curl"

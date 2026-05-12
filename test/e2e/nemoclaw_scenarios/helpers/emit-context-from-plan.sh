@@ -14,8 +14,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=context.sh
-. "${SCRIPT_DIR}/context.sh"
+_E2E_EMIT_RUNTIME_LIB="$(cd "${SCRIPT_DIR}/../../runtime/lib" && pwd)"
+# shellcheck source=../../runtime/lib/context.sh
+. "${_E2E_EMIT_RUNTIME_LIB}/context.sh"
 
 PLAN_JSON="${1:-}"
 if [[ -z "${PLAN_JSON}" || ! -f "${PLAN_JSON}" ]]; then

@@ -9,11 +9,12 @@
 # step is performed. Full launchable orchestration lives in the Brev
 # workflow, not in the E2E helper.
 
-_E2E_INST_LNCH_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck source=../env.sh
-. "${_E2E_INST_LNCH_LIB_DIR}/env.sh"
-# shellcheck source=../install-path-refresh.sh
-. "${_E2E_INST_LNCH_LIB_DIR}/install-path-refresh.sh"
+_E2E_INST_LNCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_E2E_INST_LNCH_RUNTIME_LIB="$(cd "${_E2E_INST_LNCH_DIR}/../../runtime/lib" && pwd)"
+# shellcheck source=../../runtime/lib/env.sh
+. "${_E2E_INST_LNCH_RUNTIME_LIB}/env.sh"
+# shellcheck source=helpers/install-path-refresh.sh
+. "${_E2E_INST_LNCH_DIR}/helpers/install-path-refresh.sh"
 
 e2e_install_launchable() {
   e2e_env_trace "install-launchable"
