@@ -25,12 +25,19 @@ function testEnv(env: Record<string, string> = {}): NodeJS.ProcessEnv {
 }
 
 function runBash(script: string, env: Record<string, string> = {}): SpawnSyncReturns<string> {
-  return spawnSync("bash", ["-c", script], {
-    env: testEnv(env),
-    encoding: "utf8",
-    timeout: Number(process.env.E2E_SPAWN_TIMEOUT_MS ?? 60_000),
-    cwd: REPO_ROOT,
-  });
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "e2e-bash-"));
+  try {
+    const scriptPath = path.join(tmp, "script.sh");
+    fs.writeFileSync(scriptPath, script, { mode: 0o700 });
+    return spawnSync("bash", [scriptPath], {
+      env: testEnv(env),
+      encoding: "utf8",
+      timeout: Number(process.env.E2E_SPAWN_TIMEOUT_MS ?? 60_000),
+      cwd: REPO_ROOT,
+    });
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 describe("E2E context helper (runtime/lib/context.sh)", () => {
