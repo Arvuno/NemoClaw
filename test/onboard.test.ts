@@ -95,6 +95,7 @@ type OnboardTestInternals = {
       sandboxBin?: string | null;
       vmDriverBin?: string | null;
     },
+    arch?: NodeJS.Architecture,
   ) => boolean;
   shouldRequireDockerDriverEnv: (platform?: NodeJS.Platform) => boolean;
   getDockerDriverGatewayRuntimeDriftFromSnapshot: (snapshot: {
@@ -103,7 +104,10 @@ type OnboardTestInternals = {
     desiredEnv: Record<string, string>;
     gatewayBin?: string | null;
   }) => { reason: string } | null;
-  isLinuxDockerDriverGatewayEnabled: (platform?: NodeJS.Platform) => boolean;
+  isLinuxDockerDriverGatewayEnabled: (
+    platform?: NodeJS.Platform,
+    arch?: NodeJS.Architecture,
+  ) => boolean;
   isDockerDriverGatewayPortListener: (
     portCheck: {
       ok: boolean;
