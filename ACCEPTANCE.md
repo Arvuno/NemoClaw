@@ -80,7 +80,7 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
 
 | # | Area | Change | Test Level | Rationale |
 |---|------|--------|-----------|-----------|
-| 1 | `src/lib/onboard.ts` — reuse `isGatewayHttpReady` from `./onboard/gateway-http-readiness` (introduced by #3312) in the `startDockerDriverGateway` poll loop | Gate the `"✓ Docker-driver gateway is healthy"` log on a real HTTP probe. Converges with the K3s-path pattern rather than adding a parallel TCP probe. | **[E2E]** required | Spawns real process, binds real port. `gateway-health-honest-e2e` IS the E2E for this change. |
+| 1 | `src/lib/onboard.ts` — new `isDockerDriverGatewayTcpReady()` helper + integrate into `startDockerDriverGateway` poll loop | Gate the `"✓ Docker-driver gateway is healthy"` log on a real TCP connect. (HTTP probe via #3312 was attempted but broke the openshell-gateway-upgrade-e2e test — Docker-driver returns 404 for GET /.) | **[E2E]** required | Spawns real process, binds real port. `gateway-health-honest-e2e` AND `openshell-gateway-upgrade-e2e` both exercise this change. |
 | 2 | `src/lib/onboard.ts` — reap zombie child before `isPidAlive` | After spawn, periodically `waitpid`-equivalent check so zombies get detected | **[Unit]** + **[E2E]** | Same E2E catches this; also add a unit test that mocks a zombied PID. |
 | 3 | `src/lib/state/gateway.ts` — **do NOT modify** | The gateway-liveness-probe test pins this file to pure-function status (see #2020 follow-up test at `test/gateway-liveness-probe.test.ts:74`). Keep the string match; fix at the caller. | **[Unit]** only | No source change. |
 | 4 | `scripts/install-openshell.sh` — OPTIONAL: add a preflight that verifies the downloaded `openshell-gateway` binary can actually exec (`$BIN --version` or similar) before writing the installed marker | Surface GLIBC / linker errors at install time rather than onboard time | **[Unit]** (install script) | Out of scope for the primary fix but a useful secondary safety net for #3111's specific Ubuntu 22.04 trigger. Split into follow-up issue if larger. |
@@ -91,7 +91,7 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
 
 | # | Refactoring Goal | Overlap | Recommendation |
 |---|-----------------|---------|----------------|
-| 1 | **PR #3312** (laitingsheng, **MERGED**) — `fix(onboard): require host HTTP readiness before reusing the gateway` | Added `isGatewayHttpReady(timeoutMs, url)` — an HTTP-level readiness probe in `src/lib/onboard/gateway-http-readiness.ts`. Already used at every gateway-reuse decision site on the K3s path. | **Adopted.** We now call `isGatewayHttpReady()` directly from `startDockerDriverGateway`'s poll loop instead of adding a parallel TCP probe. Docker-driver and K3s paths share the same probe semantics. |
+| 1 | **PR #3312** (laitingsheng, **MERGED**) — `fix(onboard): require host HTTP readiness before reusing the gateway` | Added `isGatewayHttpReady(timeoutMs, url)` — HTTP probe for the K3s-path gateway. Assumes `GET /` returns 200/401. | **Considered, not adopted.** The K3s-path and Docker-driver-path gateways expose different root-path semantics (Docker-driver returns 404 on `GET /`). We use a local TCP probe for the Docker-driver path and leave unification to #3213. See `isDockerDriverGatewayTcpReady()`. |
 | 2 | **PR #3306** (cv) — `refactor(onboard): extract gateway bootstrap repair helpers` | Extracts `src/lib/onboard/gateway-bootstrap.ts` module. | No conflict with our change — doesn't touch `startDockerDriverGateway`. |
 | 3 | **#3213** — Epic: unify warnings, advisories, and fatal exits under a single registry | When onboard exits with "gateway failed to start", that message should eventually flow through the unified advisory registry. | **Seed the pattern.** `TODO(#3213)` comment added on the `startDockerDriverGateway` poll loop so the future migration to structured advisories is mechanical. |
 
@@ -99,13 +99,14 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
 
 ## Implementation Plan
 
-### Phase 1 — Reuse `isGatewayHttpReady` from #3312 (**[OK]** No new helper)
+### Phase 1 — Add a TCP liveness probe (**[Unit]** only)
 
-**Goal:** Use the shared `isGatewayHttpReady` helper introduced by PR #3312 (`src/lib/onboard/gateway-http-readiness.ts`) as the liveness gate for the Docker-driver path.
+**Goal:** Introduce `isDockerDriverGatewayTcpReady(port, timeoutMs, host)` as a small async helper in `src/lib/onboard.ts`, used to gate the "Docker-driver gateway is healthy" log on a real TCP connect.
 
-- **File:** `src/lib/onboard.ts` — the import is already there, we only add a call site in `startDockerDriverGateway`.
-- **Rationale:** #3312 landed before this PR. Its HTTP probe (whitelists `{200, 401}`, handles timeouts, injectable for tests) is strictly stronger than a raw TCP connect and already the de-facto standard at every other gateway-reuse decision site in `onboard.ts` (K3s startup, preflight reuse, adopt-port-listener, etc.). Reusing it keeps the Docker-driver path from drifting away from the K3s path.
-- **Tests:** `test/gateway-http-reuse-wait.test.ts` already covers the helper's behavior (21 tests). We only need source-shape guards for the new call site, in `test/gateway-health-honest-integration.test.ts`.
+- **File:** `src/lib/onboard.ts` — new helper near `isPidAlive`.
+- **Why TCP and not HTTP:** We originally tried reusing `isGatewayHttpReady` from `./onboard/gateway-http-readiness` (introduced by #3312), but that broke the existing `openshell-gateway-upgrade-e2e` test. The K3s gateway and the Docker-driver gateway serve different HTTP routes for the root path — K3s answers `GET /` with 200/401, but the Docker-driver gateway returns 404 for `GET /` and only serves `/openshell.v1.OpenShell/*`. A plain TCP connect is semantic-free and sufficient to catch the #3111 failure mode (crashed binary → nothing listening). Convergence with `isGatewayHttpReady` is deferred to #3213 (unified advisory / probe registry).
+- **Implementation:** `net.createConnection({ host, port })` with a socket timeout. Resolves boolean, never throws.
+- **Tests:** `test/gateway-health-honest-integration.test.ts` — 5 behavioural tests (listening / closed / timeout / min-timeout / never-throws) + 5 source-shape guards.
 - **Dependencies:** None.
 
 ### Phase 2 — Reap zombie children in the startup poll loop (**[Unit]** only)
@@ -173,7 +174,7 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
 
 | Phase | Test Depth |
 |---|---|
-| Phase 1 (reuse `isGatewayHttpReady`) | **[Unit]** only |
+| Phase 1 (`isDockerDriverGatewayTcpReady` helper) | **[Unit]** only |
 | Phase 2 (zombie-reap) | **[Unit]** only |
 | Phase 3 (poll-loop integration) | **[E2E]** (`gateway-health-honest-e2e`) |
 | Phase 4 (install-time check) | **[Unit]** only (optional) |
@@ -187,7 +188,7 @@ The PR-level verdict is **[E2E]** — Phase 3 is the acceptance gate, and it's a
 - PR title: `fix(onboard): verify Docker-driver gateway is really serving before reporting healthy (#3111)`
 - PR body MUST include `Fixes #3111` to auto-close the issue (and get the coverage guard flipping green).
 - Do NOT modify `src/lib/state/gateway.ts:isGatewayHealthy` — pinned by `test/gateway-liveness-probe.test.ts:74`.
-- Adopted PR #3312's `isGatewayHttpReady` helper (merged); no parallel TCP probe added.
+- Added local `isDockerDriverGatewayTcpReady()` helper in `onboard.ts`; did NOT converge onto PR #3312's `isGatewayHttpReady` because the two gateway types have different HTTP root-path semantics (Docker-driver returns 404 on `GET /`, which fails the HTTP probe). TODO(#3213) filed for future unification.
 - No conflict with open PR #3306 (gateway-bootstrap refactor) — our change does not touch the files being extracted.
 - The nightly-dispatch for validation:
 

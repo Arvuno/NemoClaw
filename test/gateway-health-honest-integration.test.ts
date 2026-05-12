@@ -1,31 +1,115 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Source-shape guards for the #3111 fix in startDockerDriverGateway.
+// Source-shape + behavioural guards for the #3111 fix in startDockerDriverGateway.
 //
 // The fix gates the "Docker-driver gateway is healthy" log on:
-//   1. a real HTTP liveness probe (isGatewayHttpReady — shared helper
-//      introduced in #3312 for the K3s reuse path), and
+//   1. a real TCP liveness probe (isDockerDriverGatewayTcpReady) — plain
+//      TCP, not HTTP, because the Docker-driver gateway and the K3s
+//      gateway expose different root paths (see isGatewayHttpReady in
+//      ./onboard/gateway-http-readiness for the K3s-path probe); and
 //   2. a child-exit listener that catches zombied detached children that
 //      process.kill(pid, 0) would otherwise report as alive.
 //
 // These guards keep future edits from silently regressing #3111.
 //
 // See: https://github.com/NVIDIA/NemoClaw/issues/3111
-//      https://github.com/NVIDIA/NemoClaw/pull/3312 (shared HTTP helper)
+//      https://github.com/NVIDIA/NemoClaw/pull/3312 (K3s-path HTTP helper)
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { isDockerDriverGatewayTcpReady } = require("../dist/lib/onboard");
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function startDummyServer(): Promise<{ port: number; close: () => Promise<void> }> {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer((socket) => socket.end());
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const addr = server.address();
+      if (!addr || typeof addr === "string") {
+        reject(new Error("failed to resolve server address"));
+        return;
+      }
+      resolve({
+        port: addr.port,
+        close: () =>
+          new Promise<void>((res, rej) =>
+            server.close((err) => (err ? rej(err) : res())),
+          ),
+      });
+    });
+  });
+}
+
+async function getLikelyClosedPort(): Promise<number> {
+  const { port, close } = await startDummyServer();
+  await close();
+  return port;
+}
+
+// ── Behavioural tests for isDockerDriverGatewayTcpReady ─────────────────────
+
+describe("isDockerDriverGatewayTcpReady (#3111)", () => {
+  let teardown: (() => Promise<void>) | null = null;
+
+  afterEach(async () => {
+    if (teardown) {
+      await teardown();
+      teardown = null;
+    }
+  });
+
+  it("resolves true when something is accepting connections", async () => {
+    const { port, close } = await startDummyServer();
+    teardown = close;
+    await expect(isDockerDriverGatewayTcpReady(port, 500)).resolves.toBe(true);
+  });
+
+  it("resolves false when nothing is listening (Connection refused)", async () => {
+    const port = await getLikelyClosedPort();
+    await expect(isDockerDriverGatewayTcpReady(port, 500)).resolves.toBe(false);
+  });
+
+  it("resolves false on timeout (non-routable host)", async () => {
+    // 10.255.255.1 is a non-routable RFC 1918 address that SYN-drops on most
+    // CI runners, forcing the timeout path rather than immediate ECONNREFUSED.
+    const started = Date.now();
+    await expect(
+      isDockerDriverGatewayTcpReady(9, 200, "10.255.255.1"),
+    ).resolves.toBe(false);
+    const elapsed = Date.now() - started;
+    expect(elapsed).toBeLessThan(2000);
+  });
+
+  it("enforces a minimum timeout of 50ms even when caller passes 0", async () => {
+    const port = await getLikelyClosedPort();
+    const started = Date.now();
+    await expect(isDockerDriverGatewayTcpReady(port, 0)).resolves.toBe(false);
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
+  it("never throws — always resolves with a boolean", async () => {
+    await expect(isDockerDriverGatewayTcpReady(0, 100)).resolves.toBeTypeOf(
+      "boolean",
+    );
+    await expect(isDockerDriverGatewayTcpReady(65535, 100)).resolves.toBe(
+      false,
+    );
+  });
+});
+
+// ── Source-shape guards for the integration in startDockerDriverGateway ────
+
 describe("startDockerDriverGateway integration (#3111)", () => {
   const content = fs.readFileSync(path.join(ROOT, "src/lib/onboard.ts"), "utf-8");
-  // Scope assertions to the startDockerDriverGateway function body so other
-  // occurrences of the helpers (e.g. in stale-gateway reuse paths or in
-  // module.exports) don't satisfy the source-shape checks and mask a
-  // regression inside this function.
   const fnMatch = content.match(
     /async function startDockerDriverGateway\([\s\S]*?\n\}\n/,
   );
@@ -37,59 +121,39 @@ describe("startDockerDriverGateway integration (#3111)", () => {
   const fnBody = fnMatch[0];
 
   it("tracks child-exit so zombies don't fool isPidAlive", () => {
-    // The fix pattern: a single 'exit' listener on the spawned ChildProcess
-    // that flips a flag the poll loop reads instead of relying solely on
-    // process.kill(pid, 0), which returns true for zombies.
     expect(fnBody).toMatch(/child\.once\(\s*["']exit["']/);
     expect(fnBody).toMatch(/childExited\s*=\s*true/);
   });
 
   it("breaks the poll loop when the child has exited", () => {
-    // The top of the loop body should consult childExited OR isPidAlive,
-    // not isPidAlive alone.
     expect(fnBody).toMatch(/childExited\s*\|\|\s*!isPidAlive\(childPid\)/);
   });
 
-  it("gates the 'healthy' log on the shared HTTP readiness probe", () => {
-    // The poll loop must call isGatewayHttpReady() before logging
-    // "✓ Docker-driver gateway is healthy". Reusing the shared helper
-    // introduced in #3312 keeps the Docker-driver path consistent with
-    // every other gateway-reuse decision site in onboard.ts.
+  it("gates the 'healthy' log on the TCP readiness probe", () => {
+    // The poll loop must call isDockerDriverGatewayTcpReady(GATEWAY_PORT)
+    // before logging "✓ Docker-driver gateway is healthy". We deliberately
+    // use a TCP probe rather than the K3s-path isGatewayHttpReady because
+    // the Docker-driver gateway only serves /openshell.v1.OpenShell/* —
+    // GET / returns 404, which fails the HTTP probe even though the
+    // gateway is functional.
     const healthyIdx = fnBody.indexOf("Docker-driver gateway is healthy");
     expect(healthyIdx).toBeGreaterThan(0);
     const before = fnBody.slice(0, healthyIdx);
-    expect(before).toMatch(/await\s+isGatewayHttpReady\(/);
+    expect(before).toMatch(/await\s+isDockerDriverGatewayTcpReady\(GATEWAY_PORT/);
   });
 
-  it("does NOT add a parallel TCP/HTTP probe inside onboard.ts", () => {
-    // We deliberately reuse isGatewayHttpReady from the
-    // ./onboard/gateway-http-readiness module rather than adding a
-    // second probe implementation. This test catches accidental
-    // reintroduction of a local probe helper and keeps the surface
-    // small for future refactoring (#2562, #3213).
-    expect(fnBody).not.toMatch(/verifyDockerDriverGatewayListening\s*\(/);
-    expect(fnBody).not.toMatch(/net\.createConnection\(/);
+  it("does NOT use the K3s-path HTTP probe in the Docker-driver loop", () => {
+    // Regression guard: a previous version of this fix called
+    // isGatewayHttpReady() here, which broke the existing
+    // openshell-gateway-upgrade-e2e test because the Docker-driver
+    // gateway returns 404 on GET /. Do not reintroduce that pattern.
+    const healthyIdx = fnBody.indexOf("Docker-driver gateway is healthy");
+    const before = fnBody.slice(0, healthyIdx);
+    expect(before).not.toMatch(/await\s+isGatewayHttpReady\(/);
   });
 
   it("surfaces child-exit details in the final failure message", () => {
-    // On failure, the user must see *why* the gateway didn't come up —
-    // signal or exit code — not just "failed to start". This is a UX
-    // improvement that falls out of tracking childExitCode/Signal.
     expect(fnBody).toMatch(/childExited/);
     expect(fnBody).toMatch(/childExitSignal|childExitCode/);
-  });
-});
-
-describe("shared HTTP readiness import (#3111 reuses #3312)", () => {
-  const content = fs.readFileSync(path.join(ROOT, "src/lib/onboard.ts"), "utf-8");
-
-  it("imports isGatewayHttpReady from the shared gateway-http-readiness module", () => {
-    // Guards against someone adding a parallel import or a local
-    // reimplementation. isGatewayHttpReady must come from the canonical
-    // ./onboard/gateway-http-readiness module so the Docker-driver and
-    // K3s paths converge on the same probe semantics.
-    expect(content).toMatch(
-      /isGatewayHttpReady,[\s\S]{0,200}?require\(\s*["']\.\/onboard\/gateway-http-readiness["']/,
-    );
   });
 });
