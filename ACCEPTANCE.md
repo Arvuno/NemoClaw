@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved. -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Issue #3111 — Development Plan + Acceptance Criterion
 
 **Worktree:** `/Users/jyaunches/Development/NemoClaw-working/issue-3111`
@@ -9,7 +12,7 @@
 
 ## Definition of Done (auto-added by `pr-e2e-loop`)
 
-Nightly job **`gateway-health-honest-e2e`** (added in PR #3362) must flip from 🔴 red on `main` to 🟢 green on the fix branch. Dispatch locally with:
+Nightly job **`gateway-health-honest-e2e`** (added in PR #3362) must flip from red on `main` to green on the fix branch. Dispatch locally with:
 
 ```bash
 gh workflow run nightly-e2e.yaml -f jobs=gateway-health-honest-e2e --ref <this-branch>
@@ -77,10 +80,10 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
 
 | # | Area | Change | Test Level | Rationale |
 |---|------|--------|-----------|-----------|
-| 1 | `src/lib/onboard.ts` — reuse `isGatewayHttpReady` from `./onboard/gateway-http-readiness` (introduced by #3312) in the `startDockerDriverGateway` poll loop | Gate the `"✓ Docker-driver gateway is healthy"` log on a real HTTP probe. Converges with the K3s-path pattern rather than adding a parallel TCP probe. | 🔴 **E2E** | Spawns real process, binds real port. `gateway-health-honest-e2e` IS the E2E for this change. |
-| 2 | `src/lib/onboard.ts` — reap zombie child before `isPidAlive` | After spawn, periodically `waitpid`-equivalent check so zombies get detected | 🟡 Unit + 🔴 E2E | Same E2E catches this; also add a unit test that mocks a zombied PID. |
-| 3 | `src/lib/state/gateway.ts` — **do NOT modify** | The gateway-liveness-probe test pins this file to pure-function status (see #2020 follow-up test at `test/gateway-liveness-probe.test.ts:74`). Keep the string match; fix at the caller. | 🟢 Unit | No source change. |
-| 4 | `scripts/install-openshell.sh` — OPTIONAL: add a preflight that verifies the downloaded `openshell-gateway` binary can actually exec (`$BIN --version` or similar) before writing the installed marker | Surface GLIBC / linker errors at install time rather than onboard time | 🟡 Unit + ✨ (install script) | Out of scope for the primary fix but a useful secondary safety net for #3111's specific Ubuntu 22.04 trigger. Split into follow-up issue if larger. |
+| 1 | `src/lib/onboard.ts` — reuse `isGatewayHttpReady` from `./onboard/gateway-http-readiness` (introduced by #3312) in the `startDockerDriverGateway` poll loop | Gate the `"✓ Docker-driver gateway is healthy"` log on a real HTTP probe. Converges with the K3s-path pattern rather than adding a parallel TCP probe. | **[E2E]** required | Spawns real process, binds real port. `gateway-health-honest-e2e` IS the E2E for this change. |
+| 2 | `src/lib/onboard.ts` — reap zombie child before `isPidAlive` | After spawn, periodically `waitpid`-equivalent check so zombies get detected | **[Unit]** + **[E2E]** | Same E2E catches this; also add a unit test that mocks a zombied PID. |
+| 3 | `src/lib/state/gateway.ts` — **do NOT modify** | The gateway-liveness-probe test pins this file to pure-function status (see #2020 follow-up test at `test/gateway-liveness-probe.test.ts:74`). Keep the string match; fix at the caller. | **[Unit]** only | No source change. |
+| 4 | `scripts/install-openshell.sh` — OPTIONAL: add a preflight that verifies the downloaded `openshell-gateway` binary can actually exec (`$BIN --version` or similar) before writing the installed marker | Surface GLIBC / linker errors at install time rather than onboard time | **[Unit]** (install script) | Out of scope for the primary fix but a useful secondary safety net for #3111's specific Ubuntu 22.04 trigger. Split into follow-up issue if larger. |
 
 ---
 
@@ -96,7 +99,7 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
 
 ## Implementation Plan
 
-### Phase 1 — Reuse `isGatewayHttpReady` from #3312 (🟢 No new helper needed)
+### Phase 1 — Reuse `isGatewayHttpReady` from #3312 (**[OK]** No new helper)
 
 **Goal:** Use the shared `isGatewayHttpReady` helper introduced by PR #3312 (`src/lib/onboard/gateway-http-readiness.ts`) as the liveness gate for the Docker-driver path.
 
@@ -105,7 +108,7 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
 - **Tests:** `test/gateway-http-reuse-wait.test.ts` already covers the helper's behavior (21 tests). We only need source-shape guards for the new call site, in `test/gateway-health-honest-integration.test.ts`.
 - **Dependencies:** None.
 
-### Phase 2 — Reap zombie children in the startup poll loop (🟡 Unit)
+### Phase 2 — Reap zombie children in the startup poll loop (**[Unit]** only)
 
 **Goal:** Detect crashed-then-zombied children so `isPidAlive` returns false as expected.
 
@@ -114,7 +117,7 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
 - **Tests:** Extend `test/onboard.test.ts` (or add `test/gateway-zombie-reap.test.ts`) — spawn a shim that exits immediately, assert the flag flips within N ms.
 - **Dependencies:** None. Runs in parallel with Phase 1.
 
-### Phase 3 — Integrate both checks into the poll loop (🔴 E2E required)
+### Phase 3 — Integrate both checks into the poll loop (**[E2E]** required)
 
 **Goal:** Make `startDockerDriverGateway` fail closed — "healthy" is only logged when the process is running AND metadata matches AND the port is serving.
 
@@ -148,7 +151,7 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
 - **Dependencies:** Phase 1 and Phase 2 must land first.
 - **Refactoring notes:** Format the final "failed to start" message as structured data with `code: "gateway-failed-to-start"` for future #3213 migration. Leave the log-tail output intact — it's already user-facing diagnostic.
 
-### Phase 4 (OPTIONAL) — Install-time GLIBC check (🟡 Unit)
+### Phase 4 (OPTIONAL) — Install-time GLIBC check (**[Unit]** only)
 
 **Goal:** Surface the GLIBC mismatch at install time, not onboard time. Addresses the specific #3111 trigger, not the class.
 
@@ -166,16 +169,16 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
 - **Phase 3 sequentially after 1 + 2.**
 - **Phase 4 optional / follow-up.**
 
-## Verdict: 🔴 E2E required
+## Verdict: **[E2E]** required
 
 | Phase | Test Depth |
 |---|---|
-| Phase 1 (TCP probe helper) | 🟡 Unit |
-| Phase 2 (zombie-reap) | 🟡 Unit |
-| Phase 3 (poll-loop integration) | 🔴 E2E (`gateway-health-honest-e2e`) |
-| Phase 4 (install-time check) | 🟡 Unit (optional) |
+| Phase 1 (reuse `isGatewayHttpReady`) | **[Unit]** only |
+| Phase 2 (zombie-reap) | **[Unit]** only |
+| Phase 3 (poll-loop integration) | **[E2E]** (`gateway-health-honest-e2e`) |
+| Phase 4 (install-time check) | **[Unit]** only (optional) |
 
-The PR-level verdict is 🔴 E2E — Phase 3 is the acceptance gate, and it's already implemented as the merged coverage guard. The fix PR's definition-of-done is "this E2E flips green."
+The PR-level verdict is **[E2E]** — Phase 3 is the acceptance gate, and it's already implemented as the merged coverage guard. The fix PR's definition-of-done is "this E2E flips green."
 
 ---
 
