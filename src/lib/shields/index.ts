@@ -754,7 +754,11 @@ function recoverExpiredAutoRestoreInline(
 function recoverExpiredAutoRestoreGate(
   sandboxName: string,
   allowInlineRecovery = true,
-): ShieldsState & { _hasStateFile: boolean } {
+): ShieldsState & {
+  _hasStateFile: boolean;
+  _isCorrupt?: boolean;
+  _corruptError?: string;
+} {
   const state = loadShieldsState(sandboxName);
   if (!allowInlineRecovery) return state;
   if (deriveShieldsMode(state, state._hasStateFile) !== "temporarily_unlocked") {
