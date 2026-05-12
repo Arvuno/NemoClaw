@@ -10289,6 +10289,34 @@ function ensureDashboardForward(
   }
 
   if (actualPort !== preferredPort) {
+    if (rollbackSandboxOnFailure) {
+      // Create path: the sandbox was just built with CHAT_UI_URL and
+      // NEMOCLAW_DASHBOARD_PORT baked from `preferredPort` (see the
+      // `formatEnvAssignment("CHAT_UI_URL", …)` call in createSandbox). If
+      // the port was bound during the build window (TOCTOU), picking a new
+      // host port would leave the sandbox serving the dashboard on
+      // `preferredPort` internally while the forward listens on `actualPort`
+      // — reproducing the original "onboard exits but dashboard is
+      // unreachable" failure on the newly selected port. Reallocation is
+      // only safe on reuse paths where the sandbox image is fixed; on the
+      // create path we must roll back so the next onboard re-bakes with a
+      // clean port. (#3260)
+      const err = new Error(
+        `Dashboard port ${preferredPort} became host-bound during sandbox build; ` +
+          `cannot reallocate to ${actualPort} after the sandbox has been created with ` +
+          `CHAT_UI_URL=${preferredPort}. Free the port and re-run \`${cliName()} onboard\`, ` +
+          `or pass \`--control-ui-port <N>\` to pick a different dashboard port.`,
+      );
+      const delResult = runOpenshell(["sandbox", "delete", sandboxName], { ignoreError: true });
+      for (const line of buildOrphanedSandboxRollbackMessage(
+        sandboxName,
+        err,
+        delResult.status === 0,
+      )) {
+        console.error(line);
+      }
+      process.exit(1);
+    }
     console.warn(`  ! Port ${preferredPort} is taken. Using port ${actualPort} instead.`);
   }
 

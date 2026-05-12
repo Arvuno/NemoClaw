@@ -9304,6 +9304,42 @@ const { createSandbox } = require(${onboardPath});
     assert.match(source, /buildOrphanedSandboxRollbackMessage/);
   });
 
+  it("ensureDashboardForward rolls back when the create path reallocates to a different port (#3260)", () => {
+    // The sandbox bakes CHAT_UI_URL and NEMOCLAW_DASHBOARD_PORT from
+    // `preselectedPort` at build time. If that port becomes host-bound
+    // during the multi-minute image build (TOCTOU), findAvailableDashboardPort
+    // returns a different port — but the sandbox is already configured to
+    // serve on the original one. Starting the forward on the new port
+    // would reproduce "onboard exits successfully but dashboard is
+    // unreachable" on the new port. The fix: on the create path, treat
+    // actualPort !== preferredPort as unrecoverable, roll back the sandbox,
+    // and let the next onboard re-bake with a clean port. Reuse paths still
+    // warn-and-continue because the sandbox image is fixed.
+    const source = fs.readFileSync(
+      path.join(import.meta.dirname, "..", "src", "lib", "onboard.ts"),
+      "utf-8",
+    );
+    // Locate the actualPort != preferredPort branch and verify it carries
+    // both the create-path rollback (gated on rollbackSandboxOnFailure) and
+    // the reuse-path warn fallback.
+    const mismatchBranch = source.match(
+      /if \(actualPort !== preferredPort\) \{[\s\S]*?\n  \}/,
+    );
+    assert.ok(mismatchBranch, "Expected actualPort !== preferredPort branch in ensureDashboardForward");
+    const branchBody = mismatchBranch[0];
+    assert.match(branchBody, /if \(rollbackSandboxOnFailure\)/);
+    assert.match(branchBody, /became host-bound during sandbox build/);
+    assert.match(
+      branchBody,
+      /runOpenshell\(\["sandbox", "delete", sandboxName\], \{ ignoreError: true \}\)/,
+    );
+    assert.match(branchBody, /buildOrphanedSandboxRollbackMessage/);
+    assert.match(branchBody, /process\.exit\(1\)/);
+    // Reuse-path fallback (the warn) must still be present so non-create
+    // callers keep the existing warn-and-continue semantics.
+    assert.match(branchBody, /is taken\. Using port .* instead/);
+  });
+
   it("formatOnboardConfigSummary renders all collected fields (#2165)", () => {
     const summary = formatOnboardConfigSummary({
       provider: "gemini-api",
