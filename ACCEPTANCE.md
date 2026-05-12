@@ -22,7 +22,7 @@ gh workflow run nightly-e2e.yaml -f jobs=gateway-health-honest-e2e --ref <this-b
 
 After the fix the log must show:
 
-```
+```text
 [PASS] Sabotage shim was invoked as expected (GLIBC/sabotage markers present in gateway log)
 [PASS] Onboard did not falsely log 'Docker-driver gateway is healthy' when the binary crashed
 [PASS] startGateway() did not resolve successfully with a crashed binary (node exit=1 or 3)
@@ -50,11 +50,13 @@ The reported symptom on Ubuntu 22.04 (GLIBC 2.38/2.39 link mismatch) is a *speci
 ## Root Causes
 
 ### RC-1: `isPidAlive` treats zombies as alive
+
 **Location:** `src/lib/onboard.ts:4101-4109`
 
 `process.kill(pid, 0)` returns true for both live and zombie processes. For detached `spawn()` children where the parent doesn't `wait()`, zombies accumulate. The poll loop thus never breaks on a crashed-but-unreaped child and proceeds to the metadata check.
 
 ### RC-2: `isGatewayConnected` matches a header, not a state
+
 **Location:** `src/lib/state/gateway.ts:80-85`
 
 ```js
@@ -64,6 +66,7 @@ statusOutput.includes("Connected") || statusOutput.includes("Server Status")
 `Server Status` is the **title of the table** `openshell status` prints — it's always present. The real connectivity signal is buried in the body (`Connection refused` / `Error: × client error (Connect)`). The function can't distinguish "connected" from "metadata says there's a gateway at 127.0.0.1:8080, but nothing listens there."
 
 ### RC-3: No live TCP probe in the Docker-driver startup poll loop
+
 **Location:** `src/lib/onboard.ts:5519-5540` (poll loop body)
 
 The K3s path has a live container probe (`verifyGatewayContainerRunning()` added for #2020 — checks `docker inspect {{.State.Running}}`). The Docker-driver path has no equivalent — it trusts the metadata match. A live TCP connect to `127.0.0.1:${GATEWAY_PORT}` would instantly reveal a crashed binary.
@@ -74,7 +77,7 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
 
 | # | Area | Change | Test Level | Rationale |
 |---|------|--------|-----------|-----------|
-| 1 | `src/lib/onboard.ts` — new `verifyDockerDriverGatewayListening()` helper + integrate into `startDockerDriverGateway` poll loop | Add a TCP connect probe to `127.0.0.1:${GATEWAY_PORT}` with short timeout; fail the poll iteration when probe fails | 🔴 **E2E** | Spawns real process, binds real port. `gateway-health-honest-e2e` IS the E2E for this change. |
+| 1 | `src/lib/onboard.ts` — reuse `isGatewayHttpReady` from `./onboard/gateway-http-readiness` (introduced by #3312) in the `startDockerDriverGateway` poll loop | Gate the `"✓ Docker-driver gateway is healthy"` log on a real HTTP probe. Converges with the K3s-path pattern rather than adding a parallel TCP probe. | 🔴 **E2E** | Spawns real process, binds real port. `gateway-health-honest-e2e` IS the E2E for this change. |
 | 2 | `src/lib/onboard.ts` — reap zombie child before `isPidAlive` | After spawn, periodically `waitpid`-equivalent check so zombies get detected | 🟡 Unit + 🔴 E2E | Same E2E catches this; also add a unit test that mocks a zombied PID. |
 | 3 | `src/lib/state/gateway.ts` — **do NOT modify** | The gateway-liveness-probe test pins this file to pure-function status (see #2020 follow-up test at `test/gateway-liveness-probe.test.ts:74`). Keep the string match; fix at the caller. | 🟢 Unit | No source change. |
 | 4 | `scripts/install-openshell.sh` — OPTIONAL: add a preflight that verifies the downloaded `openshell-gateway` binary can actually exec (`$BIN --version` or similar) before writing the installed marker | Surface GLIBC / linker errors at install time rather than onboard time | 🟡 Unit + ✨ (install script) | Out of scope for the primary fix but a useful secondary safety net for #3111's specific Ubuntu 22.04 trigger. Split into follow-up issue if larger. |
@@ -85,24 +88,22 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
 
 | # | Refactoring Goal | Overlap | Recommendation |
 |---|-----------------|---------|----------------|
-| 1 | **PR #3306** (cv) — `refactor(onboard): extract gateway bootstrap repair helpers` | Extracts `src/lib/onboard/gateway-bootstrap.ts` module. Our fix touches `startDockerDriverGateway` in `onboard.ts`. | **Land-order coordination.** Wait to see if #3306 extracts our target function (`startDockerDriverGateway`) into the new module. If so, rebase onto #3306 and put the fix in the new module. If not, fix in `onboard.ts` and `#3306` can pull in the new helper later. |
-| 2 | **PR #3312** (laitingsheng) — `fix(onboard): require host HTTP readiness before reusing the gateway` | Adds `isGatewayHttpReady(timeoutMs, url)` — an HTTP-level readiness probe. This is the K3s-path equivalent of what we need for Docker-driver. | **Pattern reuse.** Export the `isGatewayHttpReady` helper from wherever #3312 lands it, then call it from our new `verifyDockerDriverGatewayListening`. If #3312 lands first, extend it; if we land first, make our helper exportable and #3312 can adopt. |
-| 3 | **#3213** — Epic: unify warnings, advisories, and fatal exits under a single registry | When onboard exits with "gateway failed to start", that message should eventually flow through the unified advisory registry. | **Seed the pattern.** Format our new fatal-exit message as `{code: "gateway-failed-to-start", hint: "..."}` structured output so the later registry migration is mechanical. Add `// TODO(#3213): register in advisory registry`. |
-| 4 | **#2562** — `refactor(arch): unified timeout abstraction for child-process execution` | Our TCP probe needs a timeout. The epic proposes a unified abstraction. | **Use a local timeout for now** (e.g., `AbortSignal.timeout(500)`), but leave a `// TODO(#2562): adopt unified timeout helper` comment. |
+| 1 | **PR #3312** (laitingsheng, **MERGED**) — `fix(onboard): require host HTTP readiness before reusing the gateway` | Added `isGatewayHttpReady(timeoutMs, url)` — an HTTP-level readiness probe in `src/lib/onboard/gateway-http-readiness.ts`. Already used at every gateway-reuse decision site on the K3s path. | **Adopted.** We now call `isGatewayHttpReady()` directly from `startDockerDriverGateway`'s poll loop instead of adding a parallel TCP probe. Docker-driver and K3s paths share the same probe semantics. |
+| 2 | **PR #3306** (cv) — `refactor(onboard): extract gateway bootstrap repair helpers` | Extracts `src/lib/onboard/gateway-bootstrap.ts` module. | No conflict with our change — doesn't touch `startDockerDriverGateway`. |
+| 3 | **#3213** — Epic: unify warnings, advisories, and fatal exits under a single registry | When onboard exits with "gateway failed to start", that message should eventually flow through the unified advisory registry. | **Seed the pattern.** `TODO(#3213)` comment added on the `startDockerDriverGateway` poll loop so the future migration to structured advisories is mechanical. |
 
 ---
 
 ## Implementation Plan
 
-### Phase 1 — Add TCP liveness probe helper (🟡 Unit)
+### Phase 1 — Reuse `isGatewayHttpReady` from #3312 (🟢 No new helper needed)
 
-**Goal:** Introduce `verifyDockerDriverGatewayListening(port: number, timeoutMs: number): Promise<boolean>` as a small, pure async helper.
+**Goal:** Use the shared `isGatewayHttpReady` helper introduced by PR #3312 (`src/lib/onboard/gateway-http-readiness.ts`) as the liveness gate for the Docker-driver path.
 
-- **File:** `src/lib/onboard.ts` (or a new `src/lib/onboard/gateway-tcp-probe.ts` if #3306 lands first).
-- **Implementation:** Use `net.createConnection({ host: "127.0.0.1", port })` with `AbortSignal.timeout(timeoutMs)`. Resolve `true` on `connect`, `false` on `error` or timeout.
-- **Tests:** New `test/onboard-gateway-tcp-probe.test.ts` — spin up a real TCP server on an ephemeral port, assert `true`; close it, assert `false`; assert timeout returns `false` within `timeoutMs + margin`.
-- **Dependencies:** None. Can run in parallel with Phase 2.
-- **Refactoring notes:** If #3312's `isGatewayHttpReady` has already landed, **reuse it** instead of adding a parallel helper — a TCP probe IS a strictly weaker signal than an HTTP probe, so prefer the HTTP probe when the gateway eventually serves HTTP. Add `// TODO(#2562): adopt unified timeout helper`.
+- **File:** `src/lib/onboard.ts` — the import is already there, we only add a call site in `startDockerDriverGateway`.
+- **Rationale:** #3312 landed before this PR. Its HTTP probe (whitelists `{200, 401}`, handles timeouts, injectable for tests) is strictly stronger than a raw TCP connect and already the de-facto standard at every other gateway-reuse decision site in `onboard.ts` (K3s startup, preflight reuse, adopt-port-listener, etc.). Reusing it keeps the Docker-driver path from drifting away from the K3s path.
+- **Tests:** `test/gateway-http-reuse-wait.test.ts` already covers the helper's behavior (21 tests). We only need source-shape guards for the new call site, in `test/gateway-health-honest-integration.test.ts`.
+- **Dependencies:** None.
 
 ### Phase 2 — Reap zombie children in the startup poll loop (🟡 Unit)
 
@@ -119,6 +120,7 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
 
 - **File:** `src/lib/onboard.ts:5519-5540` (the poll loop body).
 - **Implementation:**
+
   ```ts
   for (let i = 0; i < pollCount; i += 1) {
     if (childCrashed || !isPidAlive(childPid)) {
@@ -139,6 +141,7 @@ The K3s path has a live container probe (`verifyGatewayContainerRunning()` added
     if (i < pollCount - 1) sleep(pollInterval);
   }
   ```
+
 - **Tests:**
   - **E2E (primary, already exists):** `gateway-health-honest-e2e` (from PR #3362) must flip from red to green.
   - **Unit:** mock `verifyDockerDriverGatewayListening` to return `false`; assert the loop doesn't print "healthy" and eventually throws.
@@ -181,8 +184,10 @@ The PR-level verdict is 🔴 E2E — Phase 3 is the acceptance gate, and it's al
 - PR title: `fix(onboard): verify Docker-driver gateway is really serving before reporting healthy (#3111)`
 - PR body MUST include `Fixes #3111` to auto-close the issue (and get the coverage guard flipping green).
 - Do NOT modify `src/lib/state/gateway.ts:isGatewayHealthy` — pinned by `test/gateway-liveness-probe.test.ts:74`.
-- Coordinate with open PR #3306 (gateway-bootstrap refactor) and #3312 (HTTP readiness probe) — see Refactoring Alignment above.
+- Adopted PR #3312's `isGatewayHttpReady` helper (merged); no parallel TCP probe added.
+- No conflict with open PR #3306 (gateway-bootstrap refactor) — our change does not touch the files being extracted.
 - The nightly-dispatch for validation:
+
   ```bash
   gh workflow run nightly-e2e.yaml -f jobs=gateway-health-honest-e2e --ref issue-3111-gateway-health-honesty
   ```
