@@ -61,6 +61,13 @@ const {
 const {
   getSelectionDrift,
 }: typeof import("./onboard/selection-drift") = require("./onboard/selection-drift");
+const {
+  isLinuxDockerDriverGatewayEnabled,
+  isLinuxDockerDriverGatewayPlatform,
+}: typeof import("./onboard/docker-driver-platform") = require("./onboard/docker-driver-platform");
+const {
+  shouldInspectLegacyGatewayGpuPassthrough,
+}: typeof import("./onboard/gateway-gpu-passthrough") = require("./onboard/gateway-gpu-passthrough");
 const crypto = require("node:crypto");
 const fs = require("fs");
 const os = require("os");
@@ -1318,22 +1325,6 @@ function getResumeSandboxGpuOverrides(
     return { flag: "enable", device: entry?.sandboxGpuDevice || null };
   }
   return { flag: null, device: null };
-}
-
-// Docker-driver/package-managed gateways do not expose reusable GPU state
-// through the legacy openshell-cluster-* container's DeviceRequests field.
-function shouldInspectLegacyGatewayGpuPassthrough(
-  gatewayReuseState: GatewayReuseState,
-  gpuPassthrough: boolean,
-  dockerDriverGatewayEnabled = isLinuxDockerDriverGatewayEnabled(),
-  gatewayLifecycleCommandsSupported?: boolean,
-): boolean {
-  if (gatewayReuseState !== "healthy" || !gpuPassthrough || dockerDriverGatewayEnabled) {
-    return false;
-  }
-  return (
-    gatewayLifecycleCommandsSupported ?? gatewayCliSupportsLifecycleCommands(runCaptureOpenshell)
-  );
 }
 
 function buildSandboxGpuCreateArgs(config: SandboxGpuConfig): string[] {
@@ -3207,19 +3198,6 @@ const {
   run,
   runCapture,
 });
-
-function isLinuxDockerDriverGatewayEnabled(
-  platform: NodeJS.Platform = process.platform,
-  arch: NodeJS.Architecture = process.arch,
-): boolean {
-  return platform === "linux" || (platform === "darwin" && arch === "arm64");
-}
-
-function isLinuxDockerDriverGatewayPlatform(
-  platform: NodeJS.Platform = process.platform,
-): boolean {
-  return platform === "linux";
-}
 
 function getDockerDriverGatewayStateDir(): string {
   const configured = process.env.NEMOCLAW_OPENSHELL_GATEWAY_STATE_DIR;
@@ -10420,7 +10398,14 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     // openshell-cluster-* Docker container only exists on the legacy gateway
     // path; Docker-driver/package-managed gateways use the live CLI health
     // check as the reuse signal.
-    if (shouldInspectLegacyGatewayGpuPassthrough(gatewayReuseState, gpuPassthrough)) {
+    if (
+      shouldInspectLegacyGatewayGpuPassthrough(
+        gatewayReuseState,
+        gpuPassthrough,
+        isLinuxDockerDriverGatewayEnabled(),
+        gatewayCliSupportsLifecycleCommands(runCaptureOpenshell),
+      )
+    ) {
       const container = `openshell-cluster-${GATEWAY_NAME}`;
       const gpuCheck = docker.dockerInspect(
         ["--type", "container", "--format", "{{json .HostConfig.DeviceRequests}}", container],
@@ -11051,7 +11036,6 @@ module.exports = {
   findReadableNvidiaCdiSpecFiles,
   parseDockerCdiSpecDirs,
   getResumeSandboxGpuOverrides,
-  shouldInspectLegacyGatewayGpuPassthrough,
   resolveSandboxGpuConfig,
   shouldAllowOpenshellAboveBlueprintMax,
   pullAndResolveBaseImageDigest,
