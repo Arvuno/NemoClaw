@@ -458,14 +458,9 @@ export async function addSandboxChannel(sandboxName: string, args: string[] = []
   await promptAndRebuild(sandboxName, `add '${channelArg}'`);
 }
 
-/**
- * Apply the network policy preset whose name matches the channel name
- * (e.g. `telegram` channel → `telegram.yaml` preset under
- * `nemoclaw-blueprint/policies/presets/`). No-op if the channel has no
- * matching built-in preset. Idempotent — safe to call when the preset is
- * already applied. Logs failure but does not abort, mirroring rebuild
- * Step 5.5's tolerance — the user can recover with `policy-add` if it fails.
- */
+// Must run before promptAndRebuild — the rebuild's backup manifest only
+// captures presets already applied (#3437). Without this, channel bridges
+// boot without egress to their upstream API after rebuild.
 function applyChannelPresetIfAvailable(sandboxName: string, channelName: string): void {
   const builtinPresets = new Set(policies.listPresets().map((p) => p.name));
   if (!builtinPresets.has(channelName)) {
