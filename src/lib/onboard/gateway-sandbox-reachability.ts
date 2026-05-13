@@ -165,7 +165,7 @@ function summarizeProbeResult(result: SandboxBridgeProbeRunResult): string {
     result.signal ? `signal ${result.signal}` : undefined,
     result.status !== null ? `exit ${result.status}` : undefined,
   ].filter((item): item is string => Boolean(item));
-  return details[0] ?? "docker run did not complete the probe";
+  return details.length > 0 ? details.join(" | ") : "docker run did not complete the probe";
 }
 
 function isNameResolutionFailure(detail: string): boolean {

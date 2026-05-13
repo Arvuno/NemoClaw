@@ -75,6 +75,15 @@ describe("isSandboxBridgeGatewayReachable", () => {
     expect(seen.args).toContain("custom-net");
     expect(seen.args).toContain("--pull=missing");
     expect(seen.args).toContain("host.openshell.internal:10.0.0.1");
+    const addHostIndex = seen.args.findIndex((arg) =>
+      arg.includes("host.openshell.internal:10.0.0.1"),
+    );
+    const probeCommandIndex = seen.args.findIndex((arg) =>
+      arg.includes("nc -zw7 host.openshell.internal 9090"),
+    );
+    expect(addHostIndex).toBeGreaterThanOrEqual(0);
+    expect(probeCommandIndex).toBeGreaterThanOrEqual(0);
+    expect(addHostIndex).toBeLessThan(probeCommandIndex);
     expect(seen.args.join(" ")).toContain("nc -zw7 host.openshell.internal 9090");
   });
 
