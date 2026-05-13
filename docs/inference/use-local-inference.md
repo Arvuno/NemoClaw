@@ -54,6 +54,7 @@ $ nemoclaw onboard
 
 Select **Local Ollama** from the provider list.
 NemoClaw lists installed models or offers starter models if none are installed.
+On hosts with at least 32 GiB of detected GPU memory, the starter list includes `qwen3.6:35b` and selects it by default.
 It pulls the selected model, loads it into memory, and validates it before continuing.
 If the selected model declares that it does not support tool calling, onboarding stops with guidance to choose a model whose `ollama show <model>` capabilities include `tools`.
 The validation also requires structured chat-completions tool calls.
@@ -102,9 +103,10 @@ token as its `OPENAI_API_KEY` credential.
 OpenShell's L7 proxy injects the token at egress, so the agent inside the
 sandbox never sees the token directly.
 
-`GET /api/tags` is exempt from authentication so container health checks
-continue to work.
-All other endpoints (including `POST /api/tags`) require the Bearer token.
+All proxy endpoints require the Bearer token, including `GET /api/tags`.
+Internal health and reachability checks run via the proxy treat any HTTP
+response (including `401`) as proof the proxy is alive — they only fail
+when nothing answers at all.
 
 If Ollama is already running on a non-loopback address when you start onboard,
 the wizard restarts it on `127.0.0.1:11434` so the proxy is the only network
@@ -235,15 +237,14 @@ $ NEMOCLAW_PROVIDER=anthropicCompatible \
 When vLLM is already running on `localhost:8000`, NemoClaw can detect it automatically and query the `/v1/models` endpoint to determine the loaded model.
 On supported Linux hosts with NVIDIA GPUs, the onboard wizard can also install or start a managed vLLM container for you.
 
-Set the experimental flag and run onboard.
+For an already-running vLLM server, run `nemoclaw onboard` and select **Local vLLM [experimental]** from the provider list.
 
 ```console
-$ NEMOCLAW_EXPERIMENTAL=1 nemoclaw onboard
+$ nemoclaw onboard
 ```
 
-Select **Local vLLM [experimental]** from the provider list.
 If vLLM is already running, NemoClaw detects the running model and validates the endpoint.
-If vLLM is not running and your host matches a managed profile, select the **Install vLLM** or **Start vLLM** entry.
+If vLLM is not running and your host matches a managed profile, set `NEMOCLAW_EXPERIMENTAL=1`, rerun `nemoclaw onboard`, and select the **Install vLLM** or **Start vLLM** entry.
 NemoClaw pulls the vLLM image, downloads model weights into `~/.cache/huggingface`, starts the `nemoclaw-vllm` container on `localhost:8000`, and prints progress markers while the model loads.
 The first run can take 10 to 30 minutes.
 Later runs reuse the cached image and model weights.
@@ -266,8 +267,7 @@ The vLLM `/v1/responses` endpoint does not run the `--tool-call-parser`, so tool
 Use an already-running vLLM server:
 
 ```console
-$ NEMOCLAW_EXPERIMENTAL=1 \
-  NEMOCLAW_PROVIDER=vllm \
+$ NEMOCLAW_PROVIDER=vllm \
   nemoclaw onboard --non-interactive
 ```
 
