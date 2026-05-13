@@ -176,6 +176,7 @@ const ctx = module.exports;
     const result = runScript(script);
     assert.equal(result.status, 0, `script failed: ${result.stderr}\n${result.stdout}`);
     const marker = result.stdout.lastIndexOf("__RESULT__");
+    assert.ok(marker >= 0, `no __RESULT__ marker in stdout:\n${result.stdout}`);
     const payload = JSON.parse(result.stdout.slice(marker + "__RESULT__".length).trim());
     assert.ok(!payload.error, `unexpected error: ${payload.error}\n${payload.stack || ""}`);
 
