@@ -103,9 +103,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: nightly-e2e-${{ github.event_name }}-${{ github.event_name == 'workflow_dispatch' && github.ref || 'schedule' }}
+  group: nightly-e2e-${{ github.event_name }}-${{ github.event_name == 'workflow_dispatch' && format('{0}-{1}', github.ref, inputs.pr_number || 'manual') || 'schedule' }}
   cancel-in-progress: true
 
+# Selective-dispatch contract: tools/e2e-advisor/dispatch.mts discovers
+# dispatchable jobs by looking for each job's exact predicate shape below:
+#   github.event_name != 'workflow_dispatch' || inputs.jobs == '' ||
+#   contains(format(',{0},', inputs.jobs), ',<job-id>,')
+# Keep this predicate format in sync with test/e2e-advisor-dispatch.test.ts if
+# the workflow changes how individual jobs opt in to selective dispatch.
 jobs:
   cloud-e2e:
     if: >-

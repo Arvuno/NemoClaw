@@ -82,6 +82,9 @@ jobs:
       # analyzer can write failure artifacts, summaries, and PR comments.
       PI_E2E_ADVISOR_TIMEOUT_MS: "900000"
       PI_E2E_ADVISOR_HEARTBEAT_MS: "60000"
+      # Cap automatic fan-out from noisy/flaky advisor recommendations until
+      # the dispatcher has enough production history to justify a higher limit.
+      E2E_ADVISOR_AUTO_DISPATCH_MAX_JOBS: "6"
       # The trusted checkout always lives at this path and is the only source
       # of code executed in this job. The PR content, if any, is mounted as
       # read-only analysis data under PR_WORKDIR.

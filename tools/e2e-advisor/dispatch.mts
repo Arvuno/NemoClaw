@@ -406,27 +406,16 @@ function validateWorkflowFile(workflow: string): string {
   return workflow;
 }
 
-function validateGitRef(ref: string): string {
-  if (!/^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/.test(ref)) {
-    throw new Error("Refusing to dispatch an unsafe workflow ref");
-  }
-  if (ref.includes("..") || ref.includes("//") || ref.endsWith("/") || ref.endsWith(".lock")) {
-    throw new Error("Refusing to dispatch an unsafe workflow ref");
-  }
-  return ref;
+export function validateGitRef(ref: string): string {
+  return validateSafeRef(ref, "Refusing to dispatch an unsafe workflow ref");
 }
 
-function validateDispatchInputs(inputs: DispatchInputs): DispatchInputs {
+export function validateDispatchInputs(inputs: DispatchInputs): DispatchInputs {
   const jobs = inputs.jobs.split(",").filter(Boolean);
   if (jobs.length === 0 || jobs.some((job) => !/^[A-Za-z0-9_-]+$/.test(job))) {
     throw new Error("Refusing to dispatch unsafe E2E job input");
   }
-  if (!/^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/.test(inputs.target_ref)) {
-    throw new Error("Refusing to dispatch unsafe target_ref input");
-  }
-  if (inputs.target_ref.includes("..") || inputs.target_ref.includes("//") || inputs.target_ref.endsWith("/")) {
-    throw new Error("Refusing to dispatch unsafe target_ref input");
-  }
+  validateSafeRef(inputs.target_ref, "Refusing to dispatch unsafe target_ref input");
   if (!/^\d+$/.test(inputs.pr_number)) {
     throw new Error("Refusing to dispatch unsafe pr_number input");
   }
@@ -435,6 +424,16 @@ function validateDispatchInputs(inputs: DispatchInputs): DispatchInputs {
     target_ref: inputs.target_ref,
     pr_number: inputs.pr_number,
   };
+}
+
+function validateSafeRef(ref: string, message: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/.test(ref)) {
+    throw new Error(message);
+  }
+  if (ref.includes("..") || ref.includes("//") || ref.endsWith("/") || ref.endsWith(".lock")) {
+    throw new Error(message);
+  }
+  return ref;
 }
 
 function renderDispatchSummary(result: DispatchPlan): string {

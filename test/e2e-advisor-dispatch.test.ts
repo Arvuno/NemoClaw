@@ -9,6 +9,8 @@ import {
   collectRecommendedJobs,
   extractDispatchableJobs,
   planAutoDispatch,
+  validateDispatchInputs,
+  validateGitRef,
 } from "../tools/e2e-advisor/dispatch.mts";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -56,6 +58,10 @@ describe("E2E advisor auto-dispatch planning", () => {
     expect(jobs).not.toContain("report-to-pr");
     expect(jobs).not.toContain("notify-on-failure");
     expect(jobs).not.toContain("scorecard");
+
+    for (const job of jobs) {
+      expect(workflowText).toContain(`contains(format(',{0},', inputs.jobs), ',${job},')`);
+    }
   });
 
   it("plans a trusted main-workflow dispatch for NVIDIA org member PRs", () => {
@@ -148,5 +154,67 @@ describe("E2E advisor auto-dispatch planning", () => {
         ],
       }),
     ).toEqual(["network-policy-e2e"]);
+  });
+
+  it("validates safe workflow refs and dispatch inputs", () => {
+    expect(validateGitRef("feature/e2e-advisor_123.4")).toBe("feature/e2e-advisor_123.4");
+    expect(
+      validateDispatchInputs({
+        jobs: "network-policy-e2e,cloud_e2e",
+        target_ref: "abc123def456",
+        pr_number: "123",
+      }),
+    ).toEqual({
+      jobs: "network-policy-e2e,cloud_e2e",
+      target_ref: "abc123def456",
+      pr_number: "123",
+    });
+  });
+
+  it.each([
+    "feature/../main",
+    "feature//main",
+    "feature/branch/",
+    "refs/heads/main.lock",
+    "feature/branch`echo hi`",
+    "feature/branch\nmain",
+    "a".repeat(201),
+  ])("rejects unsafe workflow ref %j", (ref) => {
+    expect(() => validateGitRef(ref)).toThrow(/unsafe workflow ref/);
+  });
+
+  it.each([
+    {
+      jobs: "network-policy-e2e,evil job",
+      target_ref: "abc123def456",
+      pr_number: "123",
+    },
+    {
+      jobs: "network-policy-e2e",
+      target_ref: "feature/../main",
+      pr_number: "123",
+    },
+    {
+      jobs: "network-policy-e2e",
+      target_ref: "feature/branch`echo hi`",
+      pr_number: "123",
+    },
+    {
+      jobs: "network-policy-e2e",
+      target_ref: "feature/branch\nmain",
+      pr_number: "123",
+    },
+    {
+      jobs: "network-policy-e2e",
+      target_ref: "a".repeat(201),
+      pr_number: "123",
+    },
+    {
+      jobs: "network-policy-e2e",
+      target_ref: "abc123def456",
+      pr_number: "123abc",
+    },
+  ])("rejects unsafe dispatch inputs %#", (inputs) => {
+    expect(() => validateDispatchInputs(inputs)).toThrow(/Refusing to dispatch unsafe/);
   });
 });
