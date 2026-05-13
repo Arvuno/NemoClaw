@@ -7977,6 +7977,18 @@ async function setupInference(
       // Persist token now that ollama-local is confirmed as the provider.
       // Not persisted earlier in case the user backs out to a different provider.
       persistProxyToken(proxyToken);
+      // Probe sandbox → proxy connectivity before committing the inference
+      // route. Running before `inference set` ensures isInferenceRouteReady()
+      // stays false on failure, so a retry (including --resume) re-enters
+      // setupInference and re-runs this check rather than skipping it.
+      const reach = await probeOllamaProxySandboxReachability();
+      if (!reach.ok) {
+        const msg = formatOllamaProxyUnreachableMessage(reach);
+        if (reach.reason === "tcp_failed") {
+          console.error(msg);
+          process.exit(1);
+        }
+      }
     }
     // Use a dedicated internal credential env (NEMOCLAW_OLLAMA_PROXY_TOKEN)
     // so the gateway never reads the user's host OPENAI_API_KEY for local
@@ -8010,18 +8022,6 @@ async function setupInference(
     if (!probe.ok) {
       console.error(`  ${probe.message}`);
       process.exit(1);
-    }
-    if (!isWsl()) {
-      const reach = await probeOllamaProxySandboxReachability();
-      if (!reach.ok) {
-        const msg = formatOllamaProxyUnreachableMessage(reach);
-        if (reach.reason === "tcp_failed") {
-          console.error(msg);
-          process.exit(1);
-        } else if (msg) {
-          console.warn(msg);
-        }
-      }
     }
     // Do not mutate ~/.nemoclaw/credentials.json here: local Ollama now uses
     // OLLAMA_PROXY_CREDENTIAL_ENV, so any saved OPENAI_API_KEY remains available
