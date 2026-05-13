@@ -239,11 +239,16 @@ function lintRetiredLegacyWrappers(root: string): LintFinding[] {
         message: "retired legacy wrapper must delegate to test/e2e/runtime/run-scenario.sh",
       });
     }
-    if (/^\s*(pass|fail)\s*\(\)|^\s*section\s*\(\)|nemoclaw\s+onboard|bash\s+.*install\.sh/m.test(body)) {
+    if (
+      /^\s*(pass|fail)\s*\(\)|^\s*section\s*\(\)|nemoclaw\s+onboard|bash\s+.*install\.sh/m.test(
+        body,
+      )
+    ) {
       findings.push({
         file: `test/e2e/${script}`,
         rule: "retired-wrapper-no-monolithic-logic",
-        message: "retired legacy wrapper must not reintroduce pass/fail helpers, install, or onboard logic",
+        message:
+          "retired legacy wrapper must not reintroduce pass/fail helpers, install, or onboard logic",
       });
     }
   }
