@@ -9,7 +9,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
 
-const SCRIPT_STATUSES = new Set(["not-started", "migrated", "parity-verified", "deferred", "retired"]);
+const SCRIPT_STATUSES = new Set([
+  "not-started",
+  "migrated",
+  "parity-verified",
+  "deferred",
+  "retired",
+]);
 const ASSERTION_STATUSES = new Set(["mapped", "deferred", "retired"]);
 
 type AssertionStatus = "mapped" | "deferred" | "retired";
@@ -127,15 +133,23 @@ function validateAssertion(
   if (effectiveStatus === "mapped") {
     if (!isNonEmptyString(assertion.id)) errors.push(`${label}: mapped assertion requires id`);
   } else if (effectiveStatus === "deferred") {
-    if (!isNonEmptyString(assertion.reason)) errors.push(`${label}: deferred assertion requires reason`);
-    if (!isNonEmptyString(assertion.owner)) errors.push(`${label}: deferred assertion requires owner`);
-    if (!isNonEmptyString(assertion.runner_requirement) && !isNonEmptyString(assertion.secret_requirement)) {
+    if (!isNonEmptyString(assertion.reason))
+      errors.push(`${label}: deferred assertion requires reason`);
+    if (!isNonEmptyString(assertion.owner))
+      errors.push(`${label}: deferred assertion requires owner`);
+    if (
+      !isNonEmptyString(assertion.runner_requirement) &&
+      !isNonEmptyString(assertion.secret_requirement)
+    ) {
       errors.push(`${label}: deferred assertion requires runner_requirement or secret_requirement`);
     }
   } else if (effectiveStatus === "retired") {
-    if (!isNonEmptyString(assertion.reason)) errors.push(`${label}: retired assertion requires reason`);
-    if (!isNonEmptyString(assertion.reviewer)) errors.push(`${label}: retired assertion requires reviewer`);
-    if (!isNonEmptyString(assertion.approved_at)) errors.push(`${label}: retired assertion requires approved_at`);
+    if (!isNonEmptyString(assertion.reason))
+      errors.push(`${label}: retired assertion requires reason`);
+    if (!isNonEmptyString(assertion.reviewer))
+      errors.push(`${label}: retired assertion requires reviewer`);
+    if (!isNonEmptyString(assertion.approved_at))
+      errors.push(`${label}: retired assertion requires approved_at`);
   }
 
   return errors;
@@ -158,14 +172,26 @@ export function validateParityMap(options: ValidationOptions): string[] {
     }
 
     const scriptStatus = scriptEntry.status;
-    if (scriptStatus !== undefined && (!isNonEmptyString(scriptStatus) || !SCRIPT_STATUSES.has(scriptStatus))) {
+    if (
+      scriptStatus !== undefined &&
+      (!isNonEmptyString(scriptStatus) || !SCRIPT_STATUSES.has(scriptStatus))
+    ) {
       errors.push(`${scriptName}: status must be one of ${Array.from(SCRIPT_STATUSES).join(", ")}`);
     }
 
-    const assertions = Array.isArray(scriptEntry.assertions) ? (scriptEntry.assertions as ParityAssertion[]) : [];
-    const effectiveScriptStatus = isNonEmptyString(scriptStatus) ? scriptStatus : assertions.length === 0 ? "not-started" : "migrated";
+    const assertions = Array.isArray(scriptEntry.assertions)
+      ? (scriptEntry.assertions as ParityAssertion[])
+      : [];
+    const effectiveScriptStatus = isNonEmptyString(scriptStatus)
+      ? scriptStatus
+      : assertions.length === 0
+        ? "not-started"
+        : "migrated";
 
-    if ((effectiveScriptStatus === "migrated" || effectiveScriptStatus === "parity-verified") && !isNonEmptyString(scriptEntry.scenario)) {
+    if (
+      (effectiveScriptStatus === "migrated" || effectiveScriptStatus === "parity-verified") &&
+      !isNonEmptyString(scriptEntry.scenario)
+    ) {
       errors.push(`${scriptName}: ${effectiveScriptStatus} script requires scenario`);
     }
 
@@ -175,7 +201,9 @@ export function validateParityMap(options: ValidationOptions): string[] {
 
     const mappedIds = new Map<string, number[]>();
     assertions.forEach((assertion, index) => {
-      errors.push(...validateAssertion(scriptName, assertion, index, inventoryTexts, options.strict));
+      errors.push(
+        ...validateAssertion(scriptName, assertion, index, inventoryTexts, options.strict),
+      );
       const status = assertion.status ?? "mapped";
       if (status === "mapped" && isNonEmptyString(assertion.id)) {
         const entries = mappedIds.get(assertion.id) ?? [];
@@ -188,14 +216,20 @@ export function validateParityMap(options: ValidationOptions): string[] {
       if (indexes.length <= 1) continue;
       const allReusable = indexes.every((index) => assertions[index]?.reusable === true);
       if (!allReusable) {
-        errors.push(`${scriptName}: duplicate scenario assertion id ${id}; set reusable: true on all duplicates if intentional`);
+        errors.push(
+          `${scriptName}: duplicate scenario assertion id ${id}; set reusable: true on all duplicates if intentional`,
+        );
       }
     }
 
     if (options.strict) {
       const categorized = new Set(
         assertions
-          .filter((assertion) => isNonEmptyString(assertion.legacy) && ASSERTION_STATUSES.has(assertion.status as string))
+          .filter(
+            (assertion) =>
+              isNonEmptyString(assertion.legacy) &&
+              ASSERTION_STATUSES.has(assertion.status as string),
+          )
           .map((assertion) => assertion.legacy as string),
       );
       for (const inventoryText of inventoryTexts) {
@@ -214,7 +248,9 @@ function main(): number {
   const errors = validateParityMap(options);
   if (errors.length > 0) {
     for (const error of errors) process.stderr.write(`${error}\n`);
-    process.stderr.write(`\ncheck-parity-map: ${errors.length} error(s)${options.strict ? " in strict mode" : ""}\n`);
+    process.stderr.write(
+      `\ncheck-parity-map: ${errors.length} error(s)${options.strict ? " in strict mode" : ""}\n`,
+    );
     return 1;
   }
   process.stdout.write(`parity map valid${options.strict ? " (strict)" : ""}\n`);

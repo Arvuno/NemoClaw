@@ -168,7 +168,9 @@ function loadMappedStatuses(root: string): Map<string, MappingStatus> {
     for (const assertion of entry.assertions as ParityAssertionEntry[]) {
       if (typeof assertion.legacy !== "string") continue;
       const status =
-        assertion.status === "mapped" || assertion.status === "deferred" || assertion.status === "retired"
+        assertion.status === "mapped" ||
+        assertion.status === "deferred" ||
+        assertion.status === "retired"
           ? assertion.status
           : "mapped";
       statuses.set(`${script}\u0000${assertion.legacy}`, status);
@@ -180,7 +182,10 @@ function loadMappedStatuses(root: string): Map<string, MappingStatus> {
 
 function extractQuotedCall(line: string, helper: AssertionPolarity): string[] {
   const out: string[] = [];
-  const helperPattern = new RegExp(`(?:^|[^A-Za-z0-9_-])${helper}\\s+(["'])((?:\\\\.|(?!\\1).)*)\\1`, "g");
+  const helperPattern = new RegExp(
+    `(?:^|[^A-Za-z0-9_-])${helper}\\s+(["'])((?:\\\\.|(?!\\1).)*)\\1`,
+    "g",
+  );
   for (const match of line.matchAll(helperPattern)) {
     out.push(unescapeShellString(match[2]));
   }
@@ -196,7 +201,10 @@ function extractDirectOutput(line: string, polarity: AssertionPolarity): string[
     if (previous === "/") continue;
     if (/^\s*(printf|echo)\s+['\"][^'\"]*%s/.test(line)) continue;
     let text = match[1].trim();
-    text = text.replace(/["'`);]+$/g, "").replace(/^["'`]+/g, "").trim();
+    text = text
+      .replace(/["'`);]+$/g, "")
+      .replace(/^["'`]+/g, "")
+      .trim();
     if (text.length > 0 && !/^\$[A-Z_][A-Z0-9_]*$/.test(text)) out.push(text);
   }
   return out;
@@ -308,12 +316,16 @@ function main(): number {
 
   if (check) {
     if (!fs.existsSync(output)) {
-      process.stderr.write(`${output} does not exist; regenerate with scripts/e2e/extract-legacy-assertions.ts\n`);
+      process.stderr.write(
+        `${output} does not exist; regenerate with scripts/e2e/extract-legacy-assertions.ts\n`,
+      );
       return 1;
     }
     const existing = fs.readFileSync(output, "utf8");
     if (existing !== serialized) {
-      process.stderr.write(`${output} is out of date; regenerate with scripts/e2e/extract-legacy-assertions.ts\n`);
+      process.stderr.write(
+        `${output} is out of date; regenerate with scripts/e2e/extract-legacy-assertions.ts\n`,
+      );
       return 1;
     }
     process.stdout.write(`legacy assertion inventory is current: ${output}\n`);
