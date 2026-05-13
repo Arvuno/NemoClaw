@@ -298,7 +298,7 @@ Create the auditable source of truth for legacy E2E assertions.
 - Scripts with zero extracted assertions are listed explicitly with a reason or review TODO.
 - Unit tests cover quoted assertions, helper-wrapped assertions, and direct `PASS:` / `FAIL:` output.
 
-## Phase 2: Enforce Parity Map Schema
+## Phase 2: Enforce Parity Map Schema [COMPLETED: 3f24605c2]
 
 Make `parity-map.yaml` structurally reliable before mapping work begins.
 
