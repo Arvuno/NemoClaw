@@ -391,7 +391,7 @@
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Get Started</span></p>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1 has-children"><a class="reference internal" href="../get-started/prerequisites.html">Prerequisites</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
-<li class="toctree-l2"><a class="reference internal" href="../get-started/windows-preparation.html">Prepare Windows for NemoClaw</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../get-started/windows-preparation.html">(Windows Only) Windows Prerequisites</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="../get-started/quickstart.html">Quickstart with OpenClaw</a></li>
@@ -511,7 +511,7 @@ No restart is required.</p>
 <h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h2>
 <ul class="simple">
 <li><p>A running NemoClaw sandbox.</p></li>
-<li><p>The OpenShell CLI on your <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p></li>
+<li><p>The OpenShell CLI on your <code class="docutils literal notranslate"><span class="pre">PATH</span></code>, which NemoClaw uses under the hood.</p></li>
 </ul>
 </section>
 <section id="switch-to-a-different-model">
@@ -654,17 +654,21 @@ Use <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_INFERE
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_AGENT_TIMEOUT</span></code> controls the per-request inference timeout baked into
 <code class="docutils literal notranslate"><span class="pre">agents.defaults.timeoutSeconds</span></code>. Increase it for slow local inference (for
-example, CPU-only Ollama or vLLM on modest hardware). <code class="docutils literal notranslate"><span class="pre">openclaw.json</span></code> is
-immutable at runtime, so this value can only be changed by rebuilding the
-sandbox via <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span></code>.</p>
+example, CPU-only Ollama or vLLM on modest hardware). NemoClaw writes this
+value into <code class="docutils literal notranslate"><span class="pre">openclaw.json</span></code> during onboarding. The default sandbox may keep that
+file writable for agent state, but direct in-sandbox edits are not the supported
+or durable way to change NemoClaw-managed defaults. Rebuild the sandbox via
+<code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span></code> to apply a new value.</p>
 <p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_AGENT_HEARTBEAT_EVERY</span></code> sets <code class="docutils literal notranslate"><span class="pre">agents.defaults.heartbeat.every</span></code>.
 This controls OpenClaw’s periodic main-session agent turn.
 Each interval, the agent wakes up to review follow-ups and read <code class="docutils literal notranslate"><span class="pre">HEARTBEAT.md</span></code> if present in the workspace.
 The OpenClaw default is 30 minutes (1 hour for Anthropic OAuth / Claude CLI reuse).
 Tune the cadence with a duration string like <code class="docutils literal notranslate"><span class="pre">5m</span></code> or <code class="docutils literal notranslate"><span class="pre">2h</span></code>, or set <code class="docutils literal notranslate"><span class="pre">0m</span></code> to disable the periodic turns entirely.
 Disabling also drops <code class="docutils literal notranslate"><span class="pre">HEARTBEAT.md</span></code> from normal-run bootstrap context per upstream behavior, so the model no longer sees heartbeat-only instructions.
-<code class="docutils literal notranslate"><span class="pre">openclaw.json</span></code> is immutable at runtime, so the in-sandbox <code class="docutils literal notranslate"><span class="pre">openclaw</span> <span class="pre">config</span> <span class="pre">set</span></code> command cannot change this.
-Rebuild the sandbox via <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span> <span class="pre">--resume</span></code> to apply a new value.</p>
+NemoClaw writes this value into <code class="docutils literal notranslate"><span class="pre">openclaw.json</span></code> during onboarding.
+The in-sandbox <code class="docutils literal notranslate"><span class="pre">openclaw</span> <span class="pre">config</span> <span class="pre">set</span></code> command is not the supported path for
+NemoClaw-managed build-time defaults, and direct file edits are overwritten by a
+rebuild. Rebuild the sandbox via <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span> <span class="pre">--resume</span></code> to apply a new value.</p>
 <p>These variables are build-time settings.
 If you change them on an existing sandbox, recreate the sandbox so the new values bake into the image:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>onboard<span class="w"> </span>--resume<span class="w"> </span>--recreate-sandbox
@@ -673,15 +677,19 @@ If you change them on an existing sandbox, recreate the sandbox so the new value
 </section>
 <section id="verify-the-active-model">
 <h2>Verify the Active Model<a class="headerlink" href="#verify-the-active-model" title="Link to this heading">#</a></h2>
-<p>Run the status command to confirm the change:</p>
+<p>Run the inference command to confirm the live gateway route:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>inference<span class="w"> </span>get
+</pre></div>
+</div>
+<p>Add <code class="docutils literal notranslate"><span class="pre">--json</span></code> for machine-readable output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>inference<span class="w"> </span>get<span class="w"> </span>--json
+</pre></div>
+</div>
+<p>Run the status command when you also need sandbox, service, and messaging health:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>&lt;name&gt;<span class="w"> </span>status
 </pre></div>
 </div>
-<p>Add the <code class="docutils literal notranslate"><span class="pre">--json</span></code> flag for machine-readable output:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>&lt;name&gt;<span class="w"> </span>status<span class="w"> </span>--json
-</pre></div>
-</div>
-<p>The output includes the active provider, model, and endpoint.</p>
+<p>The status output includes the active provider, model, and endpoint with the rest of the sandbox state.</p>
 </section>
 <section id="notes">
 <h2>Notes<a class="headerlink" href="#notes" title="Link to this heading">#</a></h2>
