@@ -66,10 +66,6 @@ function toPosix(p: string): string {
   return p.split(path.sep).join("/");
 }
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function unescapeShellString(text: string): string {
   return text.replace(/\\(["'\\])/g, "$1");
 }
