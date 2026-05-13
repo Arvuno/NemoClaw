@@ -77,8 +77,11 @@ export function getGatewayClusterContainerName(gatewayName = DEFAULT_GATEWAY_NAM
 export function parseGatewayClusterImageVersion(
   imageRef: string | null | undefined,
 ): string | null {
-  const match = String(imageRef || "").match(/openshell\/cluster:([0-9]+\.[0-9]+\.[0-9]+)/);
-  return match ? match[1] : null;
+  const ref = String(imageRef || "");
+  const upstreamMatch = ref.match(/openshell\/cluster:([0-9]+\.[0-9]+\.[0-9]+)/);
+  if (upstreamMatch) return upstreamMatch[1];
+  const patchedMatch = ref.match(/(?:^|\/)nemoclaw-cluster:([0-9]+\.[0-9]+\.[0-9]+)(?:[-@]|$)/);
+  return patchedMatch ? patchedMatch[1] : null;
 }
 
 export function getGatewayClusterImageRef(
