@@ -37,6 +37,14 @@ const {
   writeSandboxConfigSyncFile,
 }: typeof import("./onboard/config-sync") = require("./onboard/config-sync");
 const {
+  isValidProxyHost,
+  isValidProxyPort,
+  patchStagedDockerfile,
+}: typeof import("./onboard/dockerfile-patch") = require("./onboard/dockerfile-patch");
+const {
+  agentSupportsWebSearch,
+}: typeof import("./onboard/web-search-support") = require("./onboard/web-search-support");
+const {
   buildDirectGpuPolicyYaml,
   buildDirectSandboxGpuProofCommands,
   prepareInitialSandboxCreatePolicy,
@@ -214,7 +222,7 @@ const {
     inferenceCompat: LooseObject | null;
   };
 };
-const { sleepSeconds } = require("./core/wait");
+const { sleepSeconds, waitForHttp, waitUntil } = require("./core/wait");
 const platformUtils: typeof import("./platform") = require("./platform");
 const { inferContainerRuntime, isWsl, shouldPatchCoredns } = platformUtils;
 const { resolveOpenshell } = require("./adapters/openshell/resolve");
@@ -312,6 +320,7 @@ import type {
   ValidationFailureLike,
 } from "./onboard/types";
 import { listChannels } from "./sandbox/channels";
+import { streamGatewayStart } from "./onboard/gateway";
 import type { StreamSandboxCreateResult } from "./sandbox/create-stream";
 import type { SandboxEntry } from "./state/registry";
 import type { BackupResult } from "./state/sandbox";
@@ -581,155 +590,6 @@ function repairRecordedSandbox(sandboxName: string | null): void {
 }
 
 const { streamSandboxCreate } = sandboxCreateStream;
-
-/** Spawn `openshell gateway start` and stream its output with progress heartbeats. */
-function streamGatewayStart(
-  command: string,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<{ status: number; output: string }> {
-  const child = spawn("bash", ["-lc", command], {
-    cwd: ROOT,
-    env,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-
-  const lines: string[] = [];
-  let pending = "";
-  let settled = false;
-  let resolvePromise: (value: { status: number; output: string }) => void;
-  let lastPrintedLine = "";
-  let currentPhase = "cluster";
-  let lastHeartbeatBucket = -1;
-  let lastOutputAt = Date.now();
-  const startedAt = Date.now();
-
-  function getDisplayWidth(): number {
-    return Math.max(60, Number(process.stdout.columns || 100));
-  }
-
-  function trimDisplayLine(line: string): string {
-    const width = getDisplayWidth();
-    const maxLen = Math.max(40, width - 4);
-    if (line.length <= maxLen) return line;
-    return `${line.slice(0, Math.max(0, maxLen - 3))}...`;
-  }
-
-  function printProgressLine(line: string): void {
-    const display = trimDisplayLine(line);
-    if (display !== lastPrintedLine) {
-      console.log(display);
-      lastPrintedLine = display;
-    }
-  }
-
-  function elapsedSeconds(): number {
-    return Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
-  }
-
-  function setPhase(nextPhase: string | null): void {
-    if (!nextPhase || nextPhase === currentPhase) return;
-    currentPhase = nextPhase;
-    const phaseLine =
-      nextPhase === "install"
-        ? "  Installing OpenShell components..."
-        : nextPhase === "pod"
-          ? "  Starting OpenShell gateway pod..."
-          : nextPhase === "health"
-            ? "  Waiting for gateway health..."
-            : "  Starting gateway cluster...";
-    printProgressLine(phaseLine);
-  }
-
-  function classifyLine(line: string): string | null {
-    if (/ApplyJob|helm-install-openshell|Applying HelmChart/i.test(line)) return "install";
-    if (
-      /openshell-0|Observed pod startup duration|MountVolume\.MountDevice succeeded/i.test(line)
-    ) {
-      return "pod";
-    }
-    if (/Gateway .* ready\.?$/i.test(line)) return "health";
-    return null;
-  }
-
-  function flushLine(rawLine: string): void {
-    const line = rawLine.replace(/\r/g, "").trimEnd();
-    if (!line) return;
-    lines.push(line);
-    lastOutputAt = Date.now();
-    const nextPhase = classifyLine(line);
-    if (nextPhase) setPhase(nextPhase);
-  }
-
-  function onChunk(chunk: Buffer | string): void {
-    pending += chunk.toString();
-    const parts = pending.split("\n");
-    pending = parts.pop() ?? "";
-    parts.forEach(flushLine);
-  }
-
-  function finish(result: { status: number; output: string }): void {
-    if (settled) return;
-    settled = true;
-    if (pending) flushLine(pending);
-    clearInterval(heartbeatTimer);
-    resolvePromise(result);
-  }
-
-  child.stdout.on("data", onChunk);
-  child.stderr.on("data", onChunk);
-
-  printProgressLine("  Starting gateway cluster...");
-  const heartbeatTimer = setInterval(() => {
-    if (settled) return;
-    const elapsed = elapsedSeconds();
-    const bucket = Math.floor(elapsed / 10);
-    if (bucket === lastHeartbeatBucket) return;
-    if (Date.now() - lastOutputAt < 3000 && elapsed < 10) return;
-    const heartbeatLine =
-      currentPhase === "install"
-        ? `  Still installing OpenShell components... (${elapsed}s elapsed)`
-        : currentPhase === "pod"
-          ? `  Still starting OpenShell gateway pod... (${elapsed}s elapsed)`
-          : currentPhase === "health"
-            ? `  Still waiting for gateway health... (${elapsed}s elapsed)`
-            : `  Still starting gateway cluster... (${elapsed}s elapsed)`;
-    printProgressLine(heartbeatLine);
-    lastHeartbeatBucket = bucket;
-  }, 5000);
-  heartbeatTimer.unref?.();
-
-  // Hard timeout to prevent indefinite hangs if the openshell process
-  // never exits (e.g. Docker daemon unresponsive, k3s restart loop). (#1830)
-  // On timeout, send SIGTERM and let the `close` event resolve the promise
-  // so the child has actually exited before the caller proceeds to retry.
-  const GATEWAY_START_TIMEOUT = envInt("NEMOCLAW_GATEWAY_START_TIMEOUT", 600) * 1000;
-  let killedByTimeout = false;
-  const killTimer = setTimeout(() => {
-    killedByTimeout = true;
-    lines.push("[NemoClaw] Gateway start timed out — killing process.");
-    child.kill("SIGTERM");
-    // If SIGTERM is ignored, force-kill after 10s.
-    setTimeout(() => {
-      if (!settled) child.kill("SIGKILL");
-    }, 10_000).unref?.();
-  }, GATEWAY_START_TIMEOUT);
-  killTimer.unref?.();
-
-  return new Promise<{ status: number; output: string }>((resolve) => {
-    resolvePromise = resolve;
-    child.on("error", (error: Error) => {
-      clearTimeout(killTimer);
-      const detail = error?.message || String(error);
-      lines.push(detail);
-      finish({ status: 1, output: lines.join("\n") });
-    });
-    child.on("close", (code: number | null) => {
-      clearTimeout(killTimer);
-      const exitCode = killedByTimeout ? 1 : (code ?? 1);
-      finish({ status: exitCode, output: lines.join("\n") });
-    });
-  });
-}
 
 function step(n: number, total: number, msg: string): void {
   console.log("");
@@ -2362,10 +2222,6 @@ function isOpenclawReady(sandboxName: string): boolean {
   return Boolean(fetchGatewayAuthTokenFromSandbox(sandboxName));
 }
 
-function encodeDockerJsonArg(value: LooseValue): string {
-  return Buffer.from(JSON.stringify(value || {}), "utf8").toString("base64");
-}
-
 function isAffirmativeAnswer(value: string | null | undefined): boolean {
   return ["y", "yes"].includes(
     String(value || "")
@@ -2483,51 +2339,12 @@ async function ensureValidatedBraveSearchCredential(
   }
 }
 
-/**
- * Check whether the agent's Dockerfile declares ARG NEMOCLAW_WEB_SEARCH_ENABLED.
- * If the ARG is absent, the patchStagedDockerfile replace is a silent no-op and
- * the config generator has no code path to emit a web search block — so offering
- * the Brave prompt would mislead the user.
- *
- * OpenClaw uses the root Dockerfile (not agents/openclaw/Dockerfile), so we
- * fall back to the root Dockerfile when the agent-specific one doesn't exist.
- */
-function agentSupportsWebSearch(
-  agent: AgentDefinition | null | undefined,
-  dockerfilePathOverride: string | null = null,
-): boolean {
-  // Hermes has native web tools, but the NemoClaw onboarding wizard wires the
-  // OpenClaw Brave provider path. Do not offer a Brave prompt for Hermes until
-  // that provider is supported end to end.
-  if (agent?.name === "hermes") {
-    return false;
-  }
-
-  const candidates = [
-    dockerfilePathOverride,
-    agent?.dockerfilePath,
-    path.join(ROOT, "Dockerfile"),
-  ].filter(
-    (candidate): candidate is string => typeof candidate === "string" && candidate.length > 0,
-  );
-
-  for (const dockerfilePath of candidates) {
-    try {
-      const content = fs.readFileSync(dockerfilePath, "utf-8");
-      return /^\s*ARG\s+NEMOCLAW_WEB_SEARCH_ENABLED=/m.test(content);
-    } catch {
-      // Try the next candidate; custom Dockerfile paths can disappear between resume runs.
-    }
-  }
-  return false;
-}
-
 async function configureWebSearch(
   existingConfig: WebSearchConfig | null = null,
   agent: AgentDefinition | null = null,
   dockerfilePathOverride: string | null = null,
 ): Promise<WebSearchConfig | null> {
-  if (!agentSupportsWebSearch(agent, dockerfilePathOverride)) {
+  if (!agentSupportsWebSearch(agent, dockerfilePathOverride, ROOT)) {
     note(`  Web search is not yet supported by ${agent?.displayName ?? "this agent"}. Skipping.`);
     return null;
   }
@@ -2648,204 +2465,6 @@ function verifyWebSearchInsideSandbox(
 }
 
 // getSandboxInferenceConfig — moved to onboard-providers.ts
-
-// Shared validators for NEMOCLAW_PROXY_HOST / NEMOCLAW_PROXY_PORT.
-// Both `patchStagedDockerfile()` (build-time Dockerfile ARG override) and
-// `createSandbox()` (runtime sandbox env whitelist) must reject the same
-// inputs, otherwise the build and runtime paths can diverge — e.g. a
-// build-time-accepted value silently no-ops at runtime, leaving the
-// container running with the default proxy. Hostname regex deliberately
-// excludes `:` so raw IPv6 literals are rejected: the runtime
-// `http://${HOST}:${PORT}` template does not bracket them and would
-// produce a malformed URL. Port is range-checked because a 5-digit
-// length filter alone would accept out-of-range values like 70000.
-const PROXY_HOST_RE = /^[A-Za-z0-9._-]+$/;
-function isValidProxyHost(value: string): boolean {
-  return PROXY_HOST_RE.test(value);
-}
-function isValidProxyPort(value: string): boolean {
-  if (!/^[0-9]{1,5}$/.test(value)) return false;
-  const port = Number(value);
-  return port >= 1 && port <= 65535;
-}
-
-function patchStagedDockerfile(
-  dockerfilePath: string,
-  model: string,
-  chatUiUrl: string,
-  buildId = String(Date.now()),
-  provider: string | null = null,
-  preferredInferenceApi: string | null = null,
-  webSearchConfig: WebSearchConfig | null = null,
-  messagingChannels: string[] = [],
-  messagingAllowedIds: LooseObject = {},
-  discordGuilds: LooseObject = {},
-  baseImageRef: string | null = null,
-  telegramConfig: LooseObject = {},
-  darwinVmCompat = false,
-) {
-  const { providerKey, primaryModelRef, inferenceBaseUrl, inferenceApi, inferenceCompat } =
-    getSandboxInferenceConfig(model, provider, preferredInferenceApi);
-  let dockerfile = fs.readFileSync(dockerfilePath, "utf8");
-  // Pin the base image to a specific digest when available (#1904).
-  // The ref must come from pullAndResolveBaseImageDigest() — never from
-  // blueprint.yaml, whose digest belongs to a different registry.
-  // Only rewrite when the current value already points at our sandbox-base
-  // image — custom --from Dockerfiles may use a different base.
-  if (baseImageRef) {
-    dockerfile = dockerfile.replace(
-      /^ARG BASE_IMAGE=(.*)$/m,
-      (line: string, currentValue: string) => {
-        const trimmed = String(currentValue).trim();
-        if (
-          trimmed.startsWith(`${SANDBOX_BASE_IMAGE}:`) ||
-          trimmed.startsWith(`${SANDBOX_BASE_IMAGE}@`)
-        ) {
-          return `ARG BASE_IMAGE=${baseImageRef}`;
-        }
-        return line;
-      },
-    );
-  }
-  dockerfile = dockerfile.replace(/^ARG NEMOCLAW_MODEL=.*$/m, `ARG NEMOCLAW_MODEL=${model}`);
-  dockerfile = dockerfile.replace(
-    /^ARG NEMOCLAW_PROVIDER_KEY=.*$/m,
-    `ARG NEMOCLAW_PROVIDER_KEY=${providerKey}`,
-  );
-  dockerfile = dockerfile.replace(
-    /^ARG NEMOCLAW_PRIMARY_MODEL_REF=.*$/m,
-    `ARG NEMOCLAW_PRIMARY_MODEL_REF=${primaryModelRef}`,
-  );
-  dockerfile = dockerfile.replace(/^ARG CHAT_UI_URL=.*$/m, `ARG CHAT_UI_URL=${chatUiUrl}`);
-  dockerfile = dockerfile.replace(
-    /^ARG NEMOCLAW_INFERENCE_BASE_URL=.*$/m,
-    `ARG NEMOCLAW_INFERENCE_BASE_URL=${inferenceBaseUrl}`,
-  );
-  dockerfile = dockerfile.replace(
-    /^ARG NEMOCLAW_INFERENCE_API=.*$/m,
-    `ARG NEMOCLAW_INFERENCE_API=${inferenceApi}`,
-  );
-  dockerfile = dockerfile.replace(
-    /^ARG NEMOCLAW_INFERENCE_COMPAT_B64=.*$/m,
-    `ARG NEMOCLAW_INFERENCE_COMPAT_B64=${encodeDockerJsonArg(inferenceCompat)}`,
-  );
-  dockerfile = dockerfile.replace(
-    /^ARG NEMOCLAW_BUILD_ID=.*$/m,
-    `ARG NEMOCLAW_BUILD_ID=${buildId}`,
-  );
-  dockerfile = dockerfile.replace(
-    /^ARG NEMOCLAW_DARWIN_VM_COMPAT=.*$/m,
-    `ARG NEMOCLAW_DARWIN_VM_COMPAT=${darwinVmCompat ? "1" : "0"}`,
-  );
-  // Honor NEMOCLAW_CONTEXT_WINDOW / NEMOCLAW_MAX_TOKENS / NEMOCLAW_REASONING
-  // so the user can tune model metadata without editing the Dockerfile.
-  const POSITIVE_INT_RE = /^[1-9][0-9]*$/;
-  const contextWindow = process.env.NEMOCLAW_CONTEXT_WINDOW;
-  if (contextWindow && POSITIVE_INT_RE.test(contextWindow)) {
-    dockerfile = dockerfile.replace(
-      /^ARG NEMOCLAW_CONTEXT_WINDOW=.*$/m,
-      `ARG NEMOCLAW_CONTEXT_WINDOW=${contextWindow}`,
-    );
-  }
-  const maxTokens = process.env.NEMOCLAW_MAX_TOKENS;
-  if (maxTokens && POSITIVE_INT_RE.test(maxTokens)) {
-    dockerfile = dockerfile.replace(
-      /^ARG NEMOCLAW_MAX_TOKENS=.*$/m,
-      `ARG NEMOCLAW_MAX_TOKENS=${maxTokens}`,
-    );
-  }
-  const reasoning = process.env.NEMOCLAW_REASONING;
-  if (reasoning === "true" || reasoning === "false") {
-    dockerfile = dockerfile.replace(
-      /^ARG NEMOCLAW_REASONING=.*$/m,
-      `ARG NEMOCLAW_REASONING=${reasoning}`,
-    );
-  }
-  // Honor NEMOCLAW_INFERENCE_INPUTS for vision-capable models. OpenClaw's
-  // model schema currently accepts "text" and "image" only, so validate
-  // strictly against that vocabulary. Adding modalities to OpenClaw later
-  // only requires widening this regex. See #2421.
-  const inferenceInputs = process.env.NEMOCLAW_INFERENCE_INPUTS;
-  if (inferenceInputs && /^(text|image)(,(text|image))*$/.test(inferenceInputs)) {
-    dockerfile = dockerfile.replace(
-      /^ARG NEMOCLAW_INFERENCE_INPUTS=.*$/m,
-      `ARG NEMOCLAW_INFERENCE_INPUTS=${inferenceInputs}`,
-    );
-  }
-  // NEMOCLAW_AGENT_TIMEOUT — override agents.defaults.timeoutSeconds at build
-  // time. Lets users increase the per-request inference timeout without
-  // editing the Dockerfile. Ref: issue #2281
-  const agentTimeout = process.env.NEMOCLAW_AGENT_TIMEOUT;
-  if (agentTimeout && POSITIVE_INT_RE.test(agentTimeout)) {
-    dockerfile = dockerfile.replace(
-      /^ARG NEMOCLAW_AGENT_TIMEOUT=.*$/m,
-      `ARG NEMOCLAW_AGENT_TIMEOUT=${agentTimeout}`,
-    );
-  }
-  // NEMOCLAW_AGENT_HEARTBEAT_EVERY — override agents.defaults.heartbeat.every
-  // at build time. Accepts Go-style durations with a required s/m/h suffix
-  // ("30m", "1h"); "0m" disables heartbeat. Ref: issue #2880
-  const agentHeartbeat = process.env.NEMOCLAW_AGENT_HEARTBEAT_EVERY;
-  if (agentHeartbeat && /^\d+(s|m|h)$/.test(agentHeartbeat)) {
-    dockerfile = dockerfile.replace(
-      /^ARG NEMOCLAW_AGENT_HEARTBEAT_EVERY=.*$/m,
-      `ARG NEMOCLAW_AGENT_HEARTBEAT_EVERY=${agentHeartbeat}`,
-    );
-  }
-  // Honor NEMOCLAW_PROXY_HOST / NEMOCLAW_PROXY_PORT exported in the host
-  // shell so the sandbox-side nemoclaw-start.sh sees them via $ENV at runtime.
-  // Without this, the host export is silently dropped at image build time and
-  // the sandbox falls back to the default 10.200.0.1:3128 proxy. See #1409.
-  const proxyHostEnv = process.env.NEMOCLAW_PROXY_HOST;
-  if (proxyHostEnv && isValidProxyHost(proxyHostEnv)) {
-    dockerfile = dockerfile.replace(
-      /^ARG NEMOCLAW_PROXY_HOST=.*$/m,
-      `ARG NEMOCLAW_PROXY_HOST=${proxyHostEnv}`,
-    );
-  }
-  const proxyPortEnv = process.env.NEMOCLAW_PROXY_PORT;
-  if (proxyPortEnv && isValidProxyPort(proxyPortEnv)) {
-    dockerfile = dockerfile.replace(
-      /^ARG NEMOCLAW_PROXY_PORT=.*$/m,
-      `ARG NEMOCLAW_PROXY_PORT=${proxyPortEnv}`,
-    );
-  }
-  dockerfile = dockerfile.replace(
-    /^ARG NEMOCLAW_WEB_SEARCH_ENABLED=.*$/m,
-    `ARG NEMOCLAW_WEB_SEARCH_ENABLED=${webSearchConfig ? "1" : "0"}`,
-  );
-  // Onboard flow expects immediate dashboard access without device pairing,
-  // so disable device auth for images built during onboard (see #1217).
-  dockerfile = dockerfile.replace(
-    /^ARG NEMOCLAW_DISABLE_DEVICE_AUTH=.*$/m,
-    `ARG NEMOCLAW_DISABLE_DEVICE_AUTH=1`,
-  );
-  if (messagingChannels.length > 0) {
-    dockerfile = dockerfile.replace(
-      /^ARG NEMOCLAW_MESSAGING_CHANNELS_B64=.*$/m,
-      `ARG NEMOCLAW_MESSAGING_CHANNELS_B64=${encodeDockerJsonArg(messagingChannels)}`,
-    );
-  }
-  if (Object.keys(messagingAllowedIds).length > 0) {
-    dockerfile = dockerfile.replace(
-      /^ARG NEMOCLAW_MESSAGING_ALLOWED_IDS_B64=.*$/m,
-      `ARG NEMOCLAW_MESSAGING_ALLOWED_IDS_B64=${encodeDockerJsonArg(messagingAllowedIds)}`,
-    );
-  }
-  if (Object.keys(discordGuilds).length > 0) {
-    dockerfile = dockerfile.replace(
-      /^ARG NEMOCLAW_DISCORD_GUILDS_B64=.*$/m,
-      `ARG NEMOCLAW_DISCORD_GUILDS_B64=${encodeDockerJsonArg(discordGuilds)}`,
-    );
-  }
-  if (telegramConfig && Object.keys(telegramConfig).length > 0) {
-    dockerfile = dockerfile.replace(
-      /^ARG NEMOCLAW_TELEGRAM_CONFIG_B64=.*$/m,
-      `ARG NEMOCLAW_TELEGRAM_CONFIG_B64=${encodeDockerJsonArg(telegramConfig)}`,
-    );
-  }
-  fs.writeFileSync(dockerfilePath, dockerfile);
-}
 
 // Inference probes — moved to inference/onboard-probes.ts
 const {
@@ -4997,8 +4616,30 @@ async function startGatewayWithOptions(
     run(["bash", path.join(SCRIPTS, "fix-coredns.sh"), GATEWAY_NAME], {
       ignoreError: true,
     });
+    const corednsReady = waitUntil(() => {
+      const check = runCaptureOpenshell(
+        [
+          "doctor",
+          "exec",
+          "--",
+          "kubectl",
+          "get",
+          "pods",
+          "-n",
+          "kube-system",
+          "-l",
+          "k8s-app=kube-dns",
+          "-o",
+          'jsonpath={range .items[*]}{.status.phase}{" "}{range .status.containerStatuses[*]}{.ready}{" "}{end}{end}',
+        ],
+        { ignoreError: true },
+      );
+      return check.includes("Running") && check.includes("true") && !check.includes("false");
+    }, 10);
+    if (!corednsReady) {
+      console.warn("  CoreDNS did not report ready within timeout; continuing may cause DNS flakiness.");
+    }
   }
-  sleep(5);
   runOpenshell(["gateway", "select", GATEWAY_NAME], { ignoreError: true });
   process.env.OPENSHELL_GATEWAY = GATEWAY_NAME;
 }
@@ -7904,7 +7545,11 @@ async function setupNim(
           // Shell required: backgrounding (&), env var prefix, output redirection.
           const ollamaEnv = isWsl() ? "" : `OLLAMA_HOST=127.0.0.1:${OLLAMA_PORT} `;
           runShell(`${ollamaEnv}ollama serve > /dev/null 2>&1 &`, { ignoreError: true });
-          sleep(2);
+          if (!waitForHttp(`http://127.0.0.1:${OLLAMA_PORT}/`, 10)) {
+            console.error(`  Ollama did not become ready on :${OLLAMA_PORT} within timeout.`);
+            if (isNonInteractive()) process.exit(1);
+            continue selectionLoop;
+          }
         }
         if (isWsl()) {
           // WSL2 doesn't need the proxy — Docker can reach the host directly.
@@ -8031,7 +7676,11 @@ async function setupNim(
           runShell(`OLLAMA_HOST=127.0.0.1:${OLLAMA_PORT} ollama serve > /dev/null 2>&1 &`, {
             ignoreError: true,
           });
-          sleep(2);
+          if (!waitForHttp(`http://127.0.0.1:${OLLAMA_PORT}/`, 10)) {
+            console.error(`  Ollama did not become ready on :${OLLAMA_PORT} within timeout.`);
+            if (isNonInteractive()) process.exit(1);
+            continue selectionLoop;
+          }
         } else {
           ensureOllamaLinuxExtractionDependencies();
           console.log(
@@ -8039,9 +7688,6 @@ async function setupNim(
               "It uses sudo for those steps; you may be prompted for your password.",
           );
           runShell("set -o pipefail; curl -fsSL https://ollama.com/install.sh | sh");
-          // Give the just-started ollama.service a moment to bind port
-          // 11434 before we probe or apply the systemd drop-in override.
-          sleep(2);
           // install.sh only creates ollama.service when systemctl is present.
           // On non-systemd Linux (Alpine/OpenRC, container images, etc.) the
           // installer just lays down the binary and we have to start it
@@ -8080,20 +7726,18 @@ async function setupNim(
               console.error("  Refusing to continue with a potentially non-loopback Ollama bind.");
               process.exit(1);
             }
-            // Retry the probe for a few seconds before giving up — systemd's
-            // daemon may still be binding the port; a single probe could falsely
-            // conclude it's down and spawn a duplicate `ollama serve`.
-            for (let i = 0; i < 10; i++) {
-              if (findReachableOllamaHost()) break;
-              sleep(1);
-            }
+            waitUntil(() => Boolean(findReachableOllamaHost()), 10, 1000);
           }
           // Fall back to manual start if systemd path failed or isn't present.
           if (!findReachableOllamaHost()) {
             console.log("  Starting Ollama...");
             const ollamaEnv = isWsl() ? "" : `OLLAMA_HOST=127.0.0.1:${OLLAMA_PORT} `;
             runShell(`${ollamaEnv}ollama serve > /dev/null 2>&1 &`, { ignoreError: true });
-            sleep(2);
+            if (!waitForHttp(`http://127.0.0.1:${OLLAMA_PORT}/`, 10)) {
+              console.error(`  Ollama did not become ready on :${OLLAMA_PORT} within timeout.`);
+              if (isNonInteractive()) process.exit(1);
+              continue selectionLoop;
+            }
           }
         }
         if (isWsl()) {
@@ -9065,6 +8709,31 @@ async function setupOpenclaw(sandboxName: string, model: string, provider: strin
 
 // ── Step 7: Policy presets ───────────────────────────────────────
 
+function waitForPolicyMutation(description: string, mutate: () => boolean | void): void {
+  let lastError: Error | null = null;
+  const success = waitUntil(() => {
+    try {
+      const result = mutate();
+      if (result === false) {
+        lastError = new Error(`${description} returned false`);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      lastError = error;
+      if (!error.message.includes("sandbox not found")) {
+        throw err;
+      }
+      return false;
+    }
+  }, 10, 2000);
+
+  if (!success) {
+    throw lastError || new Error(`${description} timed out`);
+  }
+}
+
 async function _setupPolicies(
   sandboxName: string,
   options: {
@@ -9118,18 +8787,9 @@ async function _setupPolicies(
     }
     note(`  [non-interactive] Applying policy presets: ${selectedPresets.join(", ")}`);
     for (const name of selectedPresets) {
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          policies.applyPreset(sandboxName, name);
-          break;
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          if (!message.includes("sandbox not found") || attempt === 2) {
-            throw err;
-          }
-          sleep(2);
-        }
-      }
+      waitForPolicyMutation(`applyPreset(${name})`, () =>
+        policies.applyPreset(sandboxName, name),
+      );
     }
   } else {
     console.log("");
@@ -9901,42 +9561,16 @@ function syncPresetSelection(
   const newlySelected = target.filter((name) => !appliedSet.has(name));
 
   for (const name of deselected) {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        if (!policies.removePreset(sandboxName, name)) {
-          throw new Error(`Failed to remove preset '${name}'.`);
-        }
-        break;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        if (!message.includes("sandbox not found") || attempt === 2) {
-          throw err;
-        }
-        sleep(2);
-      }
-    }
+    waitForPolicyMutation(`removePreset(${name})`, () =>
+      policies.removePreset(sandboxName, name),
+    );
   }
 
   for (const name of newlySelected) {
     const options = accessByName ? { access: accessByName[name] } : undefined;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        // applyPreset returns false (without throwing) on some error paths —
-        // e.g. unknown preset, malformed YAML. Treat that as a failure so
-        // setupPoliciesWithSelection doesn't silently report success on a
-        // preset that never got applied.
-        if (!policies.applyPreset(sandboxName, name, options)) {
-          throw new Error(`Failed to apply preset '${name}'.`);
-        }
-        break;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        if (!message.includes("sandbox not found") || attempt === 2) {
-          throw err;
-        }
-        sleep(2);
-      }
-    }
+    waitForPolicyMutation(`applyPreset(${name})`, () =>
+      policies.applyPreset(sandboxName, name, options),
+    );
   }
 }
 
@@ -11302,7 +10936,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     }
 
     const webSearchSupportProbePath = fromDockerfile ? path.resolve(fromDockerfile) : null;
-    const webSearchSupported = agentSupportsWebSearch(agent, webSearchSupportProbePath);
+    const webSearchSupported = agentSupportsWebSearch(agent, webSearchSupportProbePath, ROOT);
     if (webSearchConfig && !webSearchSupported) {
       note(
         `  Web search is not yet supported by ${agent?.displayName ?? "this sandbox image"}. Clearing stale config.`,
