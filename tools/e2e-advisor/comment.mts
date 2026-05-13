@@ -1,9 +1,46 @@
-#!/usr/bin/env node
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 import fs from "node:fs";
 import path from "node:path";
+
+type ParsedArgs = {
+  repo?: string;
+  pr?: string;
+  summary?: string;
+  result?: string;
+  dispatch?: string;
+};
+
+type TestRecommendation = {
+  id?: string;
+};
+
+type AdvisorResult = {
+  requiredTests?: TestRecommendation[];
+  optionalTests?: TestRecommendation[];
+  dispatchHint?: {
+    jobsInput?: string;
+  };
+};
+
+type DispatchResult = {
+  status?: string;
+  jobs?: string[];
+  workflow?: string;
+  targetRef?: string;
+  reason?: string;
+};
+
+type GitHubComment = {
+  id: number;
+  body?: string;
+};
+
+type GitHubRequestOptions = {
+  method?: string;
+  body?: unknown;
+};
 
 const args = parseArgs(process.argv.slice(2));
 const repo = args.repo || process.env.GITHUB_REPOSITORY;
@@ -31,8 +68,8 @@ if (!summary) {
   throw new Error(`No advisor summary found at ${summaryPath}`);
 }
 
-const result = readJsonIfExists(resultPath);
-const dispatch = readJsonIfExists(dispatchPath);
+const result = readJsonIfExists<AdvisorResult>(resultPath);
+const dispatch = readJsonIfExists<DispatchResult>(dispatchPath);
 const body = buildComment({ summary, result, dispatch, runUrl, marker });
 
 try {
@@ -50,7 +87,7 @@ try {
     });
     console.log(`Created E2E advisor comment on ${repo}#${pr}`);
   }
-} catch (error) {
+} catch (error: unknown) {
   if (isPermissionError(error)) {
     const message = error instanceof Error ? error.message : String(error);
     console.log(`Skipping E2E advisor comment due to permission error: ${message}`);
@@ -59,12 +96,12 @@ try {
   }
 }
 
-function parseArgs(argv) {
-  const parsed = {};
+function parseArgs(argv: string[]): ParsedArgs {
+  const parsed: Record<string, string | undefined> = {};
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg.startsWith("--")) {
-      const key = arg.slice(2).replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+      const key = arg.slice(2).replace(/-([a-z])/g, (_, char: string) => char.toUpperCase());
       parsed[key] = argv[i + 1];
       i += 1;
     }
@@ -72,17 +109,29 @@ function parseArgs(argv) {
   return parsed;
 }
 
-function readIfExists(filePath) {
+function readIfExists(filePath: string): string | undefined {
   const resolved = path.resolve(process.cwd(), filePath);
   return fs.existsSync(resolved) ? fs.readFileSync(resolved, "utf8") : undefined;
 }
 
-function readJsonIfExists(filePath) {
+function readJsonIfExists<T>(filePath: string): T | undefined {
   const text = readIfExists(filePath);
-  return text ? JSON.parse(text) : undefined;
+  return text ? JSON.parse(text) as T : undefined;
 }
 
-function buildComment({ summary, result, dispatch, runUrl, marker }) {
+function buildComment({
+  summary,
+  result,
+  dispatch,
+  runUrl,
+  marker,
+}: {
+  summary: string;
+  result?: AdvisorResult;
+  dispatch?: DispatchResult;
+  runUrl?: string;
+  marker: string;
+}): string {
   const requiredTests = Array.isArray(result?.requiredTests) ? result.requiredTests : [];
   const optionalTests = Array.isArray(result?.optionalTests) ? result.optionalTests : [];
   const requiredLine = requiredTests.length > 0
@@ -112,7 +161,7 @@ ${summary.trim()}
 `;
 }
 
-function renderAutoDispatch(dispatch) {
+function renderAutoDispatch(dispatch: DispatchResult | undefined): string {
   if (!dispatch || typeof dispatch !== "object") {
     return "";
   }
@@ -130,16 +179,16 @@ function renderAutoDispatch(dispatch) {
   return "";
 }
 
-async function findExistingComment(repo, pr, token, marker) {
-  const comments = await github(`repos/${repo}/issues/${pr}/comments?per_page=100`, token);
+async function findExistingComment(repo: string, pr: string, token: string, marker: string): Promise<GitHubComment | undefined> {
+  const comments = await github<GitHubComment[]>(`repos/${repo}/issues/${pr}/comments?per_page=100`, token);
   return comments.find((comment) => typeof comment.body === "string" && comment.body.includes(marker));
 }
 
-function isPermissionError(error) {
+function isPermissionError(error: unknown): boolean {
   return error instanceof Error && /\b403\b|Resource not accessible by integration|permission/i.test(error.message);
 }
 
-async function github(pathname, token, options = {}) {
+async function github<T>(pathname: string, token: string, options: GitHubRequestOptions = {}): Promise<T> {
   const response = await fetch(`https://api.github.com/${pathname}`, {
     method: options.method || "GET",
     headers: {
@@ -155,5 +204,5 @@ async function github(pathname, token, options = {}) {
   if (!response.ok) {
     throw new Error(`GitHub API ${options.method || "GET"} ${pathname} failed: ${response.status} ${text}`);
   }
-  return text ? JSON.parse(text) : undefined;
+  return (text ? JSON.parse(text) : undefined) as T;
 }
