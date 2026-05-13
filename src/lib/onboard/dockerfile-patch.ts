@@ -89,6 +89,7 @@ export function patchStagedDockerfile(
   discordGuilds: LooseObject = {},
   baseImageRef: string | null = null,
   telegramConfig: LooseObject = {},
+  darwinVmCompat = false,
 ): void {
   const { providerKey, primaryModelRef, inferenceBaseUrl, inferenceApi, inferenceCompat } =
     getDockerfileSandboxInferenceConfig(model, provider, preferredInferenceApi);
@@ -138,6 +139,10 @@ export function patchStagedDockerfile(
   dockerfile = dockerfile.replace(
     /^ARG NEMOCLAW_BUILD_ID=.*$/m,
     `ARG NEMOCLAW_BUILD_ID=${buildId}`,
+  );
+  dockerfile = dockerfile.replace(
+    /^ARG NEMOCLAW_DARWIN_VM_COMPAT=.*$/m,
+    `ARG NEMOCLAW_DARWIN_VM_COMPAT=${darwinVmCompat ? "1" : "0"}`,
   );
   // Honor NEMOCLAW_CONTEXT_WINDOW / NEMOCLAW_MAX_TOKENS / NEMOCLAW_REASONING
   // so the user can tune model metadata without editing the Dockerfile.

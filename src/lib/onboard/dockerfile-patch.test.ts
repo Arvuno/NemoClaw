@@ -64,6 +64,7 @@ describe("dockerfile patch helpers", () => {
         "ARG NEMOCLAW_INFERENCE_API=old",
         "ARG NEMOCLAW_INFERENCE_COMPAT_B64=old",
         "ARG NEMOCLAW_BUILD_ID=old",
+        "ARG NEMOCLAW_DARWIN_VM_COMPAT=0",
         "ARG NEMOCLAW_PROXY_HOST=old",
         "ARG NEMOCLAW_PROXY_PORT=old",
         "ARG NEMOCLAW_WEB_SEARCH_ENABLED=0",
@@ -88,6 +89,7 @@ describe("dockerfile patch helpers", () => {
       { discord: ["456"] },
       "ghcr.io/nvidia/nemoclaw/sandbox-base@sha256:abc",
       { requireMention: true },
+      true,
     );
 
     const patched = fs.readFileSync(dockerfilePath, "utf-8");
@@ -98,6 +100,7 @@ describe("dockerfile patch helpers", () => {
     expect(patched).toContain("ARG CHAT_UI_URL=https://chat.example");
     expect(patched).toContain("ARG NEMOCLAW_INFERENCE_COMPAT_B64=");
     expect(patched).toContain("ARG NEMOCLAW_BUILD_ID=build-1");
+    expect(patched).toContain("ARG NEMOCLAW_DARWIN_VM_COMPAT=1");
     expect(patched).toContain("ARG NEMOCLAW_PROXY_HOST=host.docker.internal");
     expect(patched).toContain("ARG NEMOCLAW_PROXY_PORT=3128");
     expect(patched).toContain("ARG NEMOCLAW_WEB_SEARCH_ENABLED=1");
