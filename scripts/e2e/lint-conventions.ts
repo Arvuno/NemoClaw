@@ -226,7 +226,8 @@ function lintParityInventory(root: string): LintFinding[] {
     findings.push({
       file: "test/e2e/docs/parity-inventory.generated.json",
       rule: "legacy-assertion-inventory-current",
-      message: "generated parity inventory is missing; run scripts/e2e/extract-legacy-assertions.ts",
+      message:
+        "generated parity inventory is missing; run scripts/e2e/extract-legacy-assertions.ts",
     });
     return findings;
   }
@@ -253,7 +254,12 @@ function main(): number {
         message,
       }))
     : [];
-  const findings = [...lintSuiteSteps(root), ...lintLegacyFrontier(root), ...lintParityInventory(root), ...parityErrors];
+  const findings = [
+    ...lintSuiteSteps(root),
+    ...lintLegacyFrontier(root),
+    ...lintParityInventory(root),
+    ...parityErrors,
+  ];
   if (findings.length === 0) {
     return 0;
   }
