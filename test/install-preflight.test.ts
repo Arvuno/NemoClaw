@@ -491,6 +491,7 @@ exit 98
     expect(output).toMatch(/gemini \| ollama \| custom \| nim-local \| vllm \| routed/);
     expect(output).toMatch(/aliases: cloud -> build, nim -> nim-local/);
     expect(output).toMatch(/NEMOCLAW_POLICY_MODE/);
+    expect(output).toMatch(/NEMOCLAW_NON_INTERACTIVE_SUDO_MODE=prompt/);
     expect(output).toMatch(/NEMOCLAW_SANDBOX_NAME/);
     expect(output).toMatch(/nvidia\.com\/nemoclaw\.sh/);
   });
@@ -2926,8 +2927,8 @@ NON_INTERACTIVE=""
 NEMOCLAW_PROVIDER=""
 NEMOCLAW_NO_EXPRESS=""
 maybe_offer_express_install
-printf "RESULT NON_INTERACTIVE=%s PROVIDER=%s MODEL=%s POLICY=%s YES=%s\\n" \\
-  "\${NON_INTERACTIVE:-}" "\${NEMOCLAW_PROVIDER:-}" "\${NEMOCLAW_MODEL:-}" \\
+printf "RESULT NON_INTERACTIVE=%s SUDO_MODE=%s PROVIDER=%s MODEL=%s POLICY=%s YES=%s\\n" \\
+  "\${NON_INTERACTIVE:-}" "\${NEMOCLAW_NON_INTERACTIVE_SUDO_MODE:-}" "\${NEMOCLAW_PROVIDER:-}" "\${NEMOCLAW_MODEL:-}" \\
   "\${NEMOCLAW_POLICY_MODE:-}" "\${NEMOCLAW_YES:-}"
 '''
 env = dict(os.environ)
@@ -3001,7 +3002,7 @@ sys.exit(exit_code)
     expect(output).toMatch(/Run express install/);
     expect(output).toMatch(/Using express install for DGX Spark/);
     expect(output).toMatch(
-      /RESULT NON_INTERACTIVE=1 PROVIDER=install-ollama MODEL=qwen3\.6:35b POLICY=suggested YES=1/,
+      /RESULT NON_INTERACTIVE=1 SUDO_MODE=prompt PROVIDER=install-ollama MODEL=qwen3\.6:35b POLICY=suggested YES=1/,
     );
   });
 
@@ -3022,8 +3023,8 @@ NON_INTERACTIVE=""
 NEMOCLAW_PROVIDER=""
 NEMOCLAW_NO_EXPRESS=""
 maybe_offer_express_install
-printf "RESULT NON_INTERACTIVE=%s PROVIDER=%s MODEL=%s POLICY=%s YES=%s\\n" \\
-  "\${NON_INTERACTIVE:-}" "\${NEMOCLAW_PROVIDER:-}" "\${NEMOCLAW_MODEL:-}" \\
+printf "RESULT NON_INTERACTIVE=%s SUDO_MODE=%s PROVIDER=%s MODEL=%s POLICY=%s YES=%s\\n" \\
+  "\${NON_INTERACTIVE:-}" "\${NEMOCLAW_NON_INTERACTIVE_SUDO_MODE:-}" "\${NEMOCLAW_PROVIDER:-}" "\${NEMOCLAW_MODEL:-}" \\
   "\${NEMOCLAW_POLICY_MODE:-}" "\${NEMOCLAW_YES:-}"
 `,
       ],
@@ -3043,7 +3044,7 @@ printf "RESULT NON_INTERACTIVE=%s PROVIDER=%s MODEL=%s POLICY=%s YES=%s\\n" \\
     expect(output).toMatch(/Detected DGX Spark/);
     expect(output).toMatch(/Skipping express prompt \(no TTY\)/);
     expect(output).not.toMatch(/Run express install/);
-    expect(output).toMatch(/RESULT NON_INTERACTIVE= PROVIDER= MODEL= POLICY= YES=/);
+    expect(output).toMatch(/RESULT NON_INTERACTIVE= SUDO_MODE= PROVIDER= MODEL= POLICY= YES=/);
   });
 });
 
