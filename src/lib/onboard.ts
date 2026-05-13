@@ -20,6 +20,12 @@ const {
   cleanupTempDir,
   secureTempFile,
 }: typeof import("./onboard/temp-files") = require("./onboard/temp-files");
+const { stopStaleDashboardListenersForSandbox } = require("./onboard/stale-gateway-cleanup");
+const {
+  CUSTOM_BUILD_CONTEXT_WARN_BYTES,
+  isInsideIgnoredCustomBuildContextPath,
+  shouldIncludeCustomBuildContextPath,
+}: typeof import("./onboard/custom-build-context") = require("./onboard/custom-build-context");
 const {
   buildCompatibleEndpointSandboxSmokeCommand,
   buildCompatibleEndpointSandboxSmokeScript,
@@ -160,60 +166,6 @@ const {
 const onboardProviders = require("./onboard/providers");
 const hermesProviderAuth = require("./hermes-provider-auth");
 
-const CUSTOM_BUILD_CONTEXT_WARN_BYTES = 100_000_000;
-const CUSTOM_BUILD_CONTEXT_IGNORES = new Set([
-  "node_modules",
-  ".git",
-  ".venv",
-  "__pycache__",
-  ".aws",
-  ".credentials",
-  ".direnv",
-  ".netrc",
-  ".npmrc",
-  ".pypirc",
-  ".ssh",
-  "credentials.json",
-  "key.json",
-  "secrets",
-  "secrets.json",
-  "secrets.yaml",
-  "token.json",
-]);
-
-function isIgnoredCustomBuildContextName(name: string): boolean {
-  const lowerName = name.toLowerCase();
-  return (
-    CUSTOM_BUILD_CONTEXT_IGNORES.has(lowerName) ||
-    lowerName === ".env" ||
-    lowerName === ".envrc" ||
-    lowerName.startsWith(".env.") ||
-    lowerName.endsWith(".key") ||
-    lowerName.endsWith(".pem") ||
-    lowerName.endsWith(".pfx") ||
-    lowerName.endsWith(".p12") ||
-    lowerName.endsWith(".jks") ||
-    lowerName.endsWith(".keystore") ||
-    lowerName.endsWith(".tfvars") ||
-    lowerName.endsWith("_ecdsa") ||
-    lowerName.endsWith("_ed25519") ||
-    lowerName.endsWith("_rsa") ||
-    (lowerName.startsWith("service-account") && lowerName.endsWith(".json"))
-  );
-}
-
-function shouldIncludeCustomBuildContextPath(src: string): boolean {
-  return !isIgnoredCustomBuildContextName(path.basename(src));
-}
-
-function isInsideIgnoredCustomBuildContextPath(src: string): boolean {
-  return path
-    .normalize(src)
-    .split(path.sep)
-    .filter(Boolean)
-    .some((part: string) => isIgnoredCustomBuildContextName(part));
-}
-
 type RemoteProviderConfigEntry = {
   label: string;
   providerName: string;
@@ -294,7 +246,15 @@ const shields = require("./shields");
 const tiers: typeof import("./policy/tiers") = require("./policy/tiers");
 const { ensureUsageNoticeConsent } = require("./onboard/usage-notice");
 const {
+  destroyGatewayForReuse,
+  warnIfGatewayDestroyFails,
+} = require("./onboard/gateway-cleanup") as typeof import("./onboard/gateway-cleanup");
+const {
+  gatewayCliSupportsLifecycleCommands,
+} = require("./onboard/gateway-lifecycle") as typeof import("./onboard/gateway-lifecycle");
+const {
   getGatewayReuseHealthWaitConfig,
+  isDockerDriverGatewayHttpReady,
   isGatewayHttpReady,
   waitForGatewayHttpReady,
 } = require("./onboard/gateway-http-readiness") as typeof import("./onboard/gateway-http-readiness");
@@ -3265,19 +3225,26 @@ function destroyGateway(): boolean {
     stopDockerDriverGatewayProcess();
   }
 
+  const hasLifecycleCommands = gatewayCliSupportsLifecycleCommands(runCaptureOpenshell);
   const gatewayRemoved = dockerDriver
     ? removeDockerDriverGatewayRegistration()
-    : runOpenshell(["gateway", "destroy", "-g", GATEWAY_NAME], {
+    : hasLifecycleCommands
+      ? runOpenshell(["gateway", "destroy", "-g", GATEWAY_NAME], {
         ignoreError: true,
-      }).status === 0;
+        }).status === 0
+      : runOpenshell(["gateway", "remove", GATEWAY_NAME], {
+        ignoreError: true,
+        }).status === 0;
 
   // Clear the local registry so `nemoclaw list` stays consistent with OpenShell state. (#532)
   if (gatewayRemoved) {
     registry.clearAll();
   }
-  // Legacy OpenShell gateway cleanup doesn't remove Docker volumes, which
-  // leaves corrupted cluster state that breaks the next gateway start.
-  dockerRemoveVolumesByPrefix(`openshell-cluster-${GATEWAY_NAME}`, { ignoreError: true });
+  if (gatewayRemoved && (dockerDriver || hasLifecycleCommands)) {
+    // Legacy OpenShell gateway cleanup doesn't remove Docker volumes, which
+    // leaves corrupted cluster state that breaks the next gateway start.
+    dockerRemoveVolumesByPrefix(`openshell-cluster-${GATEWAY_NAME}`, { ignoreError: true });
+  }
   return gatewayRemoved;
 }
 
@@ -3535,7 +3502,7 @@ function getOpenShellDockerSupervisorImage(versionOutput: string | null = null):
   if (shouldUseOpenshellDevChannel() || isOpenshellDevVersion(versionOutput)) {
     return "ghcr.io/nvidia/openshell/supervisor:dev";
   }
-  const supportedVersion = installedVersion ?? getBlueprintMaxOpenshellVersion() ?? "0.0.37";
+  const supportedVersion = installedVersion ?? getBlueprintMaxOpenshellVersion() ?? "0.0.39";
   return `ghcr.io/nvidia/openshell/supervisor:${supportedVersion}`;
 }
 
@@ -3852,13 +3819,13 @@ function registerDockerDriverGatewayEndpoint(): boolean {
   }
 
   let addResult = runOpenshell(
-    ["gateway", "add", "--local", "--name", GATEWAY_NAME, getDockerDriverGatewayEndpoint()],
+    ["gateway", "add", getDockerDriverGatewayEndpoint(), "--local", "--name", GATEWAY_NAME],
     { ignoreError: true, suppressOutput: true },
   );
   if (addResult.status !== 0) {
     removeDockerDriverGatewayRegistration();
     addResult = runOpenshell(
-      ["gateway", "add", "--local", "--name", GATEWAY_NAME, getDockerDriverGatewayEndpoint()],
+      ["gateway", "add", getDockerDriverGatewayEndpoint(), "--local", "--name", GATEWAY_NAME],
       { ignoreError: true, suppressOutput: true },
     );
   }
@@ -4010,7 +3977,7 @@ function attachGatewayMetadataIfNeeded({
   }
 
   const addResult = runOpenshell(
-    ["gateway", "add", "--local", "--name", GATEWAY_NAME, getGatewayLocalEndpoint()],
+    ["gateway", "add", getGatewayLocalEndpoint(), "--local", "--name", GATEWAY_NAME],
     { ignoreError: true, suppressOutput: true },
   );
   if (addResult.status === 0) {
@@ -4039,9 +4006,12 @@ async function ensureNamedCredential(
 
 function waitForSandboxReady(sandboxName: string, attempts = 10, delaySeconds = 2): boolean {
   for (let i = 0; i < attempts; i += 1) {
+    const list = runCaptureOpenshell(["sandbox", "list"], { ignoreError: true });
+    if (isSandboxReady(list, sandboxName)) return true;
+
+    // Package-managed OpenShell gateways report readiness through
+    // `sandbox list`; legacy Kubernetes gateways may still expose pod state.
     if (isLinuxDockerDriverGatewayEnabled()) {
-      const list = runCaptureOpenshell(["sandbox", "list"], { ignoreError: true });
-      if (isSandboxReady(list, sandboxName)) return true;
       if (i < attempts - 1) sleep(delaySeconds);
       continue;
     }
@@ -4366,17 +4336,20 @@ async function preflight(
   let gatewayReuseState = gatewaySnapshot.gatewayReuseState;
   gatewayReuseState = await refreshDockerDriverGatewayReuseState(gatewayReuseState);
 
-  // Verify the gateway container is actually running — openshell CLI metadata
-  // can be stale after a manual `docker rm`. See #2020.
-  if (gatewayReuseState === "healthy" && !isLinuxDockerDriverGatewayEnabled()) {
+  // Verify the legacy gateway container is actually running — openshell CLI
+  // metadata can be stale after a manual `docker rm`. See #2020. Newer
+  // package-managed OpenShell gateways do not have an openshell-cluster-*
+  // Docker container, so the live CLI health check is the source of truth.
+  if (gatewayReuseState === "healthy" && gatewayCliSupportsLifecycleCommands(runCaptureOpenshell)) {
     const containerState = verifyGatewayContainerRunning();
     if (containerState === "missing") {
       console.log("  Gateway metadata is stale (container not running). Cleaning up...");
       runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
-      destroyGateway();
-      registry.clearAll();
-      gatewayReuseState = "missing";
-      console.log("  ✓ Stale gateway metadata cleaned up");
+      gatewayReuseState = destroyGatewayForReuse(
+        destroyGateway,
+        "  ✓ Stale gateway metadata cleaned up",
+        "  ! Stale gateway metadata cleanup failed; leaving registry state intact.",
+      );
     } else if (containerState === "unknown") {
       // Docker probe failed but cached metadata says healthy. Try the host-level
       // HTTP probe — it doesn't depend on Docker, so it can confirm the gateway
@@ -4406,10 +4379,11 @@ async function preflight(
         `  Gateway container is running but http://127.0.0.1:${GATEWAY_PORT}/ is not responding. Recreating...`,
       );
       runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
-      destroyGateway();
-      registry.clearAll();
-      gatewayReuseState = "missing";
-      console.log("  ✓ Stale gateway cleaned up");
+      gatewayReuseState = destroyGatewayForReuse(
+        destroyGateway,
+        "  ✓ Stale gateway cleaned up",
+        "  ! Stale gateway cleanup failed; leaving registry state intact.",
+      );
     } else {
       const imageDrift = getGatewayClusterImageDrift();
       if (imageDrift) {
@@ -4417,10 +4391,11 @@ async function preflight(
           `  Gateway image ${imageDrift.currentVersion} does not match openshell ${imageDrift.expectedVersion}. Recreating...`,
         );
         stopAllDashboardForwards();
-        destroyGateway();
-        registry.clearAll();
-        gatewayReuseState = "missing";
-        console.log("  ✓ Previous gateway cleaned up");
+        gatewayReuseState = destroyGatewayForReuse(
+          destroyGateway,
+          "  ✓ Previous gateway cleaned up",
+          "  ! Previous gateway cleanup failed; leaving registry state intact.",
+        );
       }
     }
   }
@@ -4429,12 +4404,16 @@ async function preflight(
     console.log(`  Cleaning up previous ${cliDisplayName()} session...`);
     if (isLinuxDockerDriverGatewayEnabled()) {
       retireLegacyGatewayForDockerDriverUpgrade();
+      gatewayReuseState = "missing";
+      console.log("  ✓ Previous session cleaned up");
     } else {
       runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
-      destroyGateway();
+      gatewayReuseState = destroyGatewayForReuse(
+        destroyGateway,
+        "  ✓ Previous session cleaned up",
+        "  ! Previous session cleanup failed; leaving registry state intact.",
+      );
     }
-    gatewayReuseState = "missing";
-    console.log("  ✓ Previous session cleaned up");
   }
 
   // Clean up orphaned Docker containers from interrupted onboard (e.g. Ctrl+C
@@ -4851,9 +4830,13 @@ async function startDockerDriverGateway({
     const drift = getDockerDriverGatewayRuntimeDrift(pidFileGatewayPid, gatewayEnv, gatewayBin);
     if (drift) {
       restartDockerDriverGatewayProcessForDrift(pidFileGatewayPid, drift.reason);
-    } else if (registerDockerDriverGatewayEndpoint()) {
+    } else if (registerDockerDriverGatewayEndpoint() && (await isDockerDriverGatewayHttpReady())) {
       console.log("  ✓ Reusing existing Docker-driver gateway");
       return;
+    } else {
+      console.log(
+        `  Docker-driver gateway metadata reports healthy but http://127.0.0.1:${GATEWAY_PORT}/ is not responding. Starting a fresh gateway...`,
+      );
     }
   }
 
@@ -4875,7 +4858,10 @@ async function startDockerDriverGateway({
       const adoptedActiveGatewayInfo = runCaptureOpenshell(["gateway", "info"], {
         ignoreError: true,
       });
-      if (isGatewayHealthy(adoptedStatus, adoptedGwInfo, adoptedActiveGatewayInfo)) {
+      if (
+        isGatewayHealthy(adoptedStatus, adoptedGwInfo, adoptedActiveGatewayInfo) &&
+        (await isDockerDriverGatewayHttpReady())
+      ) {
         console.log(`  ✓ Reusing existing Docker-driver gateway process (PID ${portListenerPid})`);
         return;
       }
@@ -4883,7 +4869,7 @@ async function startDockerDriverGateway({
   }
   if (!gatewayBin) {
     console.error("  OpenShell Docker-driver gateway binary not found.");
-    console.error("  Install OpenShell v0.0.37, or set NEMOCLAW_OPENSHELL_GATEWAY_BIN.");
+    console.error("  Install OpenShell v0.0.39, or set NEMOCLAW_OPENSHELL_GATEWAY_BIN.");
     if (exitOnFailure) process.exit(1);
     throw new Error("OpenShell gateway binary not found");
   }
@@ -6283,16 +6269,6 @@ async function createSandbox(
       getCredential(webSearch.BRAVE_API_KEY_ENV) || process.env[webSearch.BRAVE_API_KEY_ENV];
     if (braveKey) {
       envArgs.push(formatEnvAssignment(webSearch.BRAVE_API_KEY_ENV, braveKey));
-    }
-  }
-  // Slack Socket Mode requires both tokens in the container env so the baked
-  // openshell:resolve:env: placeholders in openclaw.json are substituted.
-  // The provider registration above handles L7 proxy auth header rewriting;
-  // the --env args here ensure the container env vars hold the real values.
-  if (tokensByEnvKey["SLACK_BOT_TOKEN"]) {
-    envArgs.push(formatEnvAssignment("SLACK_BOT_TOKEN", tokensByEnvKey["SLACK_BOT_TOKEN"]));
-    if (tokensByEnvKey["SLACK_APP_TOKEN"]) {
-      envArgs.push(formatEnvAssignment("SLACK_APP_TOKEN", tokensByEnvKey["SLACK_APP_TOKEN"]));
     }
   }
   const sandboxEnv = buildSubprocessEnv();
@@ -10334,7 +10310,7 @@ function printDashboard(
   console.log("");
   console.log("  To change settings later:");
   console.log(
-    `    Model:       ${cliName()} inference set --model <model> --provider <provider> --sandbox ${sandboxName}`,
+    `    Model:       ${cliName()} inference get\n                 ${cliName()} inference set --model <model> --provider <provider> --sandbox ${sandboxName}`,
   );
   console.log(`    Policies:    ${cliName()} ${sandboxName} policy-add`);
   console.log(`    Credentials: ${cliName()} credentials reset <KEY>  then  ${cliName()} onboard`);
@@ -10837,17 +10813,20 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     let gatewayReuseState = gatewaySnapshot.gatewayReuseState;
     gatewayReuseState = await refreshDockerDriverGatewayReuseState(gatewayReuseState);
 
-    // Verify the gateway container is actually running — openshell CLI metadata
-    // can be stale after a manual `docker rm`. See #2020.
-    if (gatewayReuseState === "healthy" && !isLinuxDockerDriverGatewayEnabled()) {
+    // Verify the legacy gateway container is actually running — openshell CLI
+    // metadata can be stale after a manual `docker rm`. See #2020. Newer
+    // package-managed OpenShell gateways do not have an openshell-cluster-*
+    // Docker container, so the live CLI health check is the source of truth.
+    if (gatewayReuseState === "healthy" && gatewayCliSupportsLifecycleCommands(runCaptureOpenshell)) {
       const containerState = verifyGatewayContainerRunning();
       if (containerState === "missing") {
         console.log("  Gateway metadata is stale (container not running). Cleaning up...");
         runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
-        destroyGateway();
-        registry.clearAll();
-        gatewayReuseState = "missing";
-        console.log("  ✓ Stale gateway metadata cleaned up");
+        gatewayReuseState = destroyGatewayForReuse(
+          destroyGateway,
+          "  ✓ Stale gateway metadata cleaned up",
+          "  ! Stale gateway metadata cleanup failed; leaving registry state intact.",
+        );
       } else if (containerState === "unknown") {
         // Docker probe failed but cached metadata says healthy. Try the host-level
         // HTTP probe — it doesn't depend on Docker, so it can confirm the gateway
@@ -10882,10 +10861,11 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
           `  Gateway container is running but http://127.0.0.1:${GATEWAY_PORT}/ is not responding. Recreating...`,
         );
         runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
-        destroyGateway();
-        registry.clearAll();
-        gatewayReuseState = "missing";
-        console.log("  ✓ Stale gateway cleaned up");
+        gatewayReuseState = destroyGatewayForReuse(
+          destroyGateway,
+          "  ✓ Stale gateway cleaned up",
+          "  ! Stale gateway cleanup failed; leaving registry state intact.",
+        );
       } else {
         const imageDrift = getGatewayClusterImageDrift();
         if (imageDrift) {
@@ -10893,10 +10873,11 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
             `  Gateway image ${imageDrift.currentVersion} does not match openshell ${imageDrift.expectedVersion}. Recreating...`,
           );
           stopAllDashboardForwards();
-          destroyGateway();
-          registry.clearAll();
-          gatewayReuseState = "missing";
-          console.log("  ✓ Previous gateway cleaned up");
+          gatewayReuseState = destroyGatewayForReuse(
+            destroyGateway,
+            "  ✓ Previous gateway cleaned up",
+            "  ! Previous gateway cleanup failed; leaving registry state intact.",
+          );
         }
       }
     }
@@ -11068,11 +11049,6 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         break;
       }
 
-      // Prompt for the sandbox name and show the review gate BEFORE
-      // setupInference runs upsertProvider / `inference set` on the gateway.
-      // On retry (inferenceResult.retry === "selection") the user is re-prompted
-      // for provider/model above and sees this gate again with the new config.
-      // See #2221 (CodeRabbit).
       if (!sandboxName) {
         sandboxName = await promptValidatedSandboxName(agent);
       }
@@ -11256,9 +11232,15 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         current.messagingChannelConfig = messagingChannelConfig;
         return current;
       });
+      if (!sandboxName) {
+        sandboxName = await promptValidatedSandboxName(agent);
+      }
       if (typeof model !== "string" || typeof provider !== "string") {
         console.error("  Inference selection is incomplete; cannot create sandbox.");
         process.exit(1);
+      }
+      if (fresh) {
+        stopStaleDashboardListenersForSandbox(registry.listSandboxes().sandboxes, sandboxName);
       }
       sandboxName = await createSandbox(
         gpu,
@@ -11274,9 +11256,6 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         sandboxGpuConfig,
       );
       webSearchConfig = nextWebSearchConfig;
-      // Persist model and provider after the sandbox entry exists in the registry.
-      // updateSandbox() silently no-ops when the entry is missing, so this must
-      // run after createSandbox() / registerSandbox() — not before. Fixes #1881.
       registry.updateSandbox(sandboxName, {
         model,
         provider,
@@ -11526,6 +11505,7 @@ module.exports = {
   getGatewayReuseHealthWaitConfig,
   getGatewayReuseState,
   isDockerDriverGatewayPortListener,
+  isDockerDriverGatewayHttpReady,
   isGatewayHttpReady,
   waitForGatewayHttpReady,
   handleFinalGatewayStartFailure,

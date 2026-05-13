@@ -33,15 +33,15 @@ esac
 
 info "Detected $OS_LABEL ($ARCH_LABEL)"
 
-# Minimum version required for the released Docker-driver gateway/sandbox
-# binaries and the GPU filesystem policy fixes NemoClaw depends on.
-MIN_VERSION="0.0.37"
+# Minimum version required for native messaging credential rewrite:
+# WebSocket text frames plus provider-shaped aliases and REST request bodies.
+MIN_VERSION="0.0.39"
 # Maximum version validated for this NemoClaw release. Newer OpenShell builds
 # may change sandbox semantics; upgrade NemoClaw before upgrading past this.
-MAX_VERSION="0.0.37"
+MAX_VERSION="0.0.39"
 # Pin fresh installs to this version instead of pulling "latest".
 PIN_VERSION="$MAX_VERSION"
-DEV_MIN_VERSION="0.0.37"
+DEV_MIN_VERSION="0.0.39"
 
 CHANNEL="${NEMOCLAW_OPENSHELL_CHANNEL:-auto}"
 case "$CHANNEL" in
@@ -87,6 +87,43 @@ required_driver_bins_present() {
       return 0
       ;;
   esac
+}
+
+OPENSHELL_FEATURE_CHECK_ERROR=""
+
+openshell_has_required_messaging_features() {
+  local openshell_bin
+  OPENSHELL_FEATURE_CHECK_ERROR=""
+  openshell_bin="${1:-$(command -v openshell 2>/dev/null || true)}"
+  if [ -z "$openshell_bin" ]; then
+    OPENSHELL_FEATURE_CHECK_ERROR="openshell binary was not found."
+    return 1
+  fi
+  if ! command -v strings >/dev/null 2>&1; then
+    OPENSHELL_FEATURE_CHECK_ERROR="'strings' is required to verify OpenShell messaging credential rewrite support. Install binutils or an equivalent package and retry."
+    return 2
+  fi
+
+  # Keep this independent of a live gateway. `policy update --dry-run` still
+  # needs gateway metadata, but the CLI binary must contain the endpoint-option
+  # parser for request-body/WebSocket rewrite support released in OpenShell 0.0.39.
+  local binary_strings
+  binary_strings="$(strings "$openshell_bin" 2>/dev/null || true)"
+  if [[ "$binary_strings" != *"request-body-credential-rewrite"* ]]; then
+    OPENSHELL_FEATURE_CHECK_ERROR="OpenShell binary is missing request-body-credential-rewrite support."
+    return 1
+  fi
+  if [[ "$binary_strings" != *"websocket-credential-rewrite"* ]]; then
+    OPENSHELL_FEATURE_CHECK_ERROR="OpenShell binary is missing websocket-credential-rewrite support."
+    return 1
+  fi
+  return 0
+}
+
+require_openshell_messaging_features() {
+  local openshell_bin="$1"
+  openshell_has_required_messaging_features "$openshell_bin" \
+    || fail "${OPENSHELL_FEATURE_CHECK_ERROR:-OpenShell binary is missing required messaging credential rewrite support.}"
 }
 
 macos_vm_driver_bin() {
@@ -176,11 +213,19 @@ if command -v openshell >/dev/null 2>&1; then
   INSTALLED_VERSION="$(printf '%s\n' "$INSTALLED_VERSION_OUTPUT" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
   [ -n "$INSTALLED_VERSION" ] || INSTALLED_VERSION="0.0.0"
   if [ "$RESOLVED_CHANNEL" = "dev" ]; then
-    if version_gte "$INSTALLED_VERSION" "$DEV_MIN_VERSION" && printf '%s\n' "$INSTALLED_VERSION_OUTPUT" | grep -qi 'dev'; then
-      info "openshell already installed: $INSTALLED_VERSION_OUTPUT (dev channel)"
-      exit 0
+    if version_gte "$INSTALLED_VERSION" "$DEV_MIN_VERSION" \
+      && printf '%s\n' "$INSTALLED_VERSION_OUTPUT" | grep -qi 'dev'; then
+      if openshell_has_required_messaging_features; then
+        info "openshell already installed: $INSTALLED_VERSION_OUTPUT (dev channel)"
+        exit 0
+      else
+        feature_status=$?
+        if [ "$feature_status" = "2" ]; then
+          fail "$OPENSHELL_FEATURE_CHECK_ERROR"
+        fi
+      fi
     fi
-    warn "openshell $INSTALLED_VERSION is not the required dev-channel Docker-driver build — upgrading..."
+    warn "openshell $INSTALLED_VERSION is not the required dev-channel messaging-rewrite build — upgrading..."
   else
     if version_gte "$INSTALLED_VERSION" "$MIN_VERSION"; then
       if ! version_gte "$MAX_VERSION" "$INSTALLED_VERSION"; then
@@ -188,10 +233,12 @@ if command -v openshell >/dev/null 2>&1; then
       fi
       if ! required_driver_bins_present; then
         warn "openshell $INSTALLED_VERSION is missing Docker-driver binaries — reinstalling pinned OpenShell ${PIN_VERSION}..."
+      elif ! openshell_has_required_messaging_features; then
+        fail "${OPENSHELL_FEATURE_CHECK_ERROR:-openshell $INSTALLED_VERSION is missing required messaging credential rewrite support. Install an OpenShell build that includes provider aliases, WebSocket text rewrite, and request-body credential rewrite.}"
       elif ! repair_existing_macos_vm_driver; then
         warn "openshell $INSTALLED_VERSION has an unsigned macOS VM driver that could not be repaired in place — reinstalling pinned OpenShell ${PIN_VERSION}..."
       else
-        info "openshell already installed: $INSTALLED_VERSION (>= $MIN_VERSION, <= $MAX_VERSION)"
+        info "openshell already installed: $INSTALLED_VERSION (>= $MIN_VERSION, <= $MAX_VERSION, messaging rewrite capable)"
         exit 0
       fi
     else
@@ -337,5 +384,7 @@ else
     sign_macos_vm_driver "$target_dir/openshell-driver-vm" 1
   fi
 fi
+
+require_openshell_messaging_features "$target_dir/openshell"
 
 info "$("$target_dir/openshell" --version 2>&1 || echo openshell) installed"

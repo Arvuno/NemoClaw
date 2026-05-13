@@ -12,7 +12,7 @@ import {
   isValidProxyHost,
   isValidProxyPort,
   patchStagedDockerfile,
-} from "./dockerfile-patch";
+} from "../../../dist/lib/onboard/dockerfile-patch";
 
 const tmpRoots: string[] = [];
 
@@ -107,6 +107,39 @@ describe("dockerfile patch helpers", () => {
     expect(patched).toContain("ARG NEMOCLAW_DISABLE_DEVICE_AUTH=1");
     expect(patched).not.toContain("ARG NEMOCLAW_MESSAGING_CHANNELS_B64=old");
     expect(patched).not.toContain("ARG NEMOCLAW_TELEGRAM_CONFIG_B64=old");
+  });
+
+  it("uses the shared sandbox inference mapping", () => {
+    const dockerfilePath = dockerfileWith(
+      [
+        "ARG NEMOCLAW_MODEL=old",
+        "ARG NEMOCLAW_PROVIDER_KEY=old",
+        "ARG NEMOCLAW_PRIMARY_MODEL_REF=old",
+        "ARG CHAT_UI_URL=old",
+        "ARG NEMOCLAW_INFERENCE_BASE_URL=old",
+        "ARG NEMOCLAW_INFERENCE_API=old",
+        "ARG NEMOCLAW_INFERENCE_COMPAT_B64=old",
+        "ARG NEMOCLAW_BUILD_ID=old",
+        "ARG NEMOCLAW_DARWIN_VM_COMPAT=0",
+      ].join("\n"),
+    );
+
+    patchStagedDockerfile(
+      dockerfilePath,
+      "moonshotai/kimi-k2.6",
+      "https://chat.example",
+      "build-1",
+      "hermes-provider",
+    );
+
+    const patched = fs.readFileSync(dockerfilePath, "utf-8");
+    const compat = patched.match(/^ARG NEMOCLAW_INFERENCE_COMPAT_B64=(.+)$/m)?.[1];
+    expect(patched).toContain("ARG NEMOCLAW_PROVIDER_KEY=inference");
+    expect(patched).toContain("ARG NEMOCLAW_PRIMARY_MODEL_REF=inference/moonshotai/kimi-k2.6");
+    expect(compat).toBeDefined();
+    expect(Buffer.from(compat || "", "base64").toString("utf-8")).toBe(
+      JSON.stringify({ supportsStore: false }),
+    );
   });
 
   it("strips CR/LF from Dockerfile ARG interpolations", () => {

@@ -3,58 +3,8 @@
 
 import fs from "node:fs";
 
+import { getSandboxInferenceConfig } from "../inference/config";
 import type { WebSearchConfig } from "../inference/web-search";
-
-type SandboxInferenceConfig = {
-  providerKey: string;
-  primaryModelRef: string;
-  inferenceBaseUrl: string;
-  inferenceApi: string;
-  inferenceCompat: unknown;
-};
-
-function getDockerfileSandboxInferenceConfig(
-  model: string,
-  provider: string | null = null,
-  preferredInferenceApi: string | null = null,
-): SandboxInferenceConfig {
-  let providerKey;
-  let primaryModelRef;
-  let inferenceBaseUrl = "https://inference.local/v1";
-  let inferenceApi = preferredInferenceApi || "openai-completions";
-  let inferenceCompat = null;
-
-  switch (provider) {
-    case "openai-api":
-      providerKey = "openai";
-      primaryModelRef = `openai/${model}`;
-      break;
-    case "anthropic-prod":
-    case "compatible-anthropic-endpoint":
-      providerKey = "anthropic";
-      primaryModelRef = `anthropic/${model}`;
-      inferenceBaseUrl = "https://inference.local";
-      inferenceApi = "anthropic-messages";
-      break;
-    case "gemini-api":
-    case "compatible-endpoint":
-      providerKey = "inference";
-      primaryModelRef = `inference/${model}`;
-      inferenceCompat = {
-        supportsStore: false,
-      };
-      break;
-    case "nvidia-router":
-    case "nvidia-prod":
-    case "nvidia-nim":
-    default:
-      providerKey = "inference";
-      primaryModelRef = `inference/${model}`;
-      break;
-  }
-
-  return { providerKey, primaryModelRef, inferenceBaseUrl, inferenceApi, inferenceCompat };
-}
 
 const SANDBOX_BASE_IMAGE = "ghcr.io/nvidia/nemoclaw/sandbox-base";
 const PROXY_HOST_RE = /^[A-Za-z0-9._-]+$/;
@@ -101,7 +51,7 @@ export function patchStagedDockerfile(
 ): void {
   const sanitizedModel = sanitizeDockerArg(model);
   const { providerKey, primaryModelRef, inferenceBaseUrl, inferenceApi, inferenceCompat } =
-    getDockerfileSandboxInferenceConfig(sanitizedModel, provider, preferredInferenceApi);
+    getSandboxInferenceConfig(sanitizedModel, provider, preferredInferenceApi);
   let dockerfile = fs.readFileSync(dockerfilePath, "utf8");
   // Pin the base image to a specific digest when available (#1904).
   // The ref must come from pullAndResolveBaseImageDigest() — never from

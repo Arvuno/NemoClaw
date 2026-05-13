@@ -6,8 +6,7 @@
 #   cloud-e2e                Cloud inference (NVIDIA Endpoint API) on ubuntu-latest.
 #   messaging-providers-e2e  Validates messaging credential provider/placeholder/L7-proxy chain
 #                            for Telegram + Discord + Slack. Uses fake tokens. Slack additionally
-#                            exercises the slack-token-rewriter Bolt-shape → canonical placeholder
-#                            translation (#2085). See PR #1081.
+#                            exercises OpenShell provider-shaped alias resolution (#2085 follow-up).
 #   messaging-compatible-endpoint-e2e
 #                            Validates Telegram + OpenAI-compatible endpoint inference routing
 #                            through inference.local with a hermetic local mock (#2766).
@@ -21,7 +20,7 @@
 #                            gateway stop/start, verify sandbox + workspace + inference).
 #   openshell-gateway-upgrade-e2e
 #                            Validates real v0.0.36 curl install upgrade into
-#                            OpenShell 0.0.37 with pre-upgrade backup, restored
+#                            the current supported OpenShell with pre-upgrade backup, restored
 #                            agent state, and the same agent type running.
 #   gateway-health-honest-e2e
 #                            Coverage guard for #3111: onboard must not log
@@ -36,7 +35,7 @@
 #   hermes-discord-e2e       Hermes Discord onboarding — validates the top-level Hermes
 #                            Discord schema plus OpenShell placeholder/token isolation.
 #   hermes-slack-e2e         Hermes Slack onboarding — validates the Hermes Slack policy,
-#                            Slack providers, and Python placeholder egress path.
+#                            Slack providers, and OpenShell credential rewrite path.
 #   openclaw-inference-switch-e2e
 #                            Switches a running OpenClaw sandbox with `nemoclaw inference set`
 #                            and verifies route, openclaw.json, hashes, and live requests.
@@ -1430,19 +1429,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
       - name: Install NemoClaw
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NEMOCLAW_NON_INTERACTIVE: "1"
           NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
-          NEMOCLAW_SANDBOX_NAME: "e2e-double-install"
         run: bash install.sh --non-interactive --yes-i-accept-third-party-software
       - name: Run double onboard E2E test
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NEMOCLAW_NON_INTERACTIVE: "1"
           NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
-          NEMOCLAW_E2E_INSTALL_SANDBOX_NAME: "e2e-double-install"
         run: |
           [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" 2>/dev/null || true
           export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
@@ -1469,19 +1467,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
       - name: Install NemoClaw
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NEMOCLAW_NON_INTERACTIVE: "1"
           NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
-          NEMOCLAW_SANDBOX_NAME: "e2e-repair-install"
         run: bash install.sh --non-interactive --yes-i-accept-third-party-software
       - name: Run onboard repair E2E test
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NEMOCLAW_NON_INTERACTIVE: "1"
           NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
-          NEMOCLAW_E2E_INSTALL_SANDBOX_NAME: "e2e-repair-install"
         run: |
           [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" 2>/dev/null || true
           export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
@@ -1508,6 +1505,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
       - name: Install NemoClaw
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
@@ -1545,6 +1543,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
       - name: Install NemoClaw
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
@@ -1583,6 +1582,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
       - name: Install NemoClaw and onboard sandbox
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
@@ -1624,6 +1624,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
       - name: Install NemoClaw and onboard sandbox
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}

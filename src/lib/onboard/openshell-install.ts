@@ -94,7 +94,7 @@ export function ensureOpenshellForOnboard(deps: OpenShellInstallDeps): OpenShell
         deps.exit(1);
       }
     } else {
-      const minOpenshellVersion = deps.getBlueprintMinOpenshellVersion() ?? "0.0.37";
+      const minOpenshellVersion = deps.getBlueprintMinOpenshellVersion() ?? "0.0.39";
       const currentVersionOutput = deps.runCaptureOpenshell(["--version"], { ignoreError: true });
       const needsDevChannel =
         deps.isLinuxDockerDriverGatewayEnabled(platform, arch) &&

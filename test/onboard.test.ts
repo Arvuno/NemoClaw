@@ -597,17 +597,17 @@ network_policies:
     ]);
     expect(parseDockerCdiSpecDirs("")).toEqual([]);
     expect(
-      shouldAllowOpenshellAboveBlueprintMax("openshell 0.0.38.dev1+gabcdef", "linux", {
+      shouldAllowOpenshellAboveBlueprintMax("openshell 0.0.40.dev1+gabcdef", "linux", {
         NEMOCLAW_OPENSHELL_CHANNEL: "dev",
       }),
     ).toBe(true);
     expect(
-      shouldAllowOpenshellAboveBlueprintMax("openshell 0.0.38.dev1+gabcdef", "linux", {
+      shouldAllowOpenshellAboveBlueprintMax("openshell 0.0.40.dev1+gabcdef", "linux", {
         NEMOCLAW_OPENSHELL_CHANNEL: "auto",
       }),
     ).toBe(false);
     expect(
-      shouldAllowOpenshellAboveBlueprintMax("openshell 0.0.38", "linux", {
+      shouldAllowOpenshellAboveBlueprintMax("openshell 0.0.40", "linux", {
         NEMOCLAW_OPENSHELL_CHANNEL: "dev",
       }),
     ).toBe(false);
@@ -2513,6 +2513,45 @@ const { loadAgent } = require(${agentDefsPath});
     );
   });
 
+  it("fails closed when gateway lifecycle support is not proven", () => {
+    const source = fs.readFileSync(
+      path.join(import.meta.dirname, "..", "src", "lib", "onboard", "gateway-lifecycle.ts"),
+      "utf-8",
+    );
+
+    assert.match(source, /normalized\.trim\(\)\.length > 0/);
+    assert.doesNotMatch(source, /!normalized\.trim\(\)\s*\|\|/);
+  });
+
+  it("keeps registry state unless gateway destruction succeeds", () => {
+    const source = fs.readFileSync(
+      path.join(import.meta.dirname, "..", "src", "lib", "onboard.ts"),
+      "utf-8",
+    );
+
+    assert.match(source, /function destroyGateway\(\): boolean/);
+    assert.match(source, /const gatewayRemoved = dockerDriver/);
+    assert.match(source, /if \(gatewayRemoved\) {\s*registry\.clearAll\(\);\s*}/);
+    assert.match(source, /return gatewayRemoved;/);
+    assert.doesNotMatch(
+      source,
+      /destroyGateway\(\);\s*registry\.clearAll\(\);\s*gatewayReuseState = "missing"/,
+    );
+  });
+
+  it("prints package-managed gateway registration hints with the local HTTPS endpoint", () => {
+    const source = fs.readFileSync(
+      path.join(import.meta.dirname, "..", "src", "lib", "onboard.ts"),
+      "utf-8",
+    );
+
+    assert.match(
+      source,
+      /"gateway",\s*"add",\s*getGatewayLocalEndpoint\(\),\s*"--local",\s*"--name",\s*GATEWAY_NAME/,
+    );
+    assert.doesNotMatch(source, /openshell gateway add http:\/\/127\.0\.0\.1:\$\{GATEWAY_PORT\}/);
+  });
+
   it("allows slow sandbox create recovery to wait beyond 60 seconds", () => {
     const envSource = fs.readFileSync(
       path.join(import.meta.dirname, "..", "src", "lib", "onboard", "env.ts"),
@@ -2592,6 +2631,10 @@ if [[ "$*" == *"doctor"*"logs"* ]]; then
   printf "\\033[31mERROR\\033[0m k3s cluster crashed: OOMKilled\\r\\n"
   printf "  Container nemoclaw_k3s ran out of memory\\r\\n"
   printf "  Gateway auth token: nvapi-fakecredential-9999\\r\\n"
+  exit 0
+fi
+if [[ "$*" == "gateway --help" ]]; then
+  printf "Commands: start destroy\\n"
   exit 0
 fi
 if [[ "$*" == *"gateway"*"start"* ]]; then
@@ -4949,6 +4992,25 @@ const { setupInference } = require(${onboardPath});
     );
   });
 
+  it("runs fresh stale-gateway cleanup after the sandbox name is known but before createSandbox", () => {
+    const source = fs.readFileSync(
+      path.join(import.meta.dirname, "..", "src", "lib", "onboard.ts"),
+      "utf-8",
+    );
+    const promptPos = source.indexOf(
+      "if (!sandboxName) {\n        sandboxName = await promptValidatedSandboxName(agent);",
+    );
+    const cleanupPos = source.indexOf(
+      "stopStaleDashboardListenersForSandbox(registry.listSandboxes().sandboxes, sandboxName);",
+      promptPos,
+    );
+    const createPos = source.indexOf("sandboxName = await createSandbox(", promptPos);
+
+    assert.ok(promptPos !== -1, "sandbox-name resolution block not found");
+    assert.ok(cleanupPos > promptPos, "fresh cleanup should run after sandboxName is known");
+    assert.ok(cleanupPos < createPos, "fresh cleanup should run before createSandbox allocates a port");
+  });
+
   it("defaults GPU passthrough on for detected NVIDIA GPUs unless opted out", () => {
     const source = fs.readFileSync(
       path.join(import.meta.dirname, "..", "src", "lib", "onboard.ts"),
@@ -5767,14 +5829,16 @@ const { createSandbox } = require(${onboardPath});
       assert.match(createCommand.policyContent || "", /slack:/);
       assert.match(createCommand.policyContent || "", /wss-primary\.slack\.com/);
 
-      // Discord and Telegram tokens must NOT appear in the sandbox create command
+      // Messaging tokens must NOT appear in the sandbox create command
       // (they flow exclusively through the openshell provider credential system).
       assert.doesNotMatch(createCommand.command, /test-discord-token-value/);
       assert.doesNotMatch(createCommand.command, /123456:ABC-test-telegram-token/);
-      // Slack tokens ARE injected as --env args so the baked openclaw.json
-      // openshell:resolve:env: placeholders resolve inside the container.
-      assert.match(createCommand.command, /SLACK_BOT_TOKEN=xoxb-test-slack-token-value/);
-      assert.match(createCommand.command, /SLACK_APP_TOKEN=xapp-test-slack-app-token-value/);
+      assert.doesNotMatch(createCommand.command, /DISCORD_BOT_TOKEN=/);
+      assert.doesNotMatch(createCommand.command, /TELEGRAM_BOT_TOKEN=/);
+      assert.doesNotMatch(createCommand.command, /xoxb-test-slack-token-value/);
+      assert.doesNotMatch(createCommand.command, /xapp-test-slack-app-token-value/);
+      assert.doesNotMatch(createCommand.command, /SLACK_BOT_TOKEN=/);
+      assert.doesNotMatch(createCommand.command, /SLACK_APP_TOKEN=/);
 
       // Verify blocked credentials are NOT in the sandbox spawn environment
       assert.ok(createCommand.env, "expected env to be captured from spawn call");
@@ -7785,6 +7849,17 @@ const { setupInference } = require(${onboardPath});
     const commands = parseStdoutJson<string[]>(result.stdout);
     // gateway select + provider get + provider update + inference set
     assert.equal(commands.length, 4);
+  });
+
+  it("prints NemoClaw inference commands in the post-onboard settings summary", () => {
+    const source = fs.readFileSync(path.join(repoRoot, "src", "lib", "onboard.ts"), "utf8");
+    const summaryBlock = source.slice(source.indexOf('console.log("  To change settings later:");'));
+    assert.match(summaryBlock, /Model:\s+\$\{cliName\(\)\} inference get/);
+    assert.match(
+      summaryBlock,
+      /inference set --model <model> --provider <provider> --sandbox \$\{sandboxName\}/,
+    );
+    assert.doesNotMatch(summaryBlock, /openshell inference (get|set)/);
   });
 
   it("accepts gateway inference output that omits the Route line", () => {
