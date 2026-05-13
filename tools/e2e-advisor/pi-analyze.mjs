@@ -22,8 +22,9 @@ const finalResultPath = path.join(outDir, "e2e-advisor-final-result.json");
 const piSummaryPath = path.join(outDir, "e2e-advisor-pi-summary.md");
 // Keep generated Pi credential config outside uploaded artifacts.
 const piConfigDir = process.env.PI_E2E_ADVISOR_CONFIG_DIR || path.join("/tmp", `nemoclaw-e2e-advisor-pi-config-${process.pid}`);
-const timeoutMs = Number.parseInt(process.env.PI_E2E_ADVISOR_TIMEOUT_MS || "900000", 10);
-const heartbeatMs = Number.parseInt(process.env.PI_E2E_ADVISOR_HEARTBEAT_MS || "60000", 10);
+const timeoutMs = parsePositiveInt(process.env.PI_E2E_ADVISOR_TIMEOUT_MS, 900000);
+const heartbeatMs = parsePositiveInt(process.env.PI_E2E_ADVISOR_HEARTBEAT_MS, 60000);
+const maxCaptureBytes = parsePositiveInt(process.env.PI_E2E_ADVISOR_MAX_CAPTURE_BYTES, 5 * 1024 * 1024);
 
 fs.mkdirSync(outDir, { recursive: true });
 
@@ -82,11 +83,18 @@ const child = await runPi(process.env.PI_BIN || "pi", piArgs, {
   input: prompt,
   timeoutMs,
   heartbeatMs,
+  maxCaptureBytes,
 });
 
-const combinedOutput = [child.stdout || "", child.stderr ? `\n--- STDERR ---\n${child.stderr}` : ""].join("");
+const capturedStdout = child.stdoutDroppedBytes > 0
+  ? `<stdout truncated; dropped ${child.stdoutDroppedBytes} byte(s)>\n${child.stdout}`
+  : child.stdout;
+const capturedStderr = child.stderrDroppedBytes > 0
+  ? `<stderr truncated; dropped ${child.stderrDroppedBytes} byte(s)>\n${child.stderr}`
+  : child.stderr;
+const combinedOutput = [capturedStdout || "", capturedStderr ? `\n--- STDERR ---\n${capturedStderr}` : ""].join("");
 fs.writeFileSync(rawPath, combinedOutput);
-logProgress(`Pi finished: status=${child.status ?? "<none>"} signal=${child.signal || "<none>"} stdoutBytes=${Buffer.byteLength(child.stdout || "")} stderrBytes=${Buffer.byteLength(child.stderr || "")}`);
+logProgress(`Pi finished: status=${child.status ?? "<none>"} signal=${child.signal || "<none>"} stdoutBytes=${Buffer.byteLength(child.stdout || "")} stderrBytes=${Buffer.byteLength(child.stderr || "")} stdoutDroppedBytes=${child.stdoutDroppedBytes} stderrDroppedBytes=${child.stderrDroppedBytes}`);
 
 if (child.error) {
   writeFailure(`pi execution failed: ${child.error.message}`);
@@ -114,7 +122,12 @@ function logProgress(message) {
   console.log(`[e2e-advisor] ${new Date().toISOString()} ${message}`);
 }
 
-function runPi(command, commandArgs, { cwd, env, input, timeoutMs, heartbeatMs }) {
+function parsePositiveInt(value, fallback) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function runPi(command, commandArgs, { cwd, env, input, timeoutMs, heartbeatMs, maxCaptureBytes }) {
   return new Promise((resolve) => {
     const startedAt = Date.now();
     const child = spawn(command, commandArgs, {
@@ -125,6 +138,8 @@ function runPi(command, commandArgs, { cwd, env, input, timeoutMs, heartbeatMs }
 
     let stdout = "";
     let stderr = "";
+    let stdoutDroppedBytes = 0;
+    let stderrDroppedBytes = 0;
     let spawnError;
     let timedOut = false;
 
@@ -150,10 +165,14 @@ function runPi(command, commandArgs, { cwd, env, input, timeoutMs, heartbeatMs }
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
-      stdout += chunk;
+      const captured = appendCapped(stdout, chunk, maxCaptureBytes, stdoutDroppedBytes);
+      stdout = captured.text;
+      stdoutDroppedBytes = captured.droppedBytes;
     });
     child.stderr.on("data", (chunk) => {
-      stderr += chunk;
+      const captured = appendCapped(stderr, chunk, maxCaptureBytes, stderrDroppedBytes);
+      stderr = captured.text;
+      stderrDroppedBytes = captured.droppedBytes;
     });
     child.on("error", (error) => {
       spawnError = error;
@@ -164,11 +183,28 @@ function runPi(command, commandArgs, { cwd, env, input, timeoutMs, heartbeatMs }
       const error = timedOut
         ? new Error(`timed out after ${timeoutMs} ms`)
         : spawnError;
-      resolve({ stdout, stderr, status, signal, error });
+      resolve({ stdout, stderr, stdoutDroppedBytes, stderrDroppedBytes, status, signal, error });
     });
 
     child.stdin.end(input);
   });
+}
+
+function appendCapped(current, chunk, maxBytes, droppedBytes) {
+  let next = current + chunk;
+  let nextDroppedBytes = droppedBytes;
+  let nextBytes = Buffer.byteLength(next, "utf8");
+  if (nextBytes <= maxBytes) {
+    return { text: next, droppedBytes: nextDroppedBytes };
+  }
+
+  let removeChars = Math.min(next.length, Math.max(1, nextBytes - maxBytes));
+  while (removeChars < next.length && Buffer.byteLength(next.slice(removeChars), "utf8") > maxBytes) {
+    removeChars += 1;
+  }
+  nextDroppedBytes += Buffer.byteLength(next.slice(0, removeChars), "utf8");
+  next = next.slice(removeChars);
+  return { text: next, droppedBytes: nextDroppedBytes };
 }
 
 function parseArgs(argv) {
@@ -177,7 +213,12 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg.startsWith("--")) {
       const key = arg.slice(2).replace(/-([a-z])/g, (_, char) => char.toUpperCase());
-      parsed[key] = argv[i + 1];
+      const next = argv[i + 1];
+      if (!next || next.startsWith("--")) {
+        parsed[key] = undefined;
+        continue;
+      }
+      parsed[key] = next;
       i += 1;
     }
   }

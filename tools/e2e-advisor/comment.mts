@@ -102,7 +102,12 @@ function parseArgs(argv: string[]): ParsedArgs {
     const arg = argv[i];
     if (arg.startsWith("--")) {
       const key = arg.slice(2).replace(/-([a-z])/g, (_, char: string) => char.toUpperCase());
-      parsed[key] = argv[i + 1];
+      const next = argv[i + 1];
+      if (!next || next.startsWith("--")) {
+        parsed[key] = undefined;
+        continue;
+      }
+      parsed[key] = next;
       i += 1;
     }
   }
@@ -180,8 +185,15 @@ function renderAutoDispatch(dispatch: DispatchResult | undefined): string {
 }
 
 async function findExistingComment(repo: string, pr: string, token: string, marker: string): Promise<GitHubComment | undefined> {
-  const comments = await github<GitHubComment[]>(`repos/${repo}/issues/${pr}/comments?per_page=100`, token);
-  return comments.find((comment) => typeof comment.body === "string" && comment.body.includes(marker));
+  for (let page = 1; ; page += 1) {
+    const comments = await github<GitHubComment[]>(
+      `repos/${repo}/issues/${pr}/comments?per_page=100&page=${page}`,
+      token,
+    );
+    const match = comments.find((comment) => typeof comment.body === "string" && comment.body.includes(marker));
+    if (match) return match;
+    if (comments.length < 100) return undefined;
+  }
 }
 
 function isPermissionError(error: unknown): boolean {

@@ -145,7 +145,12 @@ function parseArgs(argv: string[]): ParsedArgs {
     const arg = argv[i];
     if (arg.startsWith("--")) {
       const key = arg.slice(2).replace(/-([a-z])/g, (_, char: string) => char.toUpperCase());
-      parsed[key] = argv[i + 1];
+      const next = argv[i + 1];
+      if (!next || next.startsWith("--")) {
+        parsed[key] = undefined;
+        continue;
+      }
+      parsed[key] = next;
       i += 1;
     }
   }
