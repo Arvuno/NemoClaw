@@ -1320,6 +1320,22 @@ function getResumeSandboxGpuOverrides(
   return { flag: null, device: null };
 }
 
+// Docker-driver/package-managed gateways do not expose reusable GPU state
+// through the legacy openshell-cluster-* container's DeviceRequests field.
+function shouldInspectLegacyGatewayGpuPassthrough(
+  gatewayReuseState: GatewayReuseState,
+  gpuPassthrough: boolean,
+  dockerDriverGatewayEnabled = isLinuxDockerDriverGatewayEnabled(),
+  gatewayLifecycleCommandsSupported?: boolean,
+): boolean {
+  if (gatewayReuseState !== "healthy" || !gpuPassthrough || dockerDriverGatewayEnabled) {
+    return false;
+  }
+  return (
+    gatewayLifecycleCommandsSupported ?? gatewayCliSupportsLifecycleCommands(runCaptureOpenshell)
+  );
+}
+
 function buildSandboxGpuCreateArgs(config: SandboxGpuConfig): string[] {
   if (!config.sandboxGpuEnabled) return [];
   const args = ["--gpu"];
@@ -10400,10 +10416,11 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
 
     const canReuseHealthyGateway = gatewayReuseState === "healthy";
 
-    // Verify the reusable gateway has GPU passthrough when needed. Runs for
-    // both fresh-reuse and resume paths so a gateway recreated without GPU
-    // between runs is caught.
-    if (canReuseHealthyGateway && gpuPassthrough) {
+    // Verify legacy reusable gateways have GPU passthrough when needed. The
+    // openshell-cluster-* Docker container only exists on the legacy gateway
+    // path; Docker-driver/package-managed gateways use the live CLI health
+    // check as the reuse signal.
+    if (shouldInspectLegacyGatewayGpuPassthrough(gatewayReuseState, gpuPassthrough)) {
       const container = `openshell-cluster-${GATEWAY_NAME}`;
       const gpuCheck = docker.dockerInspect(
         ["--type", "container", "--format", "{{json .HostConfig.DeviceRequests}}", container],
@@ -11034,6 +11051,7 @@ module.exports = {
   findReadableNvidiaCdiSpecFiles,
   parseDockerCdiSpecDirs,
   getResumeSandboxGpuOverrides,
+  shouldInspectLegacyGatewayGpuPassthrough,
   resolveSandboxGpuConfig,
   shouldAllowOpenshellAboveBlueprintMax,
   pullAndResolveBaseImageDigest,

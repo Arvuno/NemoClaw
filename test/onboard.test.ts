@@ -15,6 +15,7 @@ import { loadAgent } from "../dist/lib/agent/defs.js";
 import { buildChain, buildControlUiUrls } from "../dist/lib/dashboard/contract.js";
 import { NAME_ALLOWED_FORMAT } from "../dist/lib/name-validation.js";
 import { stageOptimizedSandboxBuildContext } from "../dist/lib/sandbox/build-context.js";
+import type { GatewayReuseState } from "../dist/lib/state/gateway.js";
 import { testTimeoutOptions } from "./helpers/timeouts";
 
 type ShimScalar = string | number | boolean | null | undefined;
@@ -143,6 +144,12 @@ type OnboardTestInternals = {
       | undefined,
     sessionGpuPassthrough?: boolean,
   ) => { flag: "enable" | "disable" | null; device: string | null };
+  shouldInspectLegacyGatewayGpuPassthrough: (
+    gatewayReuseState: GatewayReuseState,
+    gpuPassthrough: boolean,
+    dockerDriverGatewayEnabled?: boolean,
+    gatewayLifecycleCommandsSupported?: boolean,
+  ) => boolean;
   shouldAllowOpenshellAboveBlueprintMax: (
     versionOutput?: string | null,
     platform?: NodeJS.Platform,
@@ -236,6 +243,7 @@ function isOnboardTestInternals(
     typeof value.parseDockerCdiSpecDirs === "function" &&
     typeof value.resolveSandboxGpuConfig === "function" &&
     typeof value.getResumeSandboxGpuOverrides === "function" &&
+    typeof value.shouldInspectLegacyGatewayGpuPassthrough === "function" &&
     typeof value.shouldAllowOpenshellAboveBlueprintMax === "function" &&
     typeof value.hasChatCompletionsToolCall === "function" &&
     typeof value.hasChatCompletionsToolCallLeak === "function" &&
@@ -295,6 +303,7 @@ const {
   parseDockerCdiSpecDirs,
   resolveSandboxGpuConfig,
   getResumeSandboxGpuOverrides,
+  shouldInspectLegacyGatewayGpuPassthrough,
   shouldAllowOpenshellAboveBlueprintMax,
   versionGte,
   getRequestedModelHint,
@@ -377,6 +386,17 @@ describe("onboard helpers", () => {
 
     const legacyGpuSession = getResumeSandboxGpuOverrides(null, true);
     expect(legacyGpuSession.flag).toBe("enable");
+  });
+
+  it("only inspects legacy gateway containers for reusable GPU passthrough", () => {
+    const HEALTHY: GatewayReuseState = "healthy";
+    const MISSING: GatewayReuseState = "missing";
+
+    expect(shouldInspectLegacyGatewayGpuPassthrough(HEALTHY, true, false, true)).toBe(true);
+    expect(shouldInspectLegacyGatewayGpuPassthrough(HEALTHY, true, false, false)).toBe(false);
+    expect(shouldInspectLegacyGatewayGpuPassthrough(HEALTHY, true, true, true)).toBe(false);
+    expect(shouldInspectLegacyGatewayGpuPassthrough(MISSING, true, false, true)).toBe(false);
+    expect(shouldInspectLegacyGatewayGpuPassthrough(HEALTHY, false, false, true)).toBe(false);
   });
 
   it("builds OpenShell sandbox GPU create args", () => {
