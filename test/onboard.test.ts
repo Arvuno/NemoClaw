@@ -14,6 +14,7 @@ import type { AgentDefinition } from "../dist/lib/agent/defs.js";
 import { loadAgent } from "../dist/lib/agent/defs.js";
 import { buildChain, buildControlUiUrls } from "../dist/lib/dashboard/contract.js";
 import { NAME_ALLOWED_FORMAT } from "../dist/lib/name-validation.js";
+import { hasOpenShellVmDriverChildProcessFromPsOutput } from "../dist/lib/onboard/vm-driver-process.js";
 import { stageOptimizedSandboxBuildContext } from "../dist/lib/sandbox/build-context.js";
 import { testTimeoutOptions } from "./helpers/timeouts";
 
@@ -106,10 +107,6 @@ type OnboardTestInternals = {
     desiredEnv: Record<string, string>;
     gatewayBin?: string | null;
   }) => { reason: string } | null;
-  hasOpenShellVmDriverChildProcessFromPsOutput: (
-    gatewayPid: number,
-    psOutput: string,
-  ) => boolean;
   isLinuxDockerDriverGatewayEnabled: (
     platform?: NodeJS.Platform,
     arch?: NodeJS.Architecture,
@@ -233,7 +230,6 @@ function isOnboardTestInternals(
     typeof value.getGatewayStartEnv === "function" &&
     typeof value.shouldRequireDockerDriverEnv === "function" &&
     typeof value.getDockerDriverGatewayRuntimeDriftFromSnapshot === "function" &&
-    typeof value.hasOpenShellVmDriverChildProcessFromPsOutput === "function" &&
     typeof value.isLinuxDockerDriverGatewayEnabled === "function" &&
     typeof value.areRequiredDockerDriverBinariesPresent === "function" &&
     typeof value.isDockerDriverGatewayPortListener === "function" &&
@@ -294,7 +290,6 @@ const {
   getGatewayStartEnv,
   shouldRequireDockerDriverEnv,
   getDockerDriverGatewayRuntimeDriftFromSnapshot,
-  hasOpenShellVmDriverChildProcessFromPsOutput,
   isLinuxDockerDriverGatewayEnabled,
   isDockerDriverGatewayPortListener,
   findReadableNvidiaCdiSpecFiles,

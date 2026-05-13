@@ -279,6 +279,7 @@ const { reportDockerDriverGatewayStartFailure } =
 const dockerDriverGatewayEnv: typeof import("./onboard/docker-driver-gateway-env") =
   require("./onboard/docker-driver-gateway-env");
 const { getDockerDriverGatewayEndpoint } = dockerDriverGatewayEnv;
+const vmDriverProcess: typeof import("./onboard/vm-driver-process") = require("./onboard/vm-driver-process");
 const preflightUtils: typeof import("./onboard/preflight") = require("./onboard/preflight");
 const clusterImagePatch: typeof import("./cluster-image-patch") = require("./cluster-image-patch");
 const {
@@ -1403,7 +1404,7 @@ function validateSandboxGpuPreflight(config: SandboxGpuConfig): void {
     process.exit(1);
   }
   if (!config.sandboxGpuEnabled) return;
-  if (!isLinuxDockerDriverGatewayPlatform()) return;
+  if (process.platform !== "linux") return;
 
   const cdiSpecDirs = getDockerCdiSpecDirs();
   const cdiSpecFiles = findReadableNvidiaCdiSpecFiles(cdiSpecDirs);
@@ -3191,18 +3192,11 @@ const {
   run,
   runCapture,
 });
-
 function isLinuxDockerDriverGatewayEnabled(
   platform: NodeJS.Platform = process.platform,
   arch: NodeJS.Architecture = process.arch,
 ): boolean {
   return platform === "linux" || (platform === "darwin" && arch === "arm64");
-}
-
-function isLinuxDockerDriverGatewayPlatform(
-  platform: NodeJS.Platform = process.platform,
-): boolean {
-  return platform === "linux";
 }
 
 function getDockerDriverGatewayStateDir(): string {
@@ -3346,33 +3340,6 @@ function hasDockerDriverGatewayEnv(pid: number): boolean {
   );
 }
 
-function hasOpenShellVmDriverChildProcessFromPsOutput(
-  gatewayPid: number,
-  psOutput: string,
-): boolean {
-  if (!Number.isInteger(gatewayPid) || gatewayPid <= 0) return false;
-  return psOutput.split(/\r?\n/).some((line) => {
-    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/);
-    if (!match) return false;
-    const childPid = Number.parseInt(match[1], 10);
-    const parentPid = Number.parseInt(match[2], 10);
-    const command = match[3];
-    return (
-      Number.isInteger(childPid) &&
-      childPid > 0 &&
-      parentPid === gatewayPid &&
-      command.includes("openshell-driver-vm")
-    );
-  });
-}
-
-function hasOpenShellVmDriverChildProcess(gatewayPid: number): boolean {
-  const psOutput = runCapture(["ps", "-axo", "pid=,ppid=,command="], {
-    ignoreError: true,
-  });
-  return hasOpenShellVmDriverChildProcessFromPsOutput(gatewayPid, psOutput);
-}
-
 function readProcessExe(pid: number): string | null {
   try {
     const procExePath = `/proc/${pid}/exe`;
@@ -3445,7 +3412,9 @@ function getDockerDriverGatewayRuntimeDrift(
   if (
     platform === "darwin" &&
     desiredEnv.OPENSHELL_DRIVERS === "docker" &&
-    hasOpenShellVmDriverChildProcess(pid)
+    vmDriverProcess.hasOpenShellVmDriverChildProcess(pid, (args) =>
+      runCapture([...args], { ignoreError: true }),
+    )
   ) {
     return { reason: "VM driver child process is still attached to the gateway" };
   }
@@ -11047,7 +11016,6 @@ module.exports = {
   getGatewayStartEnv,
   getDockerDriverGatewayEnv,
   getDockerDriverGatewayRuntimeDriftFromSnapshot,
-  hasOpenShellVmDriverChildProcessFromPsOutput,
   getGatewayClusterContainerState,
   getGatewayHealthWaitConfig,
   getGatewayReuseHealthWaitConfig,
