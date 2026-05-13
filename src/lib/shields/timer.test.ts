@@ -137,6 +137,7 @@ describe("shields timer authorization", () => {
     expect(exitCode).toBe(0);
     expect(runMock).not.toHaveBeenCalled();
     expect(JSON.parse(fs.readFileSync(stateFile, "utf-8"))).toEqual(initialState);
+    expect(fs.existsSync(markerPath)).toBe(true);
   });
 
   it("does not restore or rewrite state when marker pid mismatches", async () => {
@@ -172,6 +173,7 @@ describe("shields timer authorization", () => {
     expect(exitCode).toBe(0);
     expect(runMock).not.toHaveBeenCalled();
     expect(JSON.parse(fs.readFileSync(stateFile, "utf-8"))).toEqual(initialState);
+    expect(fs.existsSync(markerPath)).toBe(true);
   });
 
   it("restores and updates state when marker matches current timer invocation", async () => {

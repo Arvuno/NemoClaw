@@ -1253,8 +1253,8 @@ function shieldsStatus(sandboxName: string, allowInlineRecovery = true): void {
  * true since the config IS mutable. Only returns false when shields
  * have been explicitly locked via `shields up`.
  */
-function isShieldsDown(sandboxName: string): boolean {
-  const state = recoverExpiredAutoRestoreGate(sandboxName, true);
+function isShieldsDown(sandboxName: string, allowInlineRecovery = false): boolean {
+  const state = recoverExpiredAutoRestoreGate(sandboxName, allowInlineRecovery);
   if (state._isCorrupt) return false;
   const mode = deriveShieldsMode(state, state._hasStateFile);
   return mode !== "locked";

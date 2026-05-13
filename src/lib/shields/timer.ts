@@ -143,6 +143,7 @@ function markerMatchesCurrentTimer(args: TimerArgs): boolean {
 function runRestoreTimer(args: TimerArgs): void {
   const now = new Date().toISOString();
   let exitCode = 0;
+  let ownedMarker = false;
 
   try {
     // Timer markers are the source of authority. If the marker was removed or
@@ -151,6 +152,7 @@ function runRestoreTimer(args: TimerArgs): void {
     if (!markerMatchesCurrentTimer(args)) {
       return;
     }
+    ownedMarker = true;
 
     if (!fs.existsSync(args.snapshotPath)) {
       appendAudit({
@@ -282,7 +284,9 @@ function runRestoreTimer(args: TimerArgs): void {
     });
     exitCode = 1;
   } finally {
-    cleanupMarker(args.markerPath);
+    if (ownedMarker && markerMatchesCurrentTimer(args)) {
+      cleanupMarker(args.markerPath);
+    }
     process.exit(exitCode);
   }
 }
