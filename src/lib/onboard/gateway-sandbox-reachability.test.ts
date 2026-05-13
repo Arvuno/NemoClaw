@@ -39,6 +39,16 @@ describe("isSandboxBridgeGatewayReachable", () => {
     expect(result.subnet).toBe("172.19.0.0/16");
   });
 
+  it("treats host alias resolution failures as an inconclusive probe", async () => {
+    const result = await isSandboxBridgeGatewayReachable({
+      inspectSubnetImpl: () => "172.19.0.0/16",
+      runImpl: () => ({ status: 1, stderr: "nc: bad address 'host.openshell.internal'" }),
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("probe_unavailable");
+    expect(result.detail).toContain("did not resolve");
+  });
+
   it("flags probe_unavailable when docker cannot run the helper container", async () => {
     const result = await isSandboxBridgeGatewayReachable({
       inspectSubnetImpl: () => "172.19.0.0/16",
@@ -63,6 +73,8 @@ describe("isSandboxBridgeGatewayReachable", () => {
     });
     expect(seen.args).toContain("custom-net");
     expect(seen.args).toContain("--pull=missing");
+    expect(seen.args).toContain("host.openshell.internal:host-gateway");
+    expect(seen.args).toContain("host.docker.internal:host-gateway");
     expect(seen.args.join(" ")).toContain("nc -zw7 host.openshell.internal 9090");
   });
 });

@@ -22,6 +22,7 @@ const DEFAULT_PROBE_IMAGE =
   "busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662";
 const DEFAULT_NETWORK_NAME = "openshell-docker";
 const HOST_INTERNAL_NAME = "host.openshell.internal";
+const DOCKER_HOST_INTERNAL_NAME = "host.docker.internal";
 const DEFAULT_PROBE_TIMEOUT_SEC = 5;
 const PROBE_RUN_OVERHEAD_MS = 10_000;
 
@@ -103,6 +104,19 @@ function summarizeProbeUnavailable(result: SandboxBridgeProbeRunResult): string 
   return details[0] ?? "docker run did not complete the probe";
 }
 
+function isNameResolutionFailure(result: SandboxBridgeProbeRunResult): boolean {
+  const output = [result.error, outputTail(result.stderr), outputTail(result.stdout)]
+    .filter((item): item is string => Boolean(item))
+    .join("\n")
+    .toLowerCase();
+  return (
+    output.includes("bad address") ||
+    output.includes("name does not resolve") ||
+    output.includes("temporary failure in name resolution") ||
+    output.includes("no address associated with hostname")
+  );
+}
+
 export async function isSandboxBridgeGatewayReachable(
   opts: SandboxBridgeReachabilityOptions = {},
 ): Promise<SandboxBridgeReachabilityResult> {
@@ -125,7 +139,10 @@ export async function isSandboxBridgeGatewayReachable(
 
   const result = runImpl(
     [
-      "run", "--rm", "--pull=missing", "--network", networkName, probeImage,
+      "run", "--rm", "--pull=missing", "--network", networkName,
+      "--add-host", `${HOST_INTERNAL_NAME}:host-gateway`,
+      "--add-host", `${DOCKER_HOST_INTERNAL_NAME}:host-gateway`,
+      probeImage,
       "sh", "-c", `nc -zw${timeoutSec} ${HOST_INTERNAL_NAME} ${port}`,
     ],
     timeoutSec * 1000 + PROBE_RUN_OVERHEAD_MS,
@@ -139,6 +156,14 @@ export async function isSandboxBridgeGatewayReachable(
       reason: "probe_unavailable",
       subnet,
       detail: summarizeProbeUnavailable(result),
+    };
+  }
+  if (isNameResolutionFailure(result)) {
+    return {
+      ok: false,
+      reason: "probe_unavailable",
+      subnet,
+      detail: `${HOST_INTERNAL_NAME} did not resolve inside the probe container; cannot prove sandbox bridge reachability`,
     };
   }
   return {
