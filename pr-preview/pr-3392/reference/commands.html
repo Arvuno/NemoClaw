@@ -45,7 +45,7 @@
 
 
 
-    <script src="../_static/documentation_options.js?v=454be4fe"></script>
+    <script src="../_static/documentation_options.js?v=3f434bd6"></script>
     <script src="../_static/doctools.js?v=9a2dae69"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
@@ -56,7 +56,7 @@
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = '../versions1.json';
-        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.0.39';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.0.40';
         DOCUMENTATION_OPTIONS.show_version_warning_banner =
             false;
         </script>
@@ -592,10 +592,10 @@ Three tiers are available:</p>
 <td><p>Base sandbox only. No third-party network access beyond inference and core agent tooling.</p></td>
 </tr>
 <tr class="row-odd"><td><p>Balanced (default)</p></td>
-<td><p>Full dev tooling and web search. Package installs, model downloads, and inference. No messaging platform access.</p></td>
+<td><p>Full dev tooling and web search when the active agent supports web search. Package installs, model downloads, and inference. No messaging platform access.</p></td>
 </tr>
 <tr class="row-even"><td><p>Open</p></td>
-<td><p>Broad access across third-party services including messaging and productivity.</p></td>
+<td><p>Broad access across third-party services including messaging and productivity. Agent-specific unsupported presets are filtered out.</p></td>
 </tr>
 </tbody>
 </table>
@@ -611,7 +611,8 @@ The default is <code class="docutils literal notranslate"><span class="pre">sugg
 Onboarding applies tier defaults and preserves any presets you previously added with <a class="reference internal" href="#nemoclaw-name-policy-add"><code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">&lt;name&gt;</span> <span class="pre">policy-add</span></code></a> across re-onboards.
 Use <code class="docutils literal notranslate"><span class="pre">custom</span></code> with <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_POLICY_PRESETS</span></code> when you want the explicit list to be authoritative.
 Onboarding removes any preset that is not in the list.
-<code class="docutils literal notranslate"><span class="pre">skip</span></code> leaves the applied set untouched and does not apply tier defaults.</p>
+<code class="docutils literal notranslate"><span class="pre">skip</span></code> leaves the applied set untouched and does not apply tier defaults.
+NemoClaw filters tier suggestions and resume selections by active agent support, so unsupported presets such as Brave Search are not reapplied to agents that do not support them.</p>
 <div class="pst-scrollable-table-container"><table class="table">
 <thead>
 <tr class="row-odd"><th class="head"><p>Value</p></th>

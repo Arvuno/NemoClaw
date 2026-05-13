@@ -45,7 +45,7 @@
 
 
 
-    <script src="../_static/documentation_options.js?v=454be4fe"></script>
+    <script src="../_static/documentation_options.js?v=3f434bd6"></script>
     <script src="../_static/doctools.js?v=9a2dae69"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
@@ -56,7 +56,7 @@
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = '../versions1.json';
-        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.0.39';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.0.40';
         DOCUMENTATION_OPTIONS.show_version_warning_banner =
             false;
         </script>
@@ -525,7 +525,10 @@ Refer to the <a class="reference internal" href="../get-started/quickstart.html"
 The onboard wizard detects Ollama automatically when it is installed or running on the host.</p>
 <p>If Ollama is installed but not running, NemoClaw starts it for you.
 On macOS and Linux, the wizard can also offer to install Ollama when it is not present.
-On WSL, the wizard can use, start, restart, or install Ollama on the Windows host through PowerShell interop.</p>
+On WSL, the wizard can use, start, restart, or install Ollama on the Windows host through PowerShell interop.
+On Debian and Ubuntu, the native Linux install path checks for <code class="docutils literal notranslate"><span class="pre">zstd</span></code> before it runs the Ollama installer.
+If <code class="docutils literal notranslate"><span class="pre">zstd</span></code> is missing, NemoClaw installs it with <code class="docutils literal notranslate"><span class="pre">apt-get</span></code> and explains the sudo prompt before continuing.
+On non-apt Linux distributions, install <code class="docutils literal notranslate"><span class="pre">zstd</span></code> first, then rerun onboarding.</p>
 <p>Run the onboard wizard.</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>nemoclaw<span class="w"> </span>onboard
 </pre></div>
