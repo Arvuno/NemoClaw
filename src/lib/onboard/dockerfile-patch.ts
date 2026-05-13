@@ -13,7 +13,7 @@ const POSITIVE_INT_RE = /^[1-9][0-9]*$/;
 type LooseObject = Record<string, unknown>;
 
 export function encodeDockerJsonArg(value: unknown): string {
-  return Buffer.from(JSON.stringify(value || {}), "utf8").toString("base64");
+  return Buffer.from(JSON.stringify(value ?? {}), "utf8").toString("base64");
 }
 
 function sanitizeDockerArg(value: unknown): string {

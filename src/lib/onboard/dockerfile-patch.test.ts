@@ -38,6 +38,7 @@ describe("dockerfile patch helpers", () => {
       JSON.stringify({ supportsStore: false }),
     );
     expect(Buffer.from(encodeDockerJsonArg(null), "base64").toString("utf-8")).toBe("{}");
+    expect(Buffer.from(encodeDockerJsonArg(false), "base64").toString("utf-8")).toBe("false");
   });
 
   it("validates proxy host and port values", () => {
