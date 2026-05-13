@@ -331,7 +331,8 @@ import type {
   ProbeResult,
   ValidationFailureLike,
 } from "./onboard/types";
-import { listChannels } from "./sandbox/channels";
+import { channelHasStaticToken, getChannelTokenKeys, listChannels } from "./sandbox/channels";
+import { getMessagingToken } from "./onboard/messaging-token";
 import { streamGatewayStart } from "./onboard/gateway";
 import type { StreamSandboxCreateResult } from "./sandbox/create-stream";
 import type { SandboxEntry } from "./state/registry";
@@ -5141,8 +5142,6 @@ async function createSandbox(
   // Check whether messaging providers will be needed — this must happen before
   // the sandbox reuse decision so we can detect stale sandboxes that were created
   // without provider attachments (security: prevents legacy raw-env-var leaks).
-  const getMessagingToken = (envKey: string): string | null =>
-    getCredential(envKey) || normalizeCredentialValue(process.env[envKey]) || null;
 
   // The UI toggle list can include channels the user toggled on but then
   // skipped the token prompt for. Only channels with a real token will have a
@@ -5151,8 +5150,8 @@ async function createSandbox(
   const conflictCheckChannels = Array.isArray(enabledChannels)
     ? enabledChannels.flatMap((name) => {
         const def = MESSAGING_CHANNELS.find((c) => c.name === name);
-        if (!def || !getMessagingToken(def.envKey)) return [];
-        const tokenEnvKeys = def.appTokenEnvKey ? [def.envKey, def.appTokenEnvKey] : [def.envKey];
+        if (!def || !def.envKey || !getMessagingToken(def.envKey)) return [];
+        const tokenEnvKeys = getChannelTokenKeys(def);
         const credentialHashes: Record<string, string> = {};
         for (const envKey of tokenEnvKeys) {
           const hash = hashCredential(getMessagingToken(envKey));
@@ -5200,7 +5199,7 @@ async function createSandbox(
     enabledChannels != null
       ? new Set(
           MESSAGING_CHANNELS.filter((c) => enabledChannels.includes(c.name)).flatMap((c) =>
-            c.appTokenEnvKey ? [c.envKey, c.appTokenEnvKey] : [c.envKey],
+            getChannelTokenKeys(c),
           ),
         )
       : null;
@@ -5212,7 +5211,7 @@ async function createSandbox(
   const disabledChannels = registry.getDisabledChannels(sandboxName);
   const disabledEnvKeys = new Set(
     MESSAGING_CHANNELS.filter((c) => disabledChannels.includes(c.name)).flatMap((c) =>
-      c.appTokenEnvKey ? [c.envKey, c.appTokenEnvKey] : [c.envKey],
+      getChannelTokenKeys(c),
     ),
   );
 
@@ -5743,6 +5742,7 @@ async function createSandbox(
   const enabledTokenEnvKeys = new Set(messagingTokenDefs.map(({ envKey }) => envKey));
   for (const ch of MESSAGING_CHANNELS) {
     if (
+      ch.envKey &&
       enabledTokenEnvKeys.has(ch.envKey) &&
       ch.userIdEnvKey &&
       process.env[ch.userIdEnvKey]
@@ -8154,9 +8154,6 @@ async function checkTelegramReachability(token: string) {
 async function setupMessagingChannels(): Promise<string[]> {
   step(5, 8, "Messaging channels");
 
-  const getMessagingToken = (envKey: string): string | null =>
-    getCredential(envKey) || normalizeCredentialValue(process.env[envKey]) || null;
-
   const getMessagingConfigValue = (envKey: string): string | null =>
     normalizeMessagingChannelConfigValue(envKey, process.env[envKey]);
 
@@ -8291,6 +8288,7 @@ async function setupMessagingChannels(): Promise<string[]> {
       console.log(`  Unknown channel: ${name}`);
       continue;
     }
+    if (!channelHasStaticToken(ch)) continue;
     if (getMessagingToken(ch.envKey)) {
       console.log(`  ✓ ${ch.name} — already configured`);
     } else {
