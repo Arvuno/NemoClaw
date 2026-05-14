@@ -317,8 +317,8 @@ export function detectGpu(): GpuDetection | null {
     // Cross-check the firmware model up front. On DGX Spark, nvidia-smi may
     // identify the GPU as something like "NVIDIA JMJWOA-Generic-GPU" that
     // matches none of UNIFIED_MEMORY_GPU_TAGS, even though the device is a
-    // unified-memory one (NVB#6175939). When firmware confirms a unified-
-    // memory platform, accept whatever name nvidia-smi reports.
+    // unified-memory one (#3510). When firmware confirms a unified-memory
+    // platform, accept whatever name nvidia-smi reports.
     const firmwarePlatform = detectNvidiaPlatform();
     const firmwareIsUnifiedMemory =
       firmwarePlatform === "spark" || firmwarePlatform === "jetson";
