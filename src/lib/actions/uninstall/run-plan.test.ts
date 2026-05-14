@@ -619,4 +619,48 @@ describe("uninstall run plan", () => {
       "Destroyed gateway 'nemoclaw' skipped",
     );
   });
+
+  it("#3516: kills the orphan openshell-gateway host process during uninstall", () => {
+    // When the host glibc satisfies the gateway requirement, NemoClaw spawns
+    // /usr/local/bin/openshell-gateway directly without a container wrapper
+    // (see src/lib/onboard/docker-driver-gateway-launch.ts shouldUseContainerizedGateway).
+    // `openshell gateway destroy` does not terminate this host-process variant,
+    // so the process keeps binding port 8080 after uninstall. Uninstall must
+    // pgrep for the binary and SIGTERM/SIGKILL any survivors.
+    const logs: string[] = [];
+    const killed: number[] = [];
+    const result = runUninstallPlan(
+      { assumeYes: true, deleteModels: false, keepOpenShell: true },
+      {
+        commandExists: () => true,
+        env: { HOME: "/home/test", LOGNAME: "testuser" } as NodeJS.ProcessEnv,
+        existsSync: () => false,
+        isTty: false,
+        kill: (pid) => {
+          killed.push(pid);
+          return true;
+        },
+        log: (line) => logs.push(line),
+        rmSync: vi.fn(),
+        run: (command, args) => {
+          if (
+            command === "pgrep" &&
+            args[0] === "-f" &&
+            typeof args[1] === "string" &&
+            args[1].includes("openshell-gateway")
+          ) {
+            return ok("8888\n");
+          }
+          if (args[0] === "-f") return ok("");
+          if (args[0] === "-c") return ok("/fake/bin/tool\n");
+          return ok();
+        },
+        runDocker: () => ok(""),
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(killed).toContain(8888);
+    expect(logs).toContain("Stopped openshell-gateway host process 8888");
+  });
 });
