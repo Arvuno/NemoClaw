@@ -21,10 +21,6 @@ const root = process.cwd();
 const ADVISOR_PROVIDER = "openai";
 const ADVISOR_MODEL = "openai/openai/gpt-5.5";
 const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"];
-const ADVISOR_SYSTEM_PROMPT = `You are an automated E2E recommendation advisor for NemoClaw CI.
-Use repository context and the available read-only tools to recommend E2E coverage.
-Do not modify files, run commands, or perform dynamic analysis.
-When asked for a recommendation, return JSON only.`;
 
 type ParsedArgs = Record<string, string | undefined>;
 type AdvisorProviderConfig = Parameters<ModelRegistry["registerProvider"]>[1];
@@ -136,7 +132,8 @@ async function main(): Promise<void> {
   logProgress(`Detected ${changedFiles.length} changed file(s)`);
   const diff = getDiff(baseRef, headRef, 120000);
   logProgress(`Collected diff: ${diff.length} character(s) after truncation`);
-  const prompt = buildPrompt({ baseRef, headRef, changedFiles, schema, diff });
+  const systemPrompt = buildSystemPrompt(schema);
+  const prompt = buildPrompt({ baseRef, headRef, changedFiles, diff });
   fs.writeFileSync(artifacts.prompt, prompt);
   logProgress(`Wrote advisor prompt: ${prompt.length} character(s) at ${artifacts.prompt}`);
 
@@ -157,6 +154,7 @@ async function main(): Promise<void> {
     sdkResult = await runAdvisor({
       cwd: root,
       prompt,
+      systemPrompt,
       configDir,
       htmlExportPath: artifacts.sessionHtml,
       timeoutMs,
@@ -229,6 +227,7 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 async function runAdvisor(options: {
   cwd: string;
   prompt: string;
+  systemPrompt: string;
   configDir: string;
   htmlExportPath: string;
   timeoutMs: number;
@@ -255,7 +254,7 @@ async function runAdvisor(options: {
     noPromptTemplates: true,
     noThemes: true,
     noContextFiles: true,
-    systemPromptOverride: () => ADVISOR_SYSTEM_PROMPT,
+    systemPromptOverride: () => options.systemPrompt,
     appendSystemPromptOverride: () => [],
   });
   await resourceLoader.reload();
@@ -469,20 +468,8 @@ function gitOutput(commands: string[][], maxBuffer: number): string | undefined 
   return undefined;
 }
 
-function buildPrompt({
-  baseRef,
-  headRef,
-  changedFiles,
-  schema,
-  diff,
-}: {
-  baseRef: string;
-  headRef: string;
-  changedFiles: string[];
-  schema: AdvisorSchema;
-  diff: string;
-}): string {
-  return `You are the NemoClaw E2E recommendation advisor for an internal PR.
+function buildSystemPrompt(schema: AdvisorSchema): string {
+  return `You are the NemoClaw E2E recommendation advisor for CI.
 
 NemoClaw is NVIDIA's reference stack for running OpenClaw always-on assistants inside NVIDIA OpenShell sandboxes. It includes:
 - a Node/TypeScript CLI for install, onboarding, credentials, policy, inference, and sandbox lifecycle;
@@ -490,16 +477,30 @@ NemoClaw is NVIDIA's reference stack for running OpenClaw always-on assistants i
 - YAML blueprint/network-policy assets;
 - scenario-based and workflow-dispatched E2E tests for real user flows.
 
-Recommend which existing E2E jobs should run for this PR. Use the diff and inspect nearby files as needed, especially .github/workflows, test/e2e, touched source files, and related tests.
+Recommend which existing E2E jobs should run for a PR. Use the diff and inspect nearby repository files as needed, especially .github/workflows, test/e2e, touched source files, and related tests.
 
-Decision guidance:
+Decision policy:
 - Required E2E: changes that can affect installer/onboarding, sandbox lifecycle, credentials, security boundaries, network policy, inference routing, deployment, or real assistant user flows.
 - Optional E2E: useful confidence checks for adjacent behavior, but not merge-blocking.
 - No E2E: safe docs, tests-only, comments, refactors, or tooling changes that cannot affect runtime/user flows; explain in noE2eReason.
-- If existing E2E coverage is missing, use newE2eRecommendations. Do not invent existing test names.
+- Missing coverage: use newE2eRecommendations. Do not invent existing test names.
 
-Return JSON only, matching this schema:
-${JSON.stringify(schema, null, 2)}
+Return JSON only matching this schema:
+${JSON.stringify(schema, null, 2)}`;
+}
+
+function buildPrompt({
+  baseRef,
+  headRef,
+  changedFiles,
+  diff,
+}: {
+  baseRef: string;
+  headRef: string;
+  changedFiles: string[];
+  diff: string;
+}): string {
+  return `Return an E2E recommendation for this PR.
 
 Set these fields exactly:
 - version: 1
