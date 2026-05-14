@@ -479,34 +479,30 @@ function buildPrompt({
   schema: AdvisorSchema;
   diff: string;
 }): string {
-  return `You are the NemoClaw E2E Advisor running in CI for an internal PR.
+  return `You are the NemoClaw E2E recommendation advisor for an internal PR.
 
-Your job is to review the PR and repository context, then recommend which E2E tests should run.
+NemoClaw is NVIDIA's reference stack for running OpenClaw always-on assistants inside NVIDIA OpenShell sandboxes. It includes:
+- a Node/TypeScript CLI for install, onboarding, credentials, policy, inference, and sandbox lifecycle;
+- an OpenClaw plugin and TypeScript blueprint runner;
+- YAML blueprint/network-policy assets;
+- scenario-based and workflow-dispatched E2E tests for real user flows.
 
-This is intentionally NOT a path-rule or manifest-driven advisor. Use your judgment. Inspect repository files with read-only tools to understand:
-- existing E2E workflows under .github/workflows,
-- E2E scripts and scenarios under test/e2e,
-- source files touched by the PR,
-- nearby tests and code paths related to the change.
+Recommend which existing E2E jobs should run for this PR. Use the diff and inspect nearby files as needed, especially .github/workflows, test/e2e, touched source files, and related tests.
 
-Hard constraints:
-- Static analysis only. Do not execute repository scripts, tests, package managers, or generated code.
-- Use only read-only tools: read, grep, find, ls.
-- Recommend existing E2E tests by their actual workflow job/script names after inspecting the repo.
-- Do not invent existing tests. If behavior is not covered, add a newE2eRecommendations entry.
-- Required tests are for changes that can break real user flows, security boundaries, networking, credentials, installer/onboarding, sandbox lifecycle, inference routing, or deployment behavior.
-- Optional tests are useful confidence checks but not merge-blocking recommendations.
-- If no E2E is needed, set requiredTests to [] and explain in noE2eReason.
-- Return JSON only. No markdown, no code fences, no commentary outside JSON.
+Decision guidance:
+- Required E2E: changes that can affect installer/onboarding, sandbox lifecycle, credentials, security boundaries, network policy, inference routing, deployment, or real assistant user flows.
+- Optional E2E: useful confidence checks for adjacent behavior, but not merge-blocking.
+- No E2E: safe docs, tests-only, comments, refactors, or tooling changes that cannot affect runtime/user flows; explain in noE2eReason.
+- If existing E2E coverage is missing, use newE2eRecommendations. Do not invent existing test names.
 
-Output must conform to this JSON schema shape:
+Return JSON only, matching this schema:
 ${JSON.stringify(schema, null, 2)}
 
-Required output metadata values:
+Set these fields exactly:
 - version: 1
 - baseRef: ${JSON.stringify(baseRef)}
 - headRef: ${JSON.stringify(headRef)}
-- changedFiles: exactly this array: ${JSON.stringify(changedFiles)}
+- changedFiles: ${JSON.stringify(changedFiles)}
 
 Changed files:
 ${changedFiles.map((file) => `- ${file}`).join("\n") || "- <none>"}
