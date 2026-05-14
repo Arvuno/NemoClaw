@@ -469,24 +469,28 @@ function gitOutput(commands: string[][], maxBuffer: number): string | undefined 
 }
 
 function buildSystemPrompt(schema: AdvisorSchema): string {
-  return `You are the NemoClaw E2E recommendation advisor for CI.
-
-NemoClaw is NVIDIA's reference stack for running OpenClaw always-on assistants inside NVIDIA OpenShell sandboxes. It includes:
-- a Node/TypeScript CLI for install, onboarding, credentials, policy, inference, and sandbox lifecycle;
-- an OpenClaw plugin and TypeScript blueprint runner;
-- YAML blueprint/network-policy assets;
-- scenario-based and workflow-dispatched E2E tests for real user flows.
-
-Recommend which existing E2E jobs should run for a PR. Use the diff and inspect nearby repository files as needed, especially .github/workflows, test/e2e, touched source files, and related tests.
-
-Decision policy:
-- Required E2E: changes that can affect installer/onboarding, sandbox lifecycle, credentials, security boundaries, network policy, inference routing, deployment, or real assistant user flows.
-- Optional E2E: useful confidence checks for adjacent behavior, but not merge-blocking.
-- No E2E: safe docs, tests-only, comments, refactors, or tooling changes that cannot affect runtime/user flows; explain in noE2eReason.
-- Missing coverage: use newE2eRecommendations. Do not invent existing test names.
-
-Return JSON only matching this schema:
-${JSON.stringify(schema, null, 2)}`;
+  return [
+    "You are the NemoClaw E2E recommendation advisor for CI.",
+    "",
+    "NemoClaw is NVIDIA's reference stack for running OpenClaw always-on assistants inside NVIDIA OpenShell sandboxes. It includes:",
+    "- a Node/TypeScript CLI for install, onboarding, credentials, policy, inference, and sandbox lifecycle;",
+    "- an OpenClaw plugin and TypeScript blueprint runner;",
+    "- YAML blueprint/network-policy assets;",
+    "- scenario-based and workflow-dispatched E2E tests for real user flows.",
+    "",
+    "Recommend which existing E2E jobs should run for a PR. Use the diff and inspect nearby repository files as needed, especially .github/workflows, test/e2e, touched source files, and related tests.",
+    "",
+    "Decision policy:",
+    "- Required E2E: changes that can affect installer/onboarding, sandbox lifecycle, credentials, security boundaries, network policy, inference routing, deployment, or real assistant user flows.",
+    "- Optional E2E: useful confidence checks for adjacent behavior, but not merge-blocking.",
+    "- No E2E: safe docs, tests-only, comments, refactors, or tooling changes that cannot affect runtime/user flows; explain in noE2eReason.",
+    "- Missing coverage: use newE2eRecommendations. Do not invent existing test names.",
+    "",
+    "Return JSON only matching this schema:",
+    "```json",
+    JSON.stringify(schema),
+    "```",
+  ].join("\n");
 }
 
 function buildPrompt({
