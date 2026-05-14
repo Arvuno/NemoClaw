@@ -10,8 +10,8 @@
  * State B dead loop the reporter hit on six Linux hosts).
  */
 
-import { describe, expect, it } from "vitest";
-import { gpuPassthroughRecoveryLines } from "./gpu-recovery";
+import { describe, expect, it, vi } from "vitest";
+import { gpuPassthroughRecoveryLines, reportGpuPassthroughRecovery } from "./gpu-recovery";
 
 describe("gpuPassthroughRecoveryLines", () => {
   it("never emits a literal `<name>` placeholder for any input", () => {
@@ -70,5 +70,23 @@ describe("gpuPassthroughRecoveryLines", () => {
     expect(joined).toContain("nemoclaw real destroy --yes --cleanup-gateway");
     // No double-spaced "nemoclaw  destroy" rendering.
     expect(joined).not.toMatch(/nemoclaw\s{2,}destroy/);
+  });
+});
+
+describe("reportGpuPassthroughRecovery", () => {
+  it("emits the empty-registry path when loadNames returns no names", () => {
+    const emit = vi.fn();
+    reportGpuPassthroughRecovery(emit, () => []);
+    const joined = emit.mock.calls.map((c) => c[0]).join("\n");
+    expect(joined).toContain("nemoclaw uninstall");
+    expect(joined).not.toMatch(/<name>/);
+  });
+
+  it("emits the multi-sandbox path when loadNames returns several names", () => {
+    const emit = vi.fn();
+    reportGpuPassthroughRecovery(emit, () => ["alpha", "beta"]);
+    const joined = emit.mock.calls.map((c) => c[0]).join("\n");
+    expect(joined).toContain("nemoclaw alpha destroy --yes");
+    expect(joined).toContain("nemoclaw beta destroy --yes --cleanup-gateway");
   });
 });

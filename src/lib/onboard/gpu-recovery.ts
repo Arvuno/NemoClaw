@@ -9,8 +9,11 @@
  * with a literal `<name>` placeholder — not actionable when the registry was
  * empty (the State A / State B dead loop the reporter hit on six Linux
  * hosts). This helper renders the right shape based on what's actually
- * registered.
+ * registered AND owns the registry lookup, so the onboard.ts callsite stays
+ * a single call (also keeps onboard.ts inside its size budget).
  */
+
+import * as registry from "../state/registry";
 
 /**
  * Returns the multi-line recovery hint for the GPU-passthrough mismatch
@@ -57,4 +60,32 @@ export function gpuPassthroughRecoveryLines(names: readonly string[] | null): st
     "  To enable GPU, destroy each registered sandbox and the gateway, then re-onboard:",
     ...destroyLines,
   ];
+}
+
+/**
+ * Read registered sandbox names with a graceful empty-list fallback when the
+ * registry can't be opened. Extracted so the onboard callsite stays a single
+ * line and so unit tests can inject their own list.
+ */
+export function getRegisteredSandboxNamesForGpuRecovery(): string[] {
+  try {
+    return registry
+      .listSandboxes()
+      .sandboxes.map((s) => s.name)
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Emit the GPU-passthrough mismatch recovery hint to `emit` (typically
+ * `console.error`). `loadNames` is injectable for tests; the production
+ * default reads the on-disk sandbox registry.
+ */
+export function reportGpuPassthroughRecovery(
+  emit: (line: string) => void,
+  loadNames: () => string[] = getRegisteredSandboxNamesForGpuRecovery,
+): void {
+  for (const line of gpuPassthroughRecoveryLines(loadNames())) emit(line);
 }
