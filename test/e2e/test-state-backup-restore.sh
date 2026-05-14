@@ -3,22 +3,16 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # =============================================================================
-# test-deployment-services.sh
-# NemoClaw Deployment & Services E2E Tests
+# test-state-backup-restore.sh
+# NemoClaw Workspace Backup & Restore E2E Tests
 #
 # Covers:
 #   TC-STATE-01: backup-workspace.sh backup → destroy → recreate → restore
-#   TC-DEPLOY-01a: nemoclaw tunnel start (cloudflared tunnel)
-#   TC-DEPLOY-01b: tunnel URL serves the OpenClaw dashboard
-#   TC-DEPLOY-01c: nemoclaw tunnel stop removes URL from status
-#   TC-DEPLOY-02: nemoclaw uninstall --keep-openshell --yes
 #
 # Prerequisites:
 #   - Docker running
 #   - NVIDIA_API_KEY set
 #   - Network access to integrate.api.nvidia.com
-#
-# TC-DEPLOY-03 is DESTRUCTIVE — it uninstalls NemoClaw. Runs last.
 # =============================================================================
 
 set -euo pipefail
@@ -65,8 +59,8 @@ skip() {
 }
 
 # ── Config ───────────────────────────────────────────────────────────────────
-SANDBOX_NAME="${NEMOCLAW_SANDBOX_NAME:-e2e-deploy-svc}"
-LOG_FILE="test-deployment-services-$(date +%Y%m%d-%H%M%S).log"
+SANDBOX_NAME="${NEMOCLAW_SANDBOX_NAME:-e2e-state-backup}"
+LOG_FILE="test-state-backup-restore-$(date +%Y%m%d-%H%M%S).log"
 
 # ── Resolve repo root ────────────────────────────────────────────────────────
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -115,30 +109,7 @@ preflight() {
 
   install_nemoclaw
 
-  if ! command -v cloudflared >/dev/null 2>&1; then
-    log "Installing cloudflared..."
-    local arch
-    arch=$(uname -m)
-    case "$arch" in
-      x86_64) arch="amd64" ;;
-      aarch64 | arm64) arch="arm64" ;;
-      *)
-        log "WARNING: Unsupported arch $arch for cloudflared — skipping install"
-        return 0
-        ;;
-    esac
-    local cf_url="${CLOUDFLARED_DOWNLOAD_URL:-https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}}"
-    if curl -fsSL "$cf_url" -o /tmp/cloudflared \
-      && chmod +x /tmp/cloudflared \
-      && sudo mv /tmp/cloudflared /usr/local/bin/cloudflared 2>/dev/null; then
-      log "cloudflared installed"
-    else
-      log "WARNING: Could not install cloudflared"
-    fi
-  fi
-
   log "nemoclaw: $(nemoclaw --version 2>/dev/null || echo unknown)"
-  log "cloudflared: $(cloudflared --version 2>/dev/null || echo 'not available')"
   log "Pre-flight complete"
 }
 
@@ -182,7 +153,7 @@ onboard_sandbox() {
 # =============================================================================
 # TC-STATE-01: backup-workspace.sh lifecycle
 # =============================================================================
-test_state_01_backup_restore() {
+test_backup_restore_lifecycle() {
   log "=== TC-STATE-01: Backup-Workspace Lifecycle ==="
 
   local workspace_path="/sandbox/.openclaw/workspace"
@@ -300,168 +271,6 @@ test_state_01_backup_restore() {
   fi
 }
 
-# =============================================================================
-# TC-DEPLOY-01a: nemoclaw tunnel start (cloudflared tunnel)
-# TC-DEPLOY-01b: tunnel URL serves the OpenClaw dashboard
-# TC-DEPLOY-01c: nemoclaw tunnel stop removes tunnel URL from status
-# =============================================================================
-test_deploy_01_start_stop_tunnel() {
-  log "=== TC-DEPLOY-01a/b/c: Start / Probe / Stop ==="
-
-  if ! command -v cloudflared >/dev/null 2>&1; then
-    skip "TC-DEPLOY-01a / TC-DEPLOY-01b / TC-DEPLOY-01c" "cloudflared not installed"
-    return
-  fi
-
-  # Cascade guard: skip if a prior TC (e.g. TC-STATE-01) left the sandbox missing.
-  if ! nemoclaw list 2>/dev/null | grep -Fq -- "$SANDBOX_NAME"; then
-    skip "TC-DEPLOY-01a / TC-DEPLOY-01b / TC-DEPLOY-01c" \
-      "Sandbox '$SANDBOX_NAME' not present"
-    return
-  fi
-
-  # ── TC-DEPLOY-01a: Start tunnel + verify URL surfaces ───────────────────────────────────
-  log "  Step 1: Running nemoclaw tunnel start..."
-  local start_output start_rc=0
-  start_output=$(nemoclaw tunnel start 2>&1) || start_rc=$?
-  log "  Start output: ${start_output}"
-  if [[ $start_rc -ne 0 ]]; then
-    fail "TC-DEPLOY-01a: Start" "nemoclaw tunnel start failed (exit $start_rc)"
-    return
-  fi
-
-  log "  Step 2: Reading nemoclaw status (polling for tunnel URL)..."
-  local status_output tunnel_url
-  for i in $(seq 1 15); do
-    status_output=$(nemoclaw status 2>&1) || true
-    tunnel_url=$(printf '%s\n' "$status_output" | grep -oE "https://[a-z0-9-]+\.trycloudflare\.com" | head -1) || true
-    [[ -n "$tunnel_url" ]] && break
-    sleep 1
-  done
-  log "  Status output:     ${status_output//$'\n'/$'\n'    }"
-
-  if [[ -n "$tunnel_url" ]]; then
-    pass "TC-DEPLOY-01a: Tunnel URL found in status ($tunnel_url)"
-  else
-    fail "TC-DEPLOY-01a: Start" "Start executed but tunnel URL did not surface in status"
-    nemoclaw tunnel stop 2>/dev/null || true
-    return
-  fi
-
-  # ── TC-DEPLOY-01b: Tunnel serves the OpenClaw dashboard ────────────────────────
-  if [[ -n "$tunnel_url" ]]; then
-    log "  Step 3: Probing tunnel URL (HTTP + content)..."
-    local http_code="000" body_file
-    body_file=$(mktemp)
-    for i in $(seq 1 10); do
-      http_code=$(curl -sS -o "$body_file" -w '%{http_code}' \
-        --max-time 30 "$tunnel_url" 2>/dev/null || echo "000")
-      if [[ "$http_code" == "200" ]]; then
-        break
-      fi
-      log "  [$i] Tunnel URL returned '$http_code', retrying in 5s..."
-      sleep 5
-    done
-
-    if [[ "$http_code" == "200" ]]; then
-      if grep -qE '<title>OpenClaw Control</title>|<openclaw-app' "$body_file"; then
-        pass "TC-DEPLOY-01b: Tunnel serves OpenClaw dashboard (HTTP 200, marker matched)"
-      else
-        fail "TC-DEPLOY-01b" "HTTP 200 but body lacks dashboard markers (first 200B: $(head -c 200 "$body_file" | tr -d '\n'))"
-      fi
-    else
-      fail "TC-DEPLOY-01b" "Tunnel URL returned unexpected status: $http_code"
-    fi
-    rm -f "$body_file"
-  else
-    skip "TC-DEPLOY-01b" "Tunnel URL not available"
-  fi
-
-  log "  Step 4: Running nemoclaw tunnel stop..."
-  local stop_output stop_rc=0
-  stop_output=$(nemoclaw tunnel stop 2>&1) || stop_rc=$?
-  log "  Tunnel stop output:     ${stop_output//$'\n'/$'\n'    }"
-  if [[ $stop_rc -ne 0 ]]; then
-    fail "TC-DEPLOY-01c: Stop command" "nemoclaw tunnel stop failed (exit $stop_rc)"
-    return
-  fi
-
-  # ── TC-DEPLOY-01c: Tunnel URL absent after stop ─────────────────────────────
-  log "  Step 5: Verifying tunnel stopped (polling for URL removal)..."
-  if [[ -z "$tunnel_url" ]]; then
-    skip "TC-DEPLOY-01c" "Tunnel URL was never confirmed in status"
-  else
-    local post_status post_url status_rc=0 status_ok=0
-    for i in $(seq 1 10); do
-      status_rc=0
-      post_status=$(nemoclaw status 2>&1) || status_rc=$?
-      if [[ $status_rc -ne 0 ]]; then
-        log "  [$i] nemoclaw status failed (exit $status_rc), retrying in 1s..."
-        sleep 1
-        continue
-      fi
-      status_ok=1
-      post_url=$(printf '%s\n' "$post_status" | grep -oE "https://[a-z0-9-]+\.trycloudflare\.com" | head -1) || true
-      [[ -z "$post_url" ]] && break
-      sleep 1
-    done
-    if [[ $status_ok -eq 0 ]]; then
-      fail "TC-DEPLOY-01c: Stop" "Could not read nemoclaw status after stop"
-    elif [[ -z "$post_url" ]]; then
-      pass "TC-DEPLOY-01c: Tunnel URL absent after stop"
-    else
-      fail "TC-DEPLOY-01c: Stop" "Tunnel URL still present after stop ($post_url)"
-    fi
-  fi
-}
-
-# =============================================================================
-# TC-DEPLOY-02: uninstall --keep-openshell (DESTRUCTIVE — runs last)
-# =============================================================================
-test_deploy_02_uninstall_keep_openshell() {
-  log "=== TC-DEPLOY-02: Uninstall --keep-openshell ==="
-
-  if ! command -v openshell >/dev/null 2>&1; then
-    skip "TC-DEPLOY-02" "openshell not installed"
-    return
-  fi
-
-  local openshell_path
-  openshell_path=$(command -v openshell)
-  log "  openshell before uninstall: $openshell_path"
-
-  log "  Step 1: Destroying sandbox before uninstall..."
-  nemoclaw "$SANDBOX_NAME" destroy --yes 2>&1 | tee -a "$LOG_FILE" || true
-
-  log "  Step 2: Running uninstall --keep-openshell --yes..."
-  local uninstall_output
-  if [[ -f "$REPO_ROOT/uninstall.sh" ]]; then
-    uninstall_output=$(bash "$REPO_ROOT/uninstall.sh" --keep-openshell --yes 2>&1) || true
-  else
-    uninstall_output=$(nemoclaw uninstall --keep-openshell --yes 2>&1) || true
-  fi
-  hash -r 2>/dev/null || true
-  log "  Uninstall output: ${uninstall_output:0:400}"
-
-  log "  Step 3: Verifying openshell still present..."
-  if command -v openshell >/dev/null 2>&1; then
-    pass "TC-DEPLOY-02: openshell binary still in PATH after uninstall"
-  else
-    fail "TC-DEPLOY-02: openshell" "openshell not found after uninstall --keep-openshell"
-  fi
-
-  log "  Step 4: Verifying nemoclaw removed..."
-  local nemoclaw_path
-  nemoclaw_path=$(command -v nemoclaw 2>/dev/null || true)
-  if [[ -z "$nemoclaw_path" || ! -e "$nemoclaw_path" ]]; then
-    pass "TC-DEPLOY-02: nemoclaw removed after uninstall"
-  elif [[ "$nemoclaw_path" == "$REPO_ROOT"* ]]; then
-    pass "TC-DEPLOY-02: uninstall completed (nemoclaw in source tree is expected)"
-  else
-    fail "TC-DEPLOY-02: nemoclaw" "nemoclaw still found at $nemoclaw_path"
-  fi
-}
-
 # Clean up sandbox and services on exit.
 teardown() {
   # Do not unlink ~/.nemoclaw/onboard.lock: see rationale in
@@ -477,7 +286,7 @@ teardown() {
 summary() {
   echo ""
   echo "============================================================"
-  echo "  Deployment & Services E2E Results"
+  echo "  Workspace Backup & Restore E2E Results"
   echo "============================================================"
   echo -e "  ${GREEN}PASS: $PASS${NC}"
   echo -e "  ${RED}FAIL: $FAIL${NC}"
@@ -498,7 +307,7 @@ summary() {
 main() {
   echo ""
   echo "============================================================"
-  echo "  NemoClaw Deployment & Services E2E Tests"
+  echo "  NemoClaw Workspace Backup & Restore E2E Tests"
   echo "  $(date)"
   echo "============================================================"
   echo ""
@@ -511,15 +320,7 @@ main() {
     exit 1
   fi
 
-  test_state_01_backup_restore
-  test_deploy_01_start_stop_tunnel
-
-  # TC-DEPLOY-02 is destructive — always runs last
-  if [[ "${SKIP_UNINSTALL:-}" == "1" ]]; then
-    skip "TC-DEPLOY-02" "SKIP_UNINSTALL=1 set"
-  else
-    test_deploy_02_uninstall_keep_openshell
-  fi
+  test_backup_restore_lifecycle
 
   teardown
   trap - EXIT

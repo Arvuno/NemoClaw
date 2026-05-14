@@ -3,11 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # =============================================================================
-# test-deployment-services.sh
-# NemoClaw Deployment & Services E2E Tests
+# test-tunnel-and-uninstall.sh
+# NemoClaw Tunnel & Uninstall E2E Tests
 #
 # Covers:
-#   TC-STATE-01: backup-workspace.sh backup → destroy → recreate → restore
 #   TC-DEPLOY-01a: nemoclaw tunnel start (cloudflared tunnel)
 #   TC-DEPLOY-01b: tunnel URL serves the OpenClaw dashboard
 #   TC-DEPLOY-01c: nemoclaw tunnel stop removes URL from status
@@ -18,7 +17,8 @@
 #   - NVIDIA_API_KEY set
 #   - Network access to integrate.api.nvidia.com
 #
-# TC-DEPLOY-03 is DESTRUCTIVE — it uninstalls NemoClaw. Runs last.
+# TC-DEPLOY-02 is DESTRUCTIVE — it uninstalls NemoClaw. Runs last.
+# Skip with SKIP_UNINSTALL=1.
 # =============================================================================
 
 set -euo pipefail
@@ -65,8 +65,8 @@ skip() {
 }
 
 # ── Config ───────────────────────────────────────────────────────────────────
-SANDBOX_NAME="${NEMOCLAW_SANDBOX_NAME:-e2e-deploy-svc}"
-LOG_FILE="test-deployment-services-$(date +%Y%m%d-%H%M%S).log"
+SANDBOX_NAME="${NEMOCLAW_SANDBOX_NAME:-e2e-tunnel-uninstall}"
+LOG_FILE="test-tunnel-and-uninstall-$(date +%Y%m%d-%H%M%S).log"
 
 # ── Resolve repo root ────────────────────────────────────────────────────────
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -142,26 +142,6 @@ preflight() {
   log "Pre-flight complete"
 }
 
-# Execute a command inside the sandbox via SSH.
-sandbox_exec() {
-  local cmd="$1"
-  local ssh_cfg
-  ssh_cfg="$(mktemp)"
-  if ! openshell sandbox ssh-config "$SANDBOX_NAME" >"$ssh_cfg" 2>/dev/null; then
-    rm -f "$ssh_cfg"
-    echo ""
-    return 1
-  fi
-  local result ssh_exit=0
-  result=$(run_with_timeout 120 ssh -F "$ssh_cfg" \
-    -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    -o ConnectTimeout=10 -o LogLevel=ERROR \
-    "openshell-${SANDBOX_NAME}" "$cmd" 2>&1) || ssh_exit=$?
-  rm -f "$ssh_cfg"
-  echo "$result"
-  return $ssh_exit
-}
-
 # ── Onboard helper ───────────────────────────────────────────────────────────
 onboard_sandbox() {
   local name="$1"
@@ -180,132 +160,11 @@ onboard_sandbox() {
 }
 
 # =============================================================================
-# TC-STATE-01: backup-workspace.sh lifecycle
-# =============================================================================
-test_state_01_backup_restore() {
-  log "=== TC-STATE-01: Backup-Workspace Lifecycle ==="
-
-  local workspace_path="/sandbox/.openclaw/workspace"
-  local marker_content
-  marker_content="E2E_BACKUP_TEST_$(date +%s)"
-
-  log "  Step 1: Writing marker content into workspace files..."
-  local files_written=0
-  for f in SOUL.md USER.md IDENTITY.md AGENTS.md MEMORY.md; do
-    if sandbox_exec "mkdir -p $workspace_path && echo '${marker_content}_${f}' > ${workspace_path}/${f}" 2>/dev/null; then
-      files_written=$((files_written + 1))
-    fi
-  done
-  sandbox_exec "mkdir -p ${workspace_path}/memory && echo '${marker_content}_daily' > ${workspace_path}/memory/2026-04-20.md" 2>/dev/null || true
-
-  if [[ $files_written -eq 0 ]]; then
-    fail "TC-STATE-01: Setup" "Could not write any workspace files"
-    return
-  fi
-  log "  Wrote $files_written workspace files + memory note"
-
-  log "  Step 2: Running backup-workspace.sh backup..."
-  local backup_output
-  backup_output=$(bash "$REPO_ROOT/scripts/backup-workspace.sh" backup "$SANDBOX_NAME" 2>&1) || true
-  log "  Backup output: ${backup_output:0:300}"
-
-  if echo "$backup_output" | grep -q "Backup saved"; then
-    pass "TC-STATE-01: Backup completed successfully"
-  else
-    fail "TC-STATE-01: Backup" "backup-workspace.sh did not report success"
-    return
-  fi
-
-  local backup_dir
-  backup_dir=$(find "$HOME/.nemoclaw/backups" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -r | head -1)
-  if [[ -z "$backup_dir" || ! -d "$backup_dir" ]]; then
-    fail "TC-STATE-01: Backup dir" "No backup directory found"
-    return
-  fi
-  log "  Backup dir: $backup_dir"
-
-  log "  Step 3: Destroying sandbox..."
-  local destroy_ok=0
-  for destroy_attempt in 1 2 3; do
-    nemoclaw "$SANDBOX_NAME" destroy --yes 2>&1 | tee -a "$LOG_FILE" || true
-    local list_output list_rc=0
-    list_output=$(nemoclaw list 2>&1) || list_rc=$?
-    if [[ $list_rc -eq 0 ]]; then
-      if ! printf '%s\n' "$list_output" | grep -Fq -- "$SANDBOX_NAME"; then
-        destroy_ok=1
-        break
-      fi
-    else
-      log "  Destroy attempt $destroy_attempt: unable to read sandbox list (exit $list_rc), retrying..."
-    fi
-    if [[ $destroy_attempt -lt 3 ]]; then
-      log "  Destroy attempt $destroy_attempt failed (sandbox still listed), retrying in 10s..."
-      sleep 10
-    fi
-  done
-
-  if [[ $destroy_ok -eq 0 ]]; then
-    fail "TC-STATE-01: Destroy" "Sandbox still exists after 3 destroy attempts"
-    return
-  fi
-  pass "TC-STATE-01: Sandbox destroyed"
-
-  log "  Step 4: Re-onboarding sandbox..."
-  if ! onboard_sandbox "$SANDBOX_NAME"; then
-    fail "TC-STATE-01: Re-onboard" "Could not recreate sandbox"
-    return
-  fi
-  pass "TC-STATE-01: Sandbox re-onboarded"
-
-  log "  Step 5: Running backup-workspace.sh restore..."
-  local restore_output
-  restore_output=$(bash "$REPO_ROOT/scripts/backup-workspace.sh" restore "$SANDBOX_NAME" 2>&1) || true
-  log "  Restore output: ${restore_output:0:300}"
-
-  if echo "$restore_output" | grep -q "Restored"; then
-    pass "TC-STATE-01: Restore completed successfully"
-  else
-    fail "TC-STATE-01: Restore" "backup-workspace.sh restore did not report success"
-    return
-  fi
-
-  log "  Step 6: Verifying workspace files restored..."
-  local verified=0
-  for f in SOUL.md USER.md IDENTITY.md AGENTS.md MEMORY.md; do
-    local content
-    content=$(sandbox_exec "cat ${workspace_path}/${f} 2>/dev/null") || true
-    if echo "$content" | grep -q "${marker_content}_${f}"; then
-      verified=$((verified + 1))
-    else
-      log "  WARNING: ${f} content mismatch: ${content:0:100}"
-    fi
-  done
-
-  if [[ $verified -eq 5 ]]; then
-    pass "TC-STATE-01: ${verified}/5 workspace files verified with correct content"
-  elif [[ $verified -ge 4 ]]; then
-    log "  WARNING: Only ${verified}/5 files verified — check logs above for mismatched file"
-    pass "TC-STATE-01: ${verified}/5 workspace files verified (partial tolerance applied)"
-  else
-    fail "TC-STATE-01: Verify" "Only ${verified}/5 workspace files matched expected content"
-  fi
-
-  local memory_content
-  memory_content=$(sandbox_exec "cat ${workspace_path}/memory/2026-04-20.md 2>/dev/null") || true
-  if echo "$memory_content" | grep -q "${marker_content}_daily"; then
-    pass "TC-STATE-01: Memory note restored correctly"
-  else
-    log "  Memory note content: ${memory_content:0:100}"
-    skip "TC-STATE-01: Memory note" "Memory directory restore may not be supported"
-  fi
-}
-
-# =============================================================================
 # TC-DEPLOY-01a: nemoclaw tunnel start (cloudflared tunnel)
 # TC-DEPLOY-01b: tunnel URL serves the OpenClaw dashboard
 # TC-DEPLOY-01c: nemoclaw tunnel stop removes tunnel URL from status
 # =============================================================================
-test_deploy_01_start_stop_tunnel() {
+test_tunnel_lifecycle() {
   log "=== TC-DEPLOY-01a/b/c: Start / Probe / Stop ==="
 
   if ! command -v cloudflared >/dev/null 2>&1; then
@@ -313,7 +172,7 @@ test_deploy_01_start_stop_tunnel() {
     return
   fi
 
-  # Cascade guard: skip if a prior TC (e.g. TC-STATE-01) left the sandbox missing.
+  # Cascade guard: skip if a prior step left the sandbox missing.
   if ! nemoclaw list 2>/dev/null | grep -Fq -- "$SANDBOX_NAME"; then
     skip "TC-DEPLOY-01a / TC-DEPLOY-01b / TC-DEPLOY-01c" \
       "Sandbox '$SANDBOX_NAME' not present"
@@ -324,7 +183,10 @@ test_deploy_01_start_stop_tunnel() {
   log "  Step 1: Running nemoclaw tunnel start..."
   local start_output start_rc=0
   start_output=$(nemoclaw tunnel start 2>&1) || start_rc=$?
-  log "  Start output: ${start_output}"
+  log "  Start output:"
+  log "  ---"
+  log "$start_output"
+  log "  ---"
   if [[ $start_rc -ne 0 ]]; then
     fail "TC-DEPLOY-01a: Start" "nemoclaw tunnel start failed (exit $start_rc)"
     return
@@ -338,13 +200,15 @@ test_deploy_01_start_stop_tunnel() {
     [[ -n "$tunnel_url" ]] && break
     sleep 1
   done
-  log "  Status output:     ${status_output//$'\n'/$'\n'    }"
 
   if [[ -n "$tunnel_url" ]]; then
     pass "TC-DEPLOY-01a: Tunnel URL found in status ($tunnel_url)"
   else
     fail "TC-DEPLOY-01a: Start" "Start executed but tunnel URL did not surface in status"
+    # Stop the tunnel even no tunnel URL was found
+    log "  Stopping tunnel..."
     nemoclaw tunnel stop 2>/dev/null || true
+    log "  Tunnel stopped"
     return
   fi
 
@@ -362,6 +226,9 @@ test_deploy_01_start_stop_tunnel() {
       log "  [$i] Tunnel URL returned '$http_code', retrying in 5s..."
       sleep 5
     done
+
+    # print the body file in beautiful format
+    log "  Body file: $(cat "$body_file" | jq .)"
 
     if [[ "$http_code" == "200" ]]; then
       if grep -qE '<title>OpenClaw Control</title>|<openclaw-app' "$body_file"; then
@@ -383,6 +250,7 @@ test_deploy_01_start_stop_tunnel() {
   log "  Tunnel stop output:     ${stop_output//$'\n'/$'\n'    }"
   if [[ $stop_rc -ne 0 ]]; then
     fail "TC-DEPLOY-01c: Stop command" "nemoclaw tunnel stop failed (exit $stop_rc)"
+    log "  Tunnel stop output: ${stop_output}"
     return
   fi
 
@@ -418,7 +286,7 @@ test_deploy_01_start_stop_tunnel() {
 # =============================================================================
 # TC-DEPLOY-02: uninstall --keep-openshell (DESTRUCTIVE — runs last)
 # =============================================================================
-test_deploy_02_uninstall_keep_openshell() {
+test_uninstall_keep_openshell() {
   log "=== TC-DEPLOY-02: Uninstall --keep-openshell ==="
 
   if ! command -v openshell >/dev/null 2>&1; then
@@ -477,7 +345,7 @@ teardown() {
 summary() {
   echo ""
   echo "============================================================"
-  echo "  Deployment & Services E2E Results"
+  echo "  Tunnel & Uninstall E2E Results"
   echo "============================================================"
   echo -e "  ${GREEN}PASS: $PASS${NC}"
   echo -e "  ${RED}FAIL: $FAIL${NC}"
@@ -498,7 +366,7 @@ summary() {
 main() {
   echo ""
   echo "============================================================"
-  echo "  NemoClaw Deployment & Services E2E Tests"
+  echo "  NemoClaw Tunnel & Uninstall E2E Tests"
   echo "  $(date)"
   echo "============================================================"
   echo ""
@@ -511,14 +379,13 @@ main() {
     exit 1
   fi
 
-  test_state_01_backup_restore
-  test_deploy_01_start_stop_tunnel
+  test_tunnel_lifecycle
 
   # TC-DEPLOY-02 is destructive — always runs last
   if [[ "${SKIP_UNINSTALL:-}" == "1" ]]; then
     skip "TC-DEPLOY-02" "SKIP_UNINSTALL=1 set"
   else
-    test_deploy_02_uninstall_keep_openshell
+    test_uninstall_keep_openshell
   fi
 
   teardown

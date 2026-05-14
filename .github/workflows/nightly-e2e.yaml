@@ -1080,9 +1080,9 @@ jobs:
           if-no-files-found: ignore
 
   # ── Deployment & Services E2E ────────────────────────────────
-  # TC-STATE-02: backup-workspace.sh lifecycle (backup → destroy → restore)
+  # TC-STATE-01: backup-workspace.sh lifecycle (backup → destroy → restore)
   # TC-DEPLOY-01: nemoclaw start/stop (cloudflared tunnel)
-  # TC-DEPLOY-03: uninstall --keep-openshell (destructive, runs last in script)
+  # TC-DEPLOY-02: uninstall --keep-openshell (destructive, runs last in script)
   deployment-services-e2e:
     if: >-
       github.repository == 'NVIDIA/NemoClaw' &&
