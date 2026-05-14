@@ -427,7 +427,16 @@ export function buildDockerGpuCloneRunArgs(
   }
 
   for (const cap of stringArray(host.CapAdd)) args.push("--cap-add", cap);
-  for (const cap of stringArray(host.CapDrop)) args.push("--cap-drop", cap);
+  const capDrops = stringArray(host.CapDrop);
+  for (const cap of capDrops) args.push("--cap-drop", cap);
+  if (!capDrops.some((cap) => cap.toUpperCase() === "SYS_ADMIN")) {
+    // OpenShell grants /proc task comm writes via its sandbox policy, but Docker's
+    // default seccomp profile can still reject that write after the GPU clone is
+    // recreated directly with `docker run`. The live GPU E2E proof exercises that
+    // policy path, so preserve OpenShell's intended sandbox behavior by allowing
+    // the proc write while still honoring sandboxes that explicitly drop SYS_ADMIN.
+    args.push("--cap-add", "SYS_ADMIN");
+  }
   for (const opt of stringArray(host.SecurityOpt)) args.push("--security-opt", opt);
   if (networkMode !== "host") {
     for (const hostEntry of stringArray(host.ExtraHosts)) args.push("--add-host", hostEntry);

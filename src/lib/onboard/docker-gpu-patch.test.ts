@@ -345,6 +345,8 @@ describe("docker-gpu-patch", () => {
         "openshell-alpha",
         "--gpus",
         "all",
+        "--cap-add",
+        "SYS_ADMIN",
         "--network",
         "host",
         "--env",
