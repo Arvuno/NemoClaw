@@ -297,6 +297,7 @@ describe("local inference helpers", () => {
       providerLabel: "Local Ollama",
       endpoint: "http://127.0.0.1:11434/api/tags",
       detail: "Local Ollama is reachable on http://127.0.0.1:11434/api/tags.",
+      probeLabel: "ollama backend",
     });
   });
 
@@ -317,6 +318,7 @@ describe("local inference helpers", () => {
     expect(result?.detail).toContain("Local Ollama is selected for inference");
     expect(result?.detail).toContain("Start Ollama and retry");
     expect(result?.detail).toContain("http://127.0.0.1:11434/api/tags");
+    expect(result?.probeLabel).toBe("ollama backend");
   });
 
   // #3265 — auth-proxy subprobe scenarios. Status was previously a single

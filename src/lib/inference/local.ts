@@ -333,12 +333,20 @@ export function probeLocalProviderHealth(
   const runCurlProbeImpl = options.runCurlProbeImpl ?? runCurlProbe;
   const result = runCurlProbeImpl(["-sS", "--connect-timeout", "3", "--max-time", "5", endpoint]);
 
+  // Per #3265 the status line is renamed `Inference (<backend>):` for local
+  // providers so the upcoming `Inference (auth proxy):` subprobe lines render
+  // in parallel and the user can see which hop is broken.
+  const probeLabel =
+    provider === "ollama-local" ? "ollama backend" :
+    provider === "vllm-local" ? "vllm backend" : undefined;
+
   const subprobes: LocalProviderHealthStatus[] = [];
   if (provider === "ollama-local") {
     const proxyProbe = probeOllamaAuthProxyHealth(options);
     if (proxyProbe) subprobes.push(proxyProbe);
   }
   const attachSubprobes = subprobes.length > 0 ? { subprobes } : {};
+  const attachProbeLabel = probeLabel ? { probeLabel } : {};
 
   if (result.ok) {
     return {
@@ -346,6 +354,7 @@ export function probeLocalProviderHealth(
       providerLabel,
       endpoint,
       detail: `${providerLabel} is reachable on ${endpoint}.`,
+      ...attachProbeLabel,
       ...attachSubprobes,
     };
   }
@@ -355,6 +364,7 @@ export function probeLocalProviderHealth(
     providerLabel,
     endpoint,
     detail: buildLocalProviderProbeDetail(provider, endpoint, result),
+    ...attachProbeLabel,
     ...attachSubprobes,
   };
 }
