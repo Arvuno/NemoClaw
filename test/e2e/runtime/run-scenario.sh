@@ -186,6 +186,11 @@ if [[ "$(read_plan_string dimensions.platform.profile.os)" == "wsl" ]] && [[ -z 
   exit 0
 fi
 
+if [[ "$(read_plan_string dimensions.platform.profile.gpu)" == "nvidia" ]] && ! command -v nvidia-smi >/dev/null 2>&1; then
+  echo "run-scenario: unsupported live scenario gate: gpu-repo-local-ollama-openclaw requires an NVIDIA GPU runner with nvidia-smi and Docker CDI; this runner has no NVIDIA GPU"
+  exit 0
+fi
+
 e2e_install "${INSTALL_METHOD}"
 
 # Negative preflight scenarios intentionally model a missing container daemon.
