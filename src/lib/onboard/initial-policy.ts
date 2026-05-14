@@ -46,7 +46,7 @@ export function buildDirectGpuPolicyYaml(basePolicy: string): string {
 
 const PROC_COMM_WRITE_PROBE = [
   "set -eu;",
-  'comm="/proc/$$/task/$$/comm";',
+  'comm="/proc/self/task/$$/comm";',
   'old="$(cat "$comm" 2>/dev/null || true)";',
   'printf nemoclaw-gpu >"$comm";',
   'if [ -n "$old" ]; then',
