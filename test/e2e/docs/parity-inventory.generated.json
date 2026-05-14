@@ -15467,7 +15467,7 @@
       "assertions": [
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 262,
+          "line": 261,
           "text": "TC-DEPLOY-01a: LocalReadiness",
           "polarity": "fail",
           "normalized_id": "tc.deploy.01a.localreadiness",
@@ -15475,7 +15475,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 266,
+          "line": 265,
           "text": "TC-DEPLOY-01a: Local dashboard reachable (pre-check passed)",
           "polarity": "pass",
           "normalized_id": "tc.deploy.01a.local.dashboard.reachable.pre.check.passed",
@@ -15483,7 +15483,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 277,
+          "line": 276,
           "text": "TC-DEPLOY-01a: Start",
           "polarity": "fail",
           "normalized_id": "tc.deploy.01a.start",
@@ -15491,7 +15491,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 291,
+          "line": 290,
           "text": "TC-DEPLOY-01a: Tunnel URL found in status ($tunnel_url)",
           "polarity": "pass",
           "normalized_id": "tc.deploy.01a.tunnel.url.found.in.status.tunnel.url",
@@ -15499,7 +15499,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 300,
+          "line": 299,
           "text": "TC-DEPLOY-01a: NoSpawn",
           "polarity": "fail",
           "normalized_id": "tc.deploy.01a.nospawn",
@@ -15507,7 +15507,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 304,
+          "line": 303,
           "text": "TC-DEPLOY-01a: CaptureBug",
           "polarity": "fail",
           "normalized_id": "tc.deploy.01a.capturebug",
@@ -15515,7 +15515,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 308,
+          "line": 307,
           "text": "TC-DEPLOY-01a: LocalOrigin",
           "polarity": "fail",
           "normalized_id": "tc.deploy.01a.localorigin",
@@ -15523,7 +15523,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 312,
+          "line": 311,
           "text": "TC-DEPLOY-01a: CloudflareRegister",
           "polarity": "fail",
           "normalized_id": "tc.deploy.01a.cloudflareregister",
@@ -15531,7 +15531,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 316,
+          "line": 315,
           "text": "TC-DEPLOY-01a: Start",
           "polarity": "fail",
           "normalized_id": "tc.deploy.01a.start",
@@ -15539,7 +15539,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 346,
+          "line": 345,
           "text": "TC-DEPLOY-01b: LocalRegression",
           "polarity": "fail",
           "normalized_id": "tc.deploy.01b.localregression",
@@ -15547,7 +15547,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 360,
+          "line": 359,
           "text": "TC-DEPLOY-01b: Tunnel serves OpenClaw dashboard (HTTP 200, marker matched)",
           "polarity": "pass",
           "normalized_id": "tc.deploy.01b.tunnel.serves.openclaw.dashboard.http.200.marker.matched",
@@ -15555,7 +15555,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 362,
+          "line": 361,
           "text": "TC-DEPLOY-01b",
           "polarity": "fail",
           "normalized_id": "tc.deploy.01b",
@@ -15563,7 +15563,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 367,
+          "line": 366,
           "text": "TC-DEPLOY-01b: CloudflareEdge",
           "polarity": "fail",
           "normalized_id": "tc.deploy.01b.cloudflareedge",
@@ -15571,7 +15571,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 381,
+          "line": 380,
           "text": "TC-DEPLOY-01c: Stop command",
           "polarity": "fail",
           "normalized_id": "tc.deploy.01c.stop.command",
@@ -15579,7 +15579,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 405,
+          "line": 404,
           "text": "TC-DEPLOY-01c: Stop",
           "polarity": "fail",
           "normalized_id": "tc.deploy.01c.stop",
@@ -15587,7 +15587,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 407,
+          "line": 406,
           "text": "TC-DEPLOY-01c: Tunnel URL absent after stop",
           "polarity": "pass",
           "normalized_id": "tc.deploy.01c.tunnel.url.absent.after.stop",
@@ -15595,7 +15595,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 409,
+          "line": 408,
           "text": "TC-DEPLOY-01c: Stop",
           "polarity": "fail",
           "normalized_id": "tc.deploy.01c.stop",
@@ -15603,7 +15603,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 431,
+          "line": 430,
           "text": "$PASS${NC}",
           "polarity": "pass",
           "normalized_id": "pass.nc",
@@ -15611,7 +15611,7 @@
         },
         {
           "script": "test/e2e/test-tunnel-lifecycle.sh",
-          "line": 432,
+          "line": 431,
           "text": "$FAIL${NC}",
           "polarity": "fail",
           "normalized_id": "fail.nc",
