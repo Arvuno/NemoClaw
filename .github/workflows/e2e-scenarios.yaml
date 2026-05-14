@@ -148,9 +148,8 @@ jobs:
         run: |
           $script = @"
           set -euo pipefail
-          workdir_parent=\$(dirname '$env:WSL_WORKDIR')
           rm -rf '$env:WSL_WORKDIR'
-          mkdir -p "\$workdir_parent"
+          mkdir -p /tmp/nemoclaw-scenario-wsl
           rsync -a --no-owner --no-group --delete --exclude '/node_modules/' --exclude '/nemoclaw/node_modules/' --exclude '/nemoclaw-blueprint/.venv/' '$env:WSL_CHECKOUT_DIR'/ '$env:WSL_WORKDIR'/
           git config --global --add safe.directory '$env:WSL_WORKDIR'
           git -C '$env:WSL_WORKDIR' reset --hard HEAD
