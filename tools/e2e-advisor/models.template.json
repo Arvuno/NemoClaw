@@ -3,7 +3,7 @@
     "anthropic": {
       "api": "anthropic-messages",
       "baseUrl": "https://inference-api.nvidia.com",
-      "apiKey": "__PI_E2E_ADVISOR_API_KEY__",
+      "apiKey": "__E2E_ADVISOR_API_KEY__",
       "models": [
         {
           "id": "aws/anthropic/claude-opus-4-5",
@@ -37,7 +37,7 @@
     "openai": {
       "api": "openai-completions",
       "baseUrl": "https://inference-api.nvidia.com/v1",
-      "apiKey": "__PI_E2E_ADVISOR_API_KEY__",
+      "apiKey": "__E2E_ADVISOR_API_KEY__",
       "models": [
         {
           "id": "openai/openai/gpt-5.5",
