@@ -1,0 +1,13 @@
+{
+  "skills": [
+    "nemoclaw-maintainer-acceptance-audit"
+  ],
+  "query": "Audit a bug_report issue where the PR is supposed to make the Reproduction Steps no longer fail.",
+  "files": [],
+  "expected_behavior": [
+    "Detects bug_report template and treats each step in the Reproduction Steps section as one clause.",
+    "Implicit acceptance for each step: the PR's tests cover the bad-case -> good-case transition.",
+    "Runs the missing-test injection check from KARPATHY-LENS.md Section 4: write the failing test, confirm it fails on main and passes on the PR branch.",
+    "If no test covers the reproduced step -> Status: MISSING for that step's clause."
+  ]
+}

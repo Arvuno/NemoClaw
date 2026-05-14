@@ -1,0 +1,13 @@
+{
+  "skills": [
+    "nemoclaw-maintainer-acceptance-audit"
+  ],
+  "query": "An issue lists 'for each commonly changed item (model, provider, policy preset, openclaw.json keys, ...)' \u2014 verify the PR covers each item verbatim.",
+  "files": [],
+  "expected_behavior": [
+    "Treats each named item in the list as its own clause; uses the verbatim phrase, not a paraphrase.",
+    "If the PR has rows for 9 of 10 items (paraphrasing 'openclaw.json keys' as 'openclaw' loses it), reports GAPS:1 and lists 'openclaw.json keys' as MISSING.",
+    "Recommends a concrete action: add a row to the relevant table titled 'openclaw.json keys' and re-run the audit.",
+    "Never declares PERFECT_MATCH on a paraphrased near-miss."
+  ]
+}

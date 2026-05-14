@@ -1,0 +1,13 @@
+{
+  "skills": [
+    "nemoclaw-maintainer-acceptance-audit"
+  ],
+  "query": "Does PR #3501 actually close issue #3230 cleanly? Strict audit.",
+  "files": [],
+  "expected_behavior": [
+    "Detects the issue's source template (bug_report / feature_request / doc_issue) from labels and applies template-specific clause extraction rules.",
+    "Extracts every literal phrase from the issue (Expected, Acceptance, Proposed change, Steps to Reproduce + every named item in lists called out by name).",
+    "Maps each clause to evidence using tiered match (Tier 1 substring, Tier 2 all-tokens-within-K=4, Tier 3 fail); marks MET / MISSING / PARTIAL.",
+    "Surplus check: every changed file in the PR must trace to at least one MET clause; flags unjustified surplus."
+  ]
+}
