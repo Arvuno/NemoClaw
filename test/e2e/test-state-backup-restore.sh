@@ -188,14 +188,14 @@ test_backup_restore_lifecycle() {
   log "  Wrote marker content to $files_written/5 workspace files + $memory_written/1 memory directory"
 
   log "  Step 2: Running backup-workspace.sh backup..."
-  local backup_output
-  backup_output=$(bash "$REPO_ROOT/scripts/backup-workspace.sh" backup "$SANDBOX_NAME" 2>&1) || true
+  local backup_output backup_rc=0
+  backup_output=$(bash "$REPO_ROOT/scripts/backup-workspace.sh" backup "$SANDBOX_NAME" 2>&1) || backup_rc=$?
   log "  Backup output: ${backup_output}"
 
-  if echo "$backup_output" | grep -q "Backup saved"; then
+  if [[ $backup_rc -eq 0 ]] && echo "$backup_output" | grep -q "Backup saved"; then
     pass "TC-STATE-01: Backup completed successfully"
   else
-    fail "TC-STATE-01: Backup" "backup-workspace.sh did not report success"
+    fail "TC-STATE-01: Backup" "backup-workspace.sh backup failed (exit=$backup_rc) or did not report success"
     return
   fi
 
@@ -270,14 +270,14 @@ test_backup_restore_lifecycle() {
   pass "TC-STATE-01: Sandbox re-onboarded"
 
   log "  Step 5: Running backup-workspace.sh restore..."
-  local restore_output
-  restore_output=$(bash "$REPO_ROOT/scripts/backup-workspace.sh" restore "$SANDBOX_NAME" 2>&1) || true
+  local restore_output restore_rc=0
+  restore_output=$(bash "$REPO_ROOT/scripts/backup-workspace.sh" restore "$SANDBOX_NAME" 2>&1) || restore_rc=$?
   log "  Restore output: ${restore_output}"
 
-  if echo "$restore_output" | grep -q "Restored"; then
+  if [[ $restore_rc -eq 0 ]] && echo "$restore_output" | grep -q "Restored"; then
     pass "TC-STATE-01: Restore completed successfully"
   else
-    fail "TC-STATE-01: Restore" "backup-workspace.sh restore did not report success"
+    fail "TC-STATE-01: Restore" "backup-workspace.sh restore failed (exit=$restore_rc) or did not report success"
     return
   fi
 
