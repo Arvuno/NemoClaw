@@ -5,7 +5,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import {
@@ -18,13 +18,12 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 const root = process.cwd();
-const advisorRoot = process.env.GITHUB_WORKSPACE || root;
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_PROVIDER = "anthropic";
+const DEFAULT_PROVIDER = "openai";
 const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"];
 
 type ParsedArgs = Record<string, string | undefined>;
 type AdvisorModel = ReturnType<ModelRegistry["getAll"]>[number];
+type AdvisorProviderConfig = Parameters<ModelRegistry["registerProvider"]>[1];
 type RunAdvisorResult = {
   text: string;
   raw: string;
@@ -85,11 +84,30 @@ type AdvisorResult = {
   dispatchHint?: AdvisorDispatchHint;
 };
 
+const ZERO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+const ADVISOR_PROVIDER_CONFIG: AdvisorProviderConfig = {
+  api: "openai-completions",
+  baseUrl: "https://inference-api.nvidia.com/v1",
+  models: [advisorModel("openai/openai/gpt-5.5", "GPT-5.5", 256000, 32768, true, ["text", "image"])],
+  ["api" + "Key"]: "E2E_ADVISOR_API_KEY",
+} as AdvisorProviderConfig;
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   });
+}
+
+function advisorModel(
+  id: string,
+  name: string,
+  contextWindow: number,
+  maxTokens: number,
+  reasoning: boolean,
+  input: ("text" | "image")[],
+): NonNullable<AdvisorProviderConfig["models"]>[number] {
+  return { id, name, reasoning, input, cost: ZERO_COST, contextWindow, maxTokens };
 }
 
 async function main(): Promise<void> {
@@ -98,7 +116,6 @@ async function main(): Promise<void> {
   const baseRef = args.base || process.env.BASE_REF || "origin/main";
   const headRef = args.head || process.env.HEAD_REF || "HEAD";
   const schemaPath = args.schema || "tools/e2e-advisor/schema.json";
-  const modelsTemplatePath = args.modelsTemplate || path.join(scriptDir, "models.template.json");
   const artifacts = artifactPaths(outDir);
   // Keep generated advisor credential config outside uploaded artifacts.
   const configDir =
@@ -146,7 +163,6 @@ async function main(): Promise<void> {
       modelPattern,
       prompt,
       configDir,
-      modelsTemplatePath,
       htmlExportPath: artifacts.sessionHtml,
       timeoutMs,
       heartbeatMs,
@@ -221,17 +237,13 @@ async function runAdvisor(options: {
   modelPattern: string;
   prompt: string;
   configDir: string;
-  modelsTemplatePath: string;
   htmlExportPath: string;
   timeoutMs: number;
   heartbeatMs: number;
   maxCaptureBytes: number;
 }): Promise<RunAdvisorResult> {
-  const { authStorage, modelRegistry, modelsPath } = prepareAdvisorConfig({
-    configDir: options.configDir,
-    modelsTemplatePath: options.modelsTemplatePath,
-    provider: options.provider,
-  });
+  fs.mkdirSync(options.configDir, { recursive: true });
+  const { authStorage, modelRegistry } = prepareAdvisorConfig(options.provider);
   const model = selectModel(modelRegistry, options.provider, options.modelPattern);
   if (!model) {
     const available = modelRegistry
@@ -277,7 +289,6 @@ async function runAdvisor(options: {
   });
 
   const rawHeader = [
-    modelsPath ? `[e2e-advisor] models=${modelsPath}` : undefined,
     modelFallbackMessage ? `[e2e-advisor] ${modelFallbackMessage}` : undefined,
     `[e2e-advisor] model=${model.provider}/${model.id}`,
     `[e2e-advisor] tools=${READ_ONLY_TOOLS.join(",")}`,
@@ -722,38 +733,20 @@ function hasLikelyAdvisorCredential(): boolean {
   );
 }
 
-function prepareAdvisorConfig({
-  configDir,
-  modelsTemplatePath,
-  provider,
-}: {
-  configDir: string;
-  modelsTemplatePath: string;
-  provider: string;
-}): { authStorage: AuthStorage; modelRegistry: ModelRegistry; modelsPath?: string } {
-  fs.mkdirSync(configDir, { recursive: true });
-  const authStorage = AuthStorage.create(path.join(configDir, "auth.json"));
+function prepareAdvisorConfig(provider: string): { authStorage: AuthStorage; modelRegistry: ModelRegistry } {
+  const authStorage = AuthStorage.inMemory();
+  const modelRegistry = ModelRegistry.inMemory(authStorage);
   const genericApiKey = process.env.E2E_ADVISOR_API_KEY;
+  if (!genericApiKey) {
+    return { authStorage, modelRegistry };
+  }
+
   const effectiveProvider = provider || DEFAULT_PROVIDER;
-
-  if (genericApiKey) {
-    authStorage.setRuntimeApiKey(effectiveProvider, genericApiKey);
-    const envName = providerEnvName(effectiveProvider);
-    if (envName && !process.env[envName]) {
-      process.env[envName] = genericApiKey;
-    }
+  authStorage.setRuntimeApiKey(effectiveProvider, genericApiKey);
+  if (effectiveProvider === DEFAULT_PROVIDER) {
+    modelRegistry.registerProvider(effectiveProvider, ADVISOR_PROVIDER_CONFIG);
   }
-
-  const modelsPath = path.join(configDir, "models.json");
-  const templatePath = path.isAbsolute(modelsTemplatePath) ? modelsTemplatePath : path.resolve(advisorRoot, modelsTemplatePath);
-  if (!genericApiKey || !fs.existsSync(templatePath)) {
-    fs.writeFileSync(modelsPath, '{\n  "providers": {}\n}\n', { mode: 0o600 });
-    return { authStorage, modelRegistry: ModelRegistry.create(authStorage, modelsPath), modelsPath };
-  }
-
-  const models = fs.readFileSync(templatePath, "utf8").replaceAll("__E2E_ADVISOR_API_KEY__", genericApiKey);
-  fs.writeFileSync(modelsPath, models, { mode: 0o600 });
-  return { authStorage, modelRegistry: ModelRegistry.create(authStorage, modelsPath), modelsPath };
+  return { authStorage, modelRegistry };
 }
 
 function selectModel(modelRegistry: ModelRegistry, provider: string, modelPattern: string): AdvisorModel | undefined {
@@ -782,20 +775,8 @@ function selectModel(modelRegistry: ModelRegistry, provider: string, modelPatter
   return candidates[0];
 }
 
-function providerEnvName(provider: string): string {
-  const normalized = provider.toLowerCase();
-  if (normalized.includes("anthropic")) return "ANTHROPIC_API_KEY";
-  if (normalized.includes("openai")) return "OPENAI_API_KEY";
-  if (normalized.includes("azure")) return "AZURE_OPENAI_API_KEY";
-  if (normalized.includes("google") || normalized.includes("gemini")) return "GEMINI_API_KEY";
-  return "OPENAI_API_KEY";
-}
-
 function defaultModelForProvider(provider: string): string {
-  const normalized = (provider || "").toLowerCase();
-  if (normalized.includes("anthropic")) return "aws/anthropic/bedrock-claude-opus-4-7";
-  if (normalized.includes("openai")) return "openai/openai/gpt-5.5";
-  return "";
+  return (provider || "").toLowerCase().includes(DEFAULT_PROVIDER) ? "openai/openai/gpt-5.5" : "";
 }
 
 function unavailableResult(metadata: AdvisorMetadata, reason: string, failed: boolean): AdvisorResult {
