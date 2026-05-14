@@ -51,7 +51,8 @@ fail() {
   ((TOTAL += 1))
   echo -e "${RED}  FAIL${NC} $1 — $2" | tee -a "$LOG_FILE"
 }
-# Record a skipped test.
+# Record a skipped test. (Kept for symmetry with pass/fail; unused after SKIP→FAIL conversion.)
+# shellcheck disable=SC2329
 skip() {
   ((SKIP += 1))
   ((TOTAL += 1))
@@ -241,33 +242,30 @@ test_backup_restore_lifecycle() {
   fi
 
   log "  Step 6: Verifying workspace files restored..."
-  local verified=0
+  local files_restored=0
   for f in SOUL.md USER.md IDENTITY.md AGENTS.md MEMORY.md; do
-    local content
-    content=$(sandbox_exec "cat ${workspace_path}/${f} 2>/dev/null") || true
-    if echo "$content" | grep -q "${marker_content}_${f}"; then
-      verified=$((verified + 1))
+    local restored_content
+    restored_content=$(sandbox_exec "cat ${workspace_path}/${f} 2>/dev/null") || true
+    if echo "$restored_content" | grep -q "${marker_content}_${f}"; then
+      files_restored=$((files_restored + 1))
     else
-      log "  WARNING: ${f} content mismatch: ${content:0:100}"
+      log "  WARNING: ${f} content mismatch: ${restored_content:0:100}"
     fi
   done
 
-  if [[ $verified -eq 5 ]]; then
-    pass "TC-STATE-01: ${verified}/5 workspace files verified with correct content"
-  elif [[ $verified -ge 4 ]]; then
-    log "  WARNING: Only ${verified}/5 files verified — check logs above for mismatched file"
-    pass "TC-STATE-01: ${verified}/5 workspace files verified (partial tolerance applied)"
+  if [[ $files_restored -eq 5 ]]; then
+    pass "TC-STATE-01: FilesRestore — ${files_restored}/5 workspace files restored correctly"
   else
-    fail "TC-STATE-01: Verify" "Only ${verified}/5 workspace files matched expected content"
+    fail "TC-STATE-01: FilesRestore" "Only ${files_restored}/5 workspace files restored correctly (expected 5/5 — backup-workspace.sh contract is FILES=(SOUL,USER,IDENTITY,AGENTS,MEMORY); partial restore is a real bug, not tolerance)"
   fi
 
-  local memory_content
-  memory_content=$(sandbox_exec "cat ${workspace_path}/memory/2026-04-20.md 2>/dev/null") || true
-  if echo "$memory_content" | grep -q "${marker_content}_daily"; then
-    pass "TC-STATE-01: Memory note restored correctly"
+  local restored_memory_content
+  restored_memory_content=$(sandbox_exec "cat ${workspace_path}/memory/2026-04-20.md 2>/dev/null") || true
+  if echo "$restored_memory_content" | grep -q "${marker_content}_daily"; then
+    pass "TC-STATE-01: MemoryDirRestore — memory directory contents restored correctly"
   else
-    log "  Memory note content: ${memory_content:0:100}"
-    skip "TC-STATE-01: Memory note" "Memory directory restore may not be supported"
+    log "  Memory note content: ${restored_memory_content:0:100}"
+    fail "TC-STATE-01: MemoryDirRestore" "Memory directory not restored — backup-workspace.sh declares DIRS=(memory) so this is a real regression in the directory backup/restore chain, NOT an unsupported feature."
   fi
 }
 
