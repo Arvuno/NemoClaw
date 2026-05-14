@@ -26,6 +26,7 @@ nemoclaw_ensure_local_bin_on_path() {
   if [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
     export PATH="$HOME/.local/bin:$PATH"
   fi
+  return 0
 }
 
 # Source ~/.bashrc (best-effort) and then ensure ~/.local/bin is on PATH.
@@ -38,4 +39,5 @@ nemoclaw_refresh_install_env() {
     source "$HOME/.bashrc" 2>/dev/null || true
   fi
   nemoclaw_ensure_local_bin_on_path
+  return 0
 }
