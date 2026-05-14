@@ -1,0 +1,13 @@
+{
+  "skills": [
+    "nemoclaw-maintainer-weekly-digest"
+  ],
+  "query": "Generate this week's Friday wrap-up digest for my team.",
+  "files": [],
+  "expected_behavior": [
+    "Resolves the time window (default --since 7d).",
+    "Fetches merged PRs, awaiting-my-review PRs, blocked-on-others PRs, and hot new issues in parallel.",
+    "Groups merged PRs by conventional-commit type; flags security-relevant PRs separately.",
+    "Outputs a paste-ready Markdown block with sections Shipped / In flight / Watching / Asks / Next week; never auto-posts."
+  ]
+}

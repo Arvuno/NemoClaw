@@ -1,0 +1,13 @@
+{
+  "skills": [
+    "nemoclaw-maintainer-weekly-digest"
+  ],
+  "query": "Generate the digest for management.",
+  "files": [],
+  "expected_behavior": [
+    "With --for-audience mgmt: rewrites the Shipped section to lead with impact statements ('3 security-relevant fixes shipped'), not PR titles.",
+    "Promotes the Asks section to the top \u2014 management updates get max value when asks are surfaced first.",
+    "Includes a one-paragraph context summary at the top suitable for a non-engineer reader.",
+    "Filename / output remains paste-ready Markdown; never auto-emails."
+  ]
+}

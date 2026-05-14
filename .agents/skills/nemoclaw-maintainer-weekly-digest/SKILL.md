@@ -162,6 +162,39 @@ Two outputs, kept separate:
 
 Never inline-paraphrase the digest into the conversation flow — keep it copyable as one block.
 
+## Reference cases (sample week — 2026-05-08 to 2026-05-14)
+
+A live run for the maintainer's week produced this digest shape. Counts derived from actual GitHub queries; section content paraphrased.
+
+```text
+# Weekly digest — week of 2026-05-08
+
+## Shipped
+- Features (3): #3499 dashboard bind, #3501 shields docs, #3520 onboard recovery
+- Fixes (7): #3498 ollama proxy probe, ... [6 more]
+- Security-relevant (2): #3498 (auth-proxy surface), #3501 (policy posture)
+- Docs / Chore (12 collapsed)
+
+## In flight
+- Open PRs by me: 4 waiting on review, 1 blocked on CI
+- Top RFRs needing my review: #3284 onboard refactor, #3351 telemetry, #3433 dns-proxy
+- Pipeline status (from quick-wins last run): 2 APPROVE-ready, 1 waiting on tier-3 e2e
+
+## Watching
+- Hot new issues: #3456 (gateway recovery messages, 6 comments in 24h)
+- Stale-PR sweep: 5 in NEEDS_REBASE, 2 in ABANDONED
+- Already-fixed candidates surfaced but not closed: 8
+
+## Asks
+- @NVIDIA/nemoclaw-maintainer admin-merge on #3499
+- @NVIDIA/nemoclaw-security re-review on #3501
+
+## Next week
+- Finish the 11-skill maintainer suite; close out #3526-#3530 when queue drains
+```
+
+Exact counts / issues will differ per week — this shows the shape of a fully-populated digest.
+
 ## Halt conditions
 
 - Sibling skills' sidecars are missing AND `--pipeline-summary on` → proceed without that section, note it as omitted in the digest. Don't halt.

@@ -1,0 +1,16 @@
+{
+  "skills": [
+    "nemoclaw-maintainer-weekly-digest"
+  ],
+  "query": "Generate the digest but include data from my last quick-wins and stale-pr-sweep runs.",
+  "files": [
+    "/tmp/nemoclaw-skill-output-quick-wins-*.json",
+    "/tmp/nemoclaw-skill-output-stale-pr-sweep-*.json"
+  ],
+  "expected_behavior": [
+    "With --pipeline-summary on, looks for sibling-skill JSON sidecars in /tmp matching the maintainer-skill-output-* pattern from the last 7 days.",
+    "If quick-wins sidecar found: counts APPROVE/REQUEST_CHANGES/BLOCK verdicts; surfaces in Pipeline status section.",
+    "If stale-pr-sweep sidecar found: counts READY_TO_MERGE / NEEDS_REBASE / ABANDONED; surfaces in Watching section.",
+    "If sidecars missing: proceeds without that section, notes 'pipeline summary omitted \u2014 no recent sibling-skill output' rather than failing."
+  ]
+}
