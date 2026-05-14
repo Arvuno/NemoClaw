@@ -5521,7 +5521,7 @@ ${webSearchVerifySource}`;
       "utf-8",
     );
 
-    assert.match(source, /useDockerGpuPatch = dockerGpuSandboxCreate\.shouldUseDockerGpuPatchForCreate/);
+    assert.match(source, /resolveDockerGpuSandboxCreatePlan\(effectiveSandboxGpuConfig/);
     assert.match(source, /suppressGpuFlag: useDockerGpuPatch/);
     assert.match(source, /maybeApplyDuringCreate/);
     assert.match(source, /printDockerGpuReadinessFailure/);
