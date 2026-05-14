@@ -20,4 +20,4 @@ if e2e_env_is_dry_run; then
   exit 0
 fi
 name="$(e2e_context_get E2E_SANDBOX_NAME)"
-nemoclaw shell "${name}" -- curl -fsS --max-time 10 "http://inference-local/api/tags" >/dev/null
+openshell sandbox exec --name "${name}" -- curl -fsS --max-time 10 "http://inference-local/api/tags" >/dev/null
