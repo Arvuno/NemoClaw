@@ -20,10 +20,11 @@ navigation:
   - section: "Get Started"
     slug: get-started
     contents:
-      - page: "Prerequisites"
+      - section: "Prerequisites"
         path: get-started/prerequisites.mdx
-      - page: "Windows Preparation"
-        path: get-started/windows-preparation.mdx
+        contents:
+          - page: "Windows Preparation"
+            path: get-started/windows-preparation.mdx
       - page: "Quickstart with OpenClaw"
         path: get-started/quickstart.mdx
       - page: "Quickstart with Hermes"
@@ -106,3 +107,7 @@ navigation:
         path: resources/agent-skills.mdx
       - page: "License"
         path: resources/license.mdx
+      - link: "Report Vulnerabilities"
+        href: https://github.com/NVIDIA/NemoClaw/blob/main/SECURITY.md
+      - link: "Discord"
+        href: https://discord.gg/XFpfPv9Uvx
