@@ -376,6 +376,7 @@ describe("local inference helpers", () => {
     expect(result?.ok).toBe(true);
     const proxy = result?.subprobes?.[0];
     expect(proxy?.ok).toBe(false);
+    expect(proxy?.failureLabel).toBe("unauthorized");
     expect(proxy?.detail).toContain("401");
     expect(proxy?.detail).toContain("nemoclaw onboard");
   });
@@ -409,6 +410,7 @@ describe("local inference helpers", () => {
     expect(result?.ok).toBe(true);
     const proxy = result?.subprobes?.[0];
     expect(proxy?.ok).toBe(false);
+    expect(proxy?.failureLabel).toBe("unreachable");
     expect(proxy?.detail).toContain("unreachable");
     expect(proxy?.detail).toContain("11435");
   });

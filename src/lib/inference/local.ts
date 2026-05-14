@@ -109,6 +109,12 @@ export interface LocalProviderHealthStatus {
   endpoint: string;
   detail: string;
   /**
+   * Specific failure mode, rendered as the status word (e.g. `unauthorized`,
+   * `unreachable`). Absent on `ok:true`; defaults to `unreachable` at the
+   * render layer if absent on `ok:false`. (#3265)
+   */
+  failureLabel?: "unreachable" | "unhealthy" | "unauthorized";
+  /**
    * Short qualifier (e.g. "auth proxy") rendered as `Inference (<probeLabel>):`
    * for additional hops so multi-hop health surfaces in the status output.
    * Absent for the main backend probe. (#3265)
@@ -298,6 +304,7 @@ export function probeOllamaAuthProxyHealth(
     return {
       ...base,
       ok: false,
+      failureLabel: "unauthorized",
       detail:
         `Ollama auth proxy returned 401 on ${endpoint} — the persisted token is no longer ` +
         `accepted. Re-run \`nemoclaw onboard\` (Ollama path) to rotate the proxy token.`,
@@ -307,6 +314,7 @@ export function probeOllamaAuthProxyHealth(
     return {
       ...base,
       ok: false,
+      failureLabel: "unreachable",
       detail:
         `Ollama auth proxy is unreachable on ${endpoint}. The proxy process may have stopped; ` +
         `re-run \`nemoclaw <sandbox> connect\` to restart it. (${result.message})`,
@@ -315,6 +323,7 @@ export function probeOllamaAuthProxyHealth(
   return {
     ...base,
     ok: false,
+    failureLabel: "unhealthy",
     detail:
       `Ollama auth proxy returned HTTP ${result.httpStatus} on ${endpoint}. (${result.message})`,
   };

@@ -26,7 +26,7 @@ export interface ProviderHealthStatus {
   providerLabel: string;
   endpoint: string;
   detail: string;
-  failureLabel?: "unreachable" | "unhealthy";
+  failureLabel?: "unreachable" | "unhealthy" | "unauthorized";
   /**
    * Short qualifier rendered as `Inference (<probeLabel>):` so multi-hop
    * health (e.g. ollama backend vs. auth proxy) surfaces in the status
@@ -342,6 +342,7 @@ function localToProviderHealth(
     providerLabel: local.providerLabel,
     endpoint: local.endpoint,
     detail: local.detail,
+    ...(local.failureLabel ? { failureLabel: local.failureLabel } : {}),
     ...(local.probeLabel ? { probeLabel: local.probeLabel } : {}),
     ...(subprobes.length > 0 ? { subprobes } : {}),
   };
