@@ -180,6 +180,12 @@ ONBOARDING_ID="$(read_plan_string dimensions.onboarding.id)"
 # configured install (e.g. repo-current); e2e_install internally traces
 # the resolved method.
 e2e_env_trace "install:${INSTALL_ID}"
+
+if [[ "$(read_plan_string dimensions.platform.profile.os)" == "wsl" ]] && [[ -z "${WSL_DISTRO_NAME:-}" ]]; then
+  echo "run-scenario: unsupported live scenario gate: wsl-repo-cloud-openclaw requires execution inside WSL2 with Docker reachable from WSL; this GitHub-hosted Windows runner executes bash outside WSL"
+  exit 0
+fi
+
 e2e_install "${INSTALL_METHOD}"
 
 # Negative preflight scenarios intentionally model a missing container daemon.
