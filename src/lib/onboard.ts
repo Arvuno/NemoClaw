@@ -5633,10 +5633,17 @@ async function createSandbox(
       ...reusableMessagingChannels,
     ]),
   ];
+  const useDockerGpuPatch = dockerGpuSandboxCreate.shouldUseDockerGpuPatchForCreate(
+    effectiveSandboxGpuConfig,
+    { dockerDriverGateway: isLinuxDockerDriverGatewayEnabled(), log: console.log },
+  );
   const initialSandboxPolicy = prepareInitialSandboxCreatePolicy(
     basePolicyPath,
     activeMessagingChannels,
-    { directGpu: effectiveSandboxGpuConfig.sandboxGpuEnabled },
+    {
+      directGpu: effectiveSandboxGpuConfig.sandboxGpuEnabled,
+      dockerGpuPatch: useDockerGpuPatch,
+    },
   );
   if (initialSandboxPolicy.cleanup) {
     process.on("exit", initialSandboxPolicy.cleanup);
@@ -5647,12 +5654,12 @@ async function createSandbox(
     );
   }
   if (effectiveSandboxGpuConfig.sandboxGpuEnabled) {
-    console.log("  Direct sandbox GPU enabled; allowing only /proc task comm writes.");
+    console.log(
+      useDockerGpuPatch
+        ? "  Direct sandbox GPU enabled; allowing /proc writes required by Docker GPU initialization."
+        : "  Direct sandbox GPU enabled; allowing OpenShell GPU policy enrichment.",
+    );
   }
-  const useDockerGpuPatch = dockerGpuSandboxCreate.shouldUseDockerGpuPatchForCreate(
-    effectiveSandboxGpuConfig,
-    { dockerDriverGateway: isLinuxDockerDriverGatewayEnabled(), log: console.log },
-  );
   const createArgs = [
     "--from",
     `${buildCtx}/Dockerfile`,
