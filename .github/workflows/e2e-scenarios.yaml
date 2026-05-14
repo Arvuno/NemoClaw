@@ -133,11 +133,6 @@ jobs:
           printf '%s\n' 'Acquire::ForceIPv4 "true";' 'Acquire::Retries "5";' >/etc/apt/apt.conf.d/99github-actions-network
           apt-get update
           apt-get install -y bash ca-certificates curl git jq lsb-release make python3 python3-pip rsync tar unzip xz-utils
-          if ! docker info >/dev/null 2>&1; then
-            apt-get install -y docker.io
-            service docker start || /etc/init.d/docker start || true
-            timeout 30 bash -c 'until docker info >/dev/null 2>&1; do sleep 2; done'
-          fi
           curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
           apt-get install -y nodejs
           node --version
