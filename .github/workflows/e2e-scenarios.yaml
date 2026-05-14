@@ -63,6 +63,7 @@ jobs:
     timeout-minutes: 90
     env:
       WSL_DISTRO: Ubuntu
+      NEMOCLAW_RECREATE_SANDBOX: "1"
     steps:
       - name: Force LF line endings for WSL checkout
         if: startsWith(github.event.inputs.scenario, 'wsl-')
@@ -188,6 +189,7 @@ jobs:
           cd '$env:WSL_WORKDIR'
           export NVIDIA_API_KEY='$env:NVIDIA_API_KEY'
           export E2E_SUITE_FILTER='$env:E2E_SUITE_FILTER'
+          export NEMOCLAW_RECREATE_SANDBOX='$env:NEMOCLAW_RECREATE_SANDBOX'
           bash test/e2e/runtime/run-scenario.sh '${{ github.event.inputs.scenario }}'
           "@
           $tmp = "$env:RUNNER_TEMP\wsl-step.sh"
