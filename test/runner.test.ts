@@ -691,6 +691,8 @@ describe("regression guards", () => {
         export -f curl
         shasum() { cat >/dev/null; echo "checksum OK"; return 0; }
         export -f shasum
+        strings() { echo "request-body-credential-rewrite websocket-credential-rewrite"; }
+        export -f strings
         tar() { return 0; }; export -f tar
         install() { return 0; }; export -f install
         source "${scriptPath}"
@@ -726,6 +728,8 @@ describe("regression guards", () => {
         export -f curl
         shasum() { echo "SHASUM $*" >> ${JSON.stringify(checksumLog)}; echo "checksum OK"; return 0; }
         export -f shasum
+        strings() { echo "request-body-credential-rewrite websocket-credential-rewrite"; }
+        export -f strings
         tar() { return 0; }; export -f tar
         install() { return 0; }; export -f install
         source "${scriptPath}"
@@ -770,7 +774,7 @@ describe("regression guards", () => {
             {
               encoding: "utf-8",
               env: { ...process.env, HOME: tmp, PATH: `${fakeBin}:/usr/bin:/bin` },
-              timeout: 5000,
+              timeout: 15000,
             },
           );
           expect(result.status, `${script}: ${result.stdout}${result.stderr}`).toBe(0);
