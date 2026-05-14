@@ -259,7 +259,7 @@ function stoppedCloudflaredCheck(): DoctorCheck {
     label: "cloudflared",
     status: "info",
     detail: "stopped",
-    hint: `start when needed with \`${CLI_NAME} tunnel start\``,
+    hint: `no cloudflared process; run \`${CLI_NAME} tunnel start\` to start it`,
   };
 }
 
@@ -269,7 +269,7 @@ function staleCloudflaredPidFileCheck(): DoctorCheck {
     label: "cloudflared",
     status: "warn",
     detail: "stale PID file",
-    hint: `run \`${CLI_NAME} tunnel stop\` and start it again if you need a public tunnel`,
+    hint: `no cloudflared process (stored PID is invalid); run \`${CLI_NAME} tunnel start\` to restart it`,
   };
 }
 
@@ -279,7 +279,7 @@ function staleCloudflaredPidCheck(pid: number): DoctorCheck {
     label: "cloudflared",
     status: "warn",
     detail: `stale PID ${pid}`,
-    hint: `run \`${CLI_NAME} tunnel stop\` to clean up the service state`,
+    hint: `no cloudflared process (PID ${pid} is dead or not cloudflared); run \`${CLI_NAME} tunnel start\` to restart it`,
   };
 }
 

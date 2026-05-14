@@ -297,17 +297,19 @@ export function showStatus(opts: ServiceOptions = {}): void {
       break;
     case "stopped":
       console.log(`  ${RED}●${NC} cloudflared  (stopped)`);
-      console.log(`      start when needed with \`${CLI_NAME} tunnel start\``);
+      console.log(`      no cloudflared process; run \`${CLI_NAME} tunnel start\` to start it`);
       break;
     case "stale-pid-file":
       console.log(`  ${YELLOW}●${NC} cloudflared  (stale PID file)`);
       console.log(
-        `      run \`${CLI_NAME} tunnel stop\` and start it again if you need a public tunnel`,
+        `      no cloudflared process (stored PID is invalid); run \`${CLI_NAME} tunnel start\` to restart it`,
       );
       break;
     case "stale-pid-process":
       console.log(`  ${YELLOW}●${NC} cloudflared  (stale PID ${String(state.pid)})`);
-      console.log(`      run \`${CLI_NAME} tunnel stop\` to clean up the service state`);
+      console.log(
+        `      no cloudflared process (PID ${String(state.pid)} is dead or not cloudflared); run \`${CLI_NAME} tunnel start\` to restart it`,
+      );
       break;
   }
   console.log("");

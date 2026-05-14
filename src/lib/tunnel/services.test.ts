@@ -130,35 +130,41 @@ describe("showStatus", () => {
     logSpy.mockRestore();
   });
 
-  // #2604: stopped/stale modes must each emit a recovery hint. The old
-  // showStatus printed bare "(stopped)" in all three failure modes with no
-  // context, which is the user-facing symptom of the bug.
+  // #2604: wangericnv and Carlos (issue comments 2026-05-11, 2026-05-14) both
+  // asked for a "no cloudflared process; restart with ..." shape — a cause
+  // phrase plus a single-command recovery. All three failure modes surface
+  // "no cloudflared process" and point at `nemoclaw tunnel start`, which
+  // overwrites a stale PID file when isRunning() is false (see startService).
   it("prints `tunnel start` remediation when the PID file is missing (stopped)", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     showStatus({ pidDir });
     const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
     expect(output).toContain("(stopped)");
+    expect(output).toContain("no cloudflared process");
     expect(output).toContain("nemoclaw tunnel start");
     logSpy.mockRestore();
   });
 
-  it("prints `tunnel stop` remediation when the PID file holds garbage (stale-pid-file)", () => {
+  it("prints `tunnel start` remediation when the PID file holds garbage (stale-pid-file)", () => {
     writeFileSync(join(pidDir, "cloudflared.pid"), "not-a-number");
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     showStatus({ pidDir });
     const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
     expect(output).toContain("(stale PID file)");
-    expect(output).toContain("nemoclaw tunnel stop");
+    expect(output).toContain("no cloudflared process");
+    expect(output).toContain("nemoclaw tunnel start");
     logSpy.mockRestore();
   });
 
-  it("prints `tunnel stop` remediation when the PID points at a dead process (stale-pid-process)", () => {
+  it("prints `tunnel start` remediation when the PID points at a dead process (stale-pid-process)", () => {
     writeFileSync(join(pidDir, "cloudflared.pid"), "999999999");
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     showStatus({ pidDir });
     const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
     expect(output).toContain("(stale PID 999999999)");
-    expect(output).toContain("nemoclaw tunnel stop");
+    expect(output).toContain("no cloudflared process");
+    expect(output).toContain("PID 999999999 is dead or not cloudflared");
+    expect(output).toContain("nemoclaw tunnel start");
     logSpy.mockRestore();
   });
 });
