@@ -137,8 +137,6 @@ jobs:
           apt-get install -y nodejs
           node --version
           npm --version
-          docker --version
-          docker info >/dev/null
           '@
           $tmp = "$env:RUNNER_TEMP\wsl-step.sh"
           [IO.File]::WriteAllText($tmp, ($script -replace "`r",""), (New-Object System.Text.UTF8Encoding $false))
