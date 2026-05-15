@@ -4,7 +4,7 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
-import { ROOT } from "./runner";
+import { ROOT, redact } from "./runner";
 import {
   dockerBuild,
   dockerCapture,
@@ -36,6 +36,27 @@ export type SandboxBaseImageResolution = {
   source: "override" | "source-sha" | "latest" | "local";
   glibcVersion: string | null;
 };
+
+/**
+ * Combine stderr + stdout from a captured `dockerBuild` failure and pass them
+ * through the runner's redaction so secrets in build output never reach the
+ * terminal. BuildKit splits diagnostics across both streams depending on the
+ * backend and progress mode, so taking only stderr can hide the actual reason
+ * a build failed.
+ */
+export function formatBuildFailureDiagnostics(
+  buildResult: { stderr?: unknown; stdout?: unknown },
+): string {
+  const streams = [buildResult.stderr, buildResult.stdout]
+    .map((stream) => {
+      if (stream == null) return "";
+      if (Buffer.isBuffer(stream)) return stream.toString("utf8");
+      return String(stream);
+    })
+    .map((text) => text.trim())
+    .filter((text) => text.length > 0);
+  return streams.length > 0 ? redact(streams.join("\n")) : "";
+}
 
 export function parseGlibcVersion(output: string | null | undefined): string | null {
   const text = String(output || "");
@@ -204,8 +225,8 @@ function resolveLocalCandidate(
     suppressOutput: true,
   });
   if (buildResult.error || buildResult.status !== 0) {
-    const stderrText = String(buildResult.stderr ?? "").trim();
-    if (stderrText) console.error(stderrText);
+    const diagnostics = formatBuildFailureDiagnostics(buildResult);
+    if (diagnostics) console.error(diagnostics);
     const detail = buildResult.error
       ? `: ${buildResult.error.message}`
       : ` (exit ${buildResult.status ?? "unknown"})`;
