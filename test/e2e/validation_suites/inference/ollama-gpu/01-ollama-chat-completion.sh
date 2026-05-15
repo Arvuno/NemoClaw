@@ -20,7 +20,9 @@ if e2e_env_is_dry_run; then
   exit 0
 fi
 name="$(e2e_context_get E2E_SANDBOX_NAME)"
-payload='{"model":"default","messages":[{"role":"user","content":"say ok"}],"max_tokens":8}'
+model="$(curl -fsS --max-time 10 http://127.0.0.1:11434/api/tags \
+  | node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); process.stdout.write(data.models?.[0]?.name || data.models?.[0]?.model || 'default');")"
+payload="$(node -e "process.stdout.write(JSON.stringify({model: process.argv[1], messages: [{role: 'user', content: 'say ok'}], max_tokens: 8}))" "${model}")"
 container_id="$(docker ps --quiet \
   --filter "label=openshell.ai/managed-by=openshell" \
   --filter "label=openshell.ai/sandbox-name=${name}" \
