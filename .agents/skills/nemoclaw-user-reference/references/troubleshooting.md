@@ -1,9 +1,5 @@
 <!-- SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved. -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-# NemoClaw Troubleshooting Guide
-
-{/* markdownlint-disable MD014 */}
-
 # Troubleshooting
 
 This page covers common issues you may encounter when installing, onboarding, or running NemoClaw, along with their resolution steps.
@@ -962,6 +958,7 @@ $ nemoclaw <name> logs
 Use `--follow` to stream logs in real time while debugging.
 
 <a id="dgx-spark"></a>
+
 ## DGX Spark
 
 For an end-to-end Ollama walkthrough on DGX Spark, refer to the [NVIDIA Spark playbook](https://build.nvidia.com/spark/nemoclaw).
@@ -1035,6 +1032,7 @@ NVIDIA AI Workbench's Traefik proxy binds ports 3000 and 10000.
 If you run other services on Spark that expect port 3000, bind them to a different port.
 
 <a id="windows-wsl-2"></a>
+
 ## Windows Subsystem for Linux
 
 For environment setup steps, see Windows Prerequisites (use the `nemoclaw-user-get-started` skill).

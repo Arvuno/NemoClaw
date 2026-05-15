@@ -140,7 +140,12 @@ def normalize_heading_levels(text: str) -> str:
             old_prefix = m.group(1)
             lines[idx] = "#" * new_level + lines[idx][len(old_prefix) :]
 
-    return "\n".join(lines)
+    return space_anchor_headings("\n".join(lines))
+
+
+def space_anchor_headings(text: str) -> str:
+    """Keep standalone HTML anchors from tripping heading spacing lint."""
+    return re.sub(r'(?m)^(<a\s+id="[^"]+"></a>)\n(#{1,6}\s)', r"\1\n\n\2", text)
 
 
 # ---------------------------------------------------------------------------
@@ -278,6 +283,40 @@ def _title_from_body(body: str, fallback: str) -> str:
     return match.group(1).strip() if match else fallback
 
 
+def strip_commented_out_blocks(text: str) -> str:
+    """Remove hidden Markdown/MDX comments while preserving fenced examples."""
+    chunks: list[tuple[bool, str]] = []
+    current: list[str] = []
+    in_fence = False
+
+    for line in text.splitlines(keepends=True):
+        if line.lstrip().startswith("```"):
+            if not in_fence:
+                if current:
+                    chunks.append((False, "".join(current)))
+                    current = []
+                in_fence = True
+            current.append(line)
+            if in_fence and len(current) > 1:
+                chunks.append((True, "".join(current)))
+                current = []
+                in_fence = False
+            continue
+        current.append(line)
+
+    if current:
+        chunks.append((in_fence, "".join(current)))
+
+    def _strip(chunk: str) -> str:
+        chunk = re.sub(r"<!--.*?-->", "", chunk, flags=re.DOTALL)
+        chunk = re.sub(r"\{/\*.*?\*/\}", "", chunk, flags=re.DOTALL)
+        chunk = re.sub(r"<!--.*\Z", "", chunk, flags=re.DOTALL)
+        chunk = re.sub(r"\{/\*.*\Z", "", chunk, flags=re.DOTALL)
+        return chunk
+
+    return "".join(chunk if is_fence else _strip(chunk) for is_fence, chunk in chunks)
+
+
 def _populate_myst_markdown_fields(page: DocPage, fm: dict, body: str) -> None:
     """Populate DocPage fields from legacy MyST Markdown frontmatter."""
     title_block = fm.get("title", {})
@@ -355,6 +394,7 @@ def parse_doc(path: Path, doc_platform: str = "myst-md") -> DocPage:
     """Parse a documentation file into a DocPage."""
     raw = path.read_text(encoding="utf-8")
     fm, body = parse_yaml_frontmatter(raw)
+    body = strip_commented_out_blocks(body)
 
     page = DocPage(path=path, raw=raw, frontmatter=fm, body=body)
 
@@ -434,6 +474,8 @@ def _format_admonition(title: str, body: str) -> str:
 
 def clean_myst_directives(text: str) -> str:
     """Convert MyST/Sphinx directives to standard markdown equivalents."""
+    text = strip_commented_out_blocks(text)
+
     # Multi-line {include} directives with :start-after: etc.
     text = re.sub(
         r"```\{include\}\s*([^\n]+)\n(?::[^\n]+\n)*```",
@@ -490,10 +532,6 @@ def clean_myst_directives(text: str) -> str:
         flags=re.DOTALL,
     )
 
-    # Remove SPDX and markdownlint comment blocks
-    text = re.sub(r"<!--\s*SPDX-.*?-->", "", text, flags=re.DOTALL)
-    text = re.sub(r"<!--\s*markdownlint-.*?-->", "", text, flags=re.DOTALL)
-
     # Strip "Contents" TOC sections (navigation artifacts, not content)
     text = re.sub(
         r"^#{2,3}\s+Contents\s*\n+(?:- [^\n]+\n?)+\n*",
@@ -524,8 +562,7 @@ def _mdx_title_attr(attrs: str, default: str) -> str:
 
 def clean_fern_mdx(text: str) -> str:
     """Convert Fern MDX components to portable markdown equivalents."""
-    text = re.sub(r"<!--\s*SPDX-.*?-->", "", text, flags=re.DOTALL)
-    text = re.sub(r"<!--\s*markdownlint-.*?-->", "", text, flags=re.DOTALL)
+    text = strip_commented_out_blocks(text)
 
     for component, default_title in (
         ("Warning", "Warning"),
@@ -824,14 +861,15 @@ _FERN_WARNING_BLOCK_RE = re.compile(r"<Warning\b([^>]*)>(.*?)</Warning>", re.DOT
 
 def _warning_blocks(page: DocPage, doc_platform: str) -> list[tuple[str, str]]:
     """Return ``(title, body)`` pairs for warning-like source blocks."""
+    body = strip_commented_out_blocks(page.body)
     if doc_platform == "fern-mdx":
         return [
             (_mdx_title_attr(m.group(1), ""), m.group(2))
-            for m in _FERN_WARNING_BLOCK_RE.finditer(page.body)
+            for m in _FERN_WARNING_BLOCK_RE.finditer(body)
         ]
     return [
         ((m.group(1) or "").strip(), m.group(2))
-        for m in _MYST_WARNING_BLOCK_RE.finditer(page.body)
+        for m in _MYST_WARNING_BLOCK_RE.finditer(body)
     ]
 
 

@@ -44,6 +44,7 @@ All endpoints use TLS termination and are enforced at port 443.
 > Enable the channel during onboarding or apply the matching messaging preset so the sandbox can reach that platform.
 
 <a id="policy-tiers"></a>
+
 ## Policy Tiers
 
 During onboarding, the wizard prompts for a policy tier that determines the default set of presets applied on top of the baseline policy.
