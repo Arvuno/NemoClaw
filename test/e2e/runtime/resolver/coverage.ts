@@ -104,6 +104,34 @@ export function renderCoverageReport(
     "_Generated from `test/e2e/{scenarios,expected-states,suites}.yaml`._",
   );
   lines.push("");
+  lines.push("## Base Scenarios");
+  lines.push("");
+  lines.push("| Base | Platform | Install | Runtime | Requirements |");
+  lines.push("|---|---|---|---|---|");
+  for (const [id, base] of Object.entries(scenarios.base_scenarios ?? {}).sort(([a], [b]) => a.localeCompare(b))) {
+    lines.push(`| ${id} | ${base.platform} | ${base.install} | ${base.runtime} | ${(base.runner_requirements ?? []).join(", ") || "_none_"} |`);
+  }
+  lines.push("");
+  lines.push("## Onboarding Profiles");
+  lines.push("");
+  lines.push("| Profile | Path | Provider | Agent | Route |");
+  lines.push("|---|---|---|---|---|");
+  for (const [id, profile] of Object.entries(scenarios.onboarding_profiles ?? {}).sort(([a], [b]) => a.localeCompare(b))) {
+    lines.push(`| ${id} | ${profile.path ?? ""} | ${profile.provider ?? ""} | ${profile.agent ?? ""} | ${profile.inference_route ?? ""} |`);
+  }
+  lines.push("");
+  lines.push("## Test Plans");
+  lines.push("");
+  lines.push("| Plan | Base | Onboarding | Expected state | Suites |");
+  lines.push("|---|---|---|---|---|");
+  for (const [id, plan] of Object.entries(scenarios.test_plans ?? {}).sort(([a], [b]) => a.localeCompare(b))) {
+    lines.push(`| ${id} | ${plan.base} | ${plan.onboarding} | ${plan.expected_state} | ${plan.suites.join(", ") || "_(none)_"} |`);
+  }
+  lines.push("");
+  lines.push("## Suites");
+  lines.push("");
+  lines.push(`Total suites: ${Object.keys(meta.suites.suites).length}`);
+  lines.push("");
   lines.push("## Scenarios");
   lines.push("");
   const hasStatus = options.lastRunStatus && Object.keys(options.lastRunStatus).length > 0;
