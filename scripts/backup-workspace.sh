@@ -41,6 +41,45 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "'$1' is required but not found in PATH."
 }
 
+shell_quote() {
+  printf "'%s'" "$(printf "%s" "$1" | sed "s/'/'\\\\''/g")"
+}
+
+RESTORE_DIR_COUNT=0
+restore_directory() {
+  local sandbox="$1"
+  local src_dir="$2"
+  local dir_name="$3"
+  local failed=0
+  RESTORE_DIR_COUNT=0
+
+  while IFS= read -r -d '' file; do
+    local rel="${file#"${src_dir}/"}"
+    local rel_parent
+    rel_parent="$(dirname -- "$rel")"
+
+    local remote_parent="${WORKSPACE_PATH}/${dir_name}"
+    if [ "$rel_parent" != "." ]; then
+      remote_parent="${remote_parent}/${rel_parent}"
+    fi
+
+    if ! openshell sandbox exec --name "$sandbox" -- sh -c "mkdir -p $(shell_quote "$remote_parent")"; then
+      warn "Failed to create restore directory ${remote_parent}"
+      failed=1
+      continue
+    fi
+
+    if openshell sandbox upload "$sandbox" "$file" "${remote_parent}/"; then
+      RESTORE_DIR_COUNT=$((RESTORE_DIR_COUNT + 1))
+    else
+      warn "Failed to restore ${dir_name}/${rel}"
+      failed=1
+    fi
+  done < <(find "$src_dir" -type f -print0)
+
+  return "$failed"
+}
+
 do_backup() {
   local sandbox="$1"
   local ts
@@ -80,38 +119,6 @@ do_backup() {
   info "Backup saved to ${dest}/ (${count} items)"
 }
 
-restore_directory() {
-  local sandbox="$1"
-  local src_dir="$2"
-  local dest_dir="$3"
-
-  openshell sandbox exec --name "$sandbox" -- mkdir -p "$dest_dir" >/dev/null \
-    || return 1
-
-  local restored=0
-  local rel src_file target_dir
-  while IFS= read -r -d '' src_file; do
-    rel="${src_file#"${src_dir}/"}"
-    target_dir="${dest_dir}/$(dirname "$rel")"
-    openshell sandbox exec --name "$sandbox" -- mkdir -p "$target_dir" >/dev/null \
-      || return 1
-    openshell sandbox upload "$sandbox" "$src_file" "$target_dir/" \
-      || return 1
-    restored=1
-  done < <(find "$src_dir" -type f -print0)
-
-  # Preserve empty directories too. Directory uploads are unreliable in some
-  # OpenShell versions, so create the tree explicitly and upload files one by one.
-  while IFS= read -r -d '' src_file; do
-    rel="${src_file#"${src_dir}/"}"
-    openshell sandbox exec --name "$sandbox" -- mkdir -p "${dest_dir}/${rel}" >/dev/null \
-      || return 1
-    restored=1
-  done < <(find "$src_dir" -mindepth 1 -type d -print0)
-
-  return "$((1 - restored))"
-}
-
 do_restore() {
   local sandbox="$1"
   local ts="${2:-}"
@@ -140,10 +147,15 @@ do_restore() {
 
   for d in "${DIRS[@]}"; do
     if [ -d "${src}/${d}" ]; then
-      if restore_directory "$sandbox" "${src}/${d}" "${WORKSPACE_PATH}/${d}"; then
-        count=$((count + 1))
+      if restore_directory "$sandbox" "${src}/${d}" "$d"; then
+        if [ "$RESTORE_DIR_COUNT" -gt 0 ]; then
+          count=$((count + RESTORE_DIR_COUNT))
+        else
+          warn "Skipped empty restore directory ${d}/"
+        fi
       else
-        warn "Failed to restore ${d}/"
+        count=$((count + RESTORE_DIR_COUNT))
+        warn "Failed to restore one or more files from ${d}/"
       fi
     fi
   done

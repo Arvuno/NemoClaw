@@ -12121,7 +12121,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-hermes.sh",
-          "line": 384,
+          "line": 383,
           "text": "No credentials in backup",
           "polarity": "pass",
           "normalized_id": "no.credentials.in.backup",
@@ -12129,7 +12129,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-hermes.sh",
-          "line": 386,
+          "line": 385,
           "text": "Credentials found: $CRED_LEAKS",
           "polarity": "fail",
           "normalized_id": "credentials.found.cred.leaks",
@@ -12137,7 +12137,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-hermes.sh",
-          "line": 389,
+          "line": 388,
           "text": "Backup directory missing: $BACKUP_DIR",
           "polarity": "fail",
           "normalized_id": "backup.directory.missing.backup.dir",
@@ -12398,7 +12398,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-openclaw.sh",
-          "line": 381,
+          "line": 380,
           "text": "No credentials in backup",
           "polarity": "pass",
           "normalized_id": "no.credentials.in.backup",
@@ -12406,7 +12406,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-openclaw.sh",
-          "line": 383,
+          "line": 382,
           "text": "Credentials found: $CRED_LEAKS",
           "polarity": "fail",
           "normalized_id": "credentials.found.cred.leaks",
@@ -12414,7 +12414,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-openclaw.sh",
-          "line": 386,
+          "line": 385,
           "text": "Backup directory missing: $BACKUP_DIR",
           "polarity": "fail",
           "normalized_id": "backup.directory.missing.backup.dir",
@@ -12422,7 +12422,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-openclaw.sh",
-          "line": 403,
+          "line": 402,
           "text": "npm preset survived rebuild (in registry)",
           "polarity": "pass",
           "normalized_id": "npm.preset.survived.rebuild.in.registry",
@@ -12430,7 +12430,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-openclaw.sh",
-          "line": 405,
+          "line": 404,
           "text": "npm preset LOST after rebuild — issue #1952",
           "polarity": "fail",
           "normalized_id": "npm.preset.lost.after.rebuild.issue.1952",
@@ -12438,7 +12438,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-openclaw.sh",
-          "line": 408,
+          "line": 407,
           "text": "pypi preset survived rebuild (in registry)",
           "polarity": "pass",
           "normalized_id": "pypi.preset.survived.rebuild.in.registry",
@@ -12446,7 +12446,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-openclaw.sh",
-          "line": 410,
+          "line": 409,
           "text": "pypi preset LOST after rebuild — issue #1952",
           "polarity": "fail",
           "normalized_id": "pypi.preset.lost.after.rebuild.issue.1952",
@@ -12454,7 +12454,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-openclaw.sh",
-          "line": 416,
+          "line": 415,
           "text": "npm preset active in gateway policy after rebuild",
           "polarity": "pass",
           "normalized_id": "npm.preset.active.in.gateway.policy.after.rebuild",
@@ -12462,7 +12462,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-openclaw.sh",
-          "line": 418,
+          "line": 417,
           "text": "npm preset not in live gateway policy after rebuild — issue #1952",
           "polarity": "fail",
           "normalized_id": "npm.preset.not.in.live.gateway.policy.after.rebuild.issue.1952",
@@ -12470,7 +12470,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-openclaw.sh",
-          "line": 421,
+          "line": 420,
           "text": "pypi preset active in gateway policy after rebuild",
           "polarity": "pass",
           "normalized_id": "pypi.preset.active.in.gateway.policy.after.rebuild",
@@ -12478,7 +12478,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-openclaw.sh",
-          "line": 423,
+          "line": 422,
           "text": "pypi preset not in live gateway policy after rebuild — issue #1952",
           "polarity": "fail",
           "normalized_id": "pypi.preset.not.in.live.gateway.policy.after.rebuild.issue.1952",
@@ -12486,7 +12486,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-openclaw.sh",
-          "line": 442,
+          "line": 441,
           "text": "Backup manifest contains policyPresets: ${MANIFEST_PRESETS}",
           "polarity": "pass",
           "normalized_id": "backup.manifest.contains.policypresets.manifest.presets",
@@ -12494,7 +12494,7 @@
         },
         {
           "script": "test/e2e/test-rebuild-openclaw.sh",
-          "line": 444,
+          "line": 443,
           "text": "Backup manifest missing expected policyPresets (npm,pypi): got '${MANIFEST_PRESETS}' — issue #1952",
           "polarity": "fail",
           "normalized_id": "backup.manifest.missing.expected.policypresets.npm.pypi.got.manifest.presets.issue.1952",
@@ -13221,7 +13221,7 @@
         },
         {
           "script": "test/e2e/test-sandbox-rebuild.sh",
-          "line": 185,
+          "line": 184,
           "text": "No credentials found in backup directory",
           "polarity": "pass",
           "normalized_id": "no.credentials.found.in.backup.directory",
@@ -13229,7 +13229,7 @@
         },
         {
           "script": "test/e2e/test-sandbox-rebuild.sh",
-          "line": 187,
+          "line": 186,
           "text": "Credentials found in backup files: $CRED_LEAKS",
           "polarity": "fail",
           "normalized_id": "credentials.found.in.backup.files.cred.leaks",
@@ -14905,7 +14905,7 @@
         },
         {
           "script": "test/e2e/test-snapshot-commands.sh",
-          "line": 254,
+          "line": 260,
           "text": "No credentials in snapshot directories",
           "polarity": "pass",
           "normalized_id": "no.credentials.in.snapshot.directories",
@@ -14913,7 +14913,7 @@
         },
         {
           "script": "test/e2e/test-snapshot-commands.sh",
-          "line": 256,
+          "line": 262,
           "text": "Credentials found: $CRED_LEAKS",
           "polarity": "fail",
           "normalized_id": "credentials.found.cred.leaks",
@@ -14921,7 +14921,7 @@
         },
         {
           "script": "test/e2e/test-snapshot-commands.sh",
-          "line": 259,
+          "line": 265,
           "text": "Backup directory missing: $BACKUP_DIR",
           "polarity": "fail",
           "normalized_id": "backup.directory.missing.backup.dir",
@@ -14929,7 +14929,7 @@
         },
         {
           "script": "test/e2e/test-snapshot-commands.sh",
-          "line": 267,
+          "line": 273,
           "text": "snapshot help exited with code $_CAPTURE_RC: ${HELP_OUTPUT}",
           "polarity": "fail",
           "normalized_id": "snapshot.help.exited.with.code.capture.rc.help.output",
@@ -14937,7 +14937,7 @@
         },
         {
           "script": "test/e2e/test-snapshot-commands.sh",
-          "line": 272,
+          "line": 278,
           "text": "snapshot help shows create/list/restore",
           "polarity": "pass",
           "normalized_id": "snapshot.help.shows.create.list.restore",
@@ -14945,7 +14945,7 @@
         },
         {
           "script": "test/e2e/test-snapshot-commands.sh",
-          "line": 274,
+          "line": 280,
           "text": "snapshot help incomplete: ${HELP_OUTPUT}",
           "polarity": "fail",
           "normalized_id": "snapshot.help.incomplete.help.output",
