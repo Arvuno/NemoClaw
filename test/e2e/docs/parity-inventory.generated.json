@@ -14905,7 +14905,7 @@
         },
         {
           "script": "test/e2e/test-snapshot-commands.sh",
-          "line": 253,
+          "line": 260,
           "text": "No credentials in snapshot directories",
           "polarity": "pass",
           "normalized_id": "no.credentials.in.snapshot.directories",
@@ -14913,7 +14913,7 @@
         },
         {
           "script": "test/e2e/test-snapshot-commands.sh",
-          "line": 255,
+          "line": 262,
           "text": "Credentials found: $CRED_LEAKS",
           "polarity": "fail",
           "normalized_id": "credentials.found.cred.leaks",
@@ -14921,7 +14921,7 @@
         },
         {
           "script": "test/e2e/test-snapshot-commands.sh",
-          "line": 258,
+          "line": 265,
           "text": "Backup directory missing: $BACKUP_DIR",
           "polarity": "fail",
           "normalized_id": "backup.directory.missing.backup.dir",
@@ -14929,7 +14929,7 @@
         },
         {
           "script": "test/e2e/test-snapshot-commands.sh",
-          "line": 266,
+          "line": 273,
           "text": "snapshot help exited with code $_CAPTURE_RC: ${HELP_OUTPUT}",
           "polarity": "fail",
           "normalized_id": "snapshot.help.exited.with.code.capture.rc.help.output",
@@ -14937,7 +14937,7 @@
         },
         {
           "script": "test/e2e/test-snapshot-commands.sh",
-          "line": 271,
+          "line": 278,
           "text": "snapshot help shows create/list/restore",
           "polarity": "pass",
           "normalized_id": "snapshot.help.shows.create.list.restore",
@@ -14945,7 +14945,7 @@
         },
         {
           "script": "test/e2e/test-snapshot-commands.sh",
-          "line": 273,
+          "line": 280,
           "text": "snapshot help incomplete: ${HELP_OUTPUT}",
           "polarity": "fail",
           "normalized_id": "snapshot.help.incomplete.help.output",
