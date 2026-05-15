@@ -4,13 +4,25 @@
 import { ROOT } from "../../runner";
 import { dockerCapture, dockerRun, type DockerCaptureOptions, type DockerRunOptions } from "./run";
 
+export type DockerBuildOptions = DockerRunOptions & { quiet?: boolean };
+
 export function dockerBuild(
   dockerfilePath: string,
   tag: string,
   contextDir: string = ROOT,
-  opts: DockerRunOptions = {},
+  opts: DockerBuildOptions = {},
 ) {
-  return dockerRun(["build", "-f", dockerfilePath, "-t", tag, contextDir], opts);
+  const { quiet, ...rest } = opts;
+  const args = [
+    "build",
+    ...(quiet ? ["--quiet"] : []),
+    "-f",
+    dockerfilePath,
+    "-t",
+    tag,
+    contextDir,
+  ];
+  return dockerRun(args, rest);
 }
 
 export function dockerRmi(imageRef: string, opts: DockerRunOptions = {}) {

@@ -48,6 +48,37 @@ describe("docker helpers", () => {
     ]);
   });
 
+  it("adds --quiet to dockerBuild argv and drops the quiet key from options (#3584)", () => {
+    dockerBuild("Dockerfile.base", "sandbox-base:latest", "/repo/root", {
+      quiet: true,
+      ignoreError: true,
+      suppressOutput: true,
+    });
+
+    expect(runMock).toHaveBeenCalledWith(
+      [
+        "docker",
+        "build",
+        "--quiet",
+        "-f",
+        "Dockerfile.base",
+        "-t",
+        "sandbox-base:latest",
+        "/repo/root",
+      ],
+      { ignoreError: true, suppressOutput: true },
+    );
+  });
+
+  it("omits --quiet by default", () => {
+    dockerBuild("Dockerfile", "example:tag", "/tmp/build", { ignoreError: true });
+
+    expect(runMock).toHaveBeenCalledWith(
+      ["docker", "build", "-f", "Dockerfile", "-t", "example:tag", "/tmp/build"],
+      { ignoreError: true },
+    );
+  });
+
   it("prefixes docker argv for info/inspect capture helpers", () => {
     dockerInfoFormat("{{.KernelVersion}}", { ignoreError: true });
     dockerContainerInspectFormat("{{.State.Status}}", "example-container", {

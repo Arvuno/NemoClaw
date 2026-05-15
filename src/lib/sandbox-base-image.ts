@@ -187,20 +187,38 @@ function resolveLocalCandidate(
 
   if (!localBuildAllowed(options.env)) return null;
 
+  const label = options.label || "sandbox base image";
   console.warn(
-    `  Building ${options.label || "sandbox base image"} locally because no compatible ` +
-      `published base image was found.`,
+    `  Building ${label} locally because no compatible published base image was found.`,
   );
-  dockerBuild(options.dockerfilePath, imageRef, options.rootDir || ROOT, {
-    stdio: ["ignore", "inherit", "inherit"],
+  console.warn("  This is a one-time step and can take several minutes.");
+  // Suppress the full BuildKit log (apt-get output, layer hashes, debconf
+  // warnings) on success — same approach as #3311 for the [2/8] gateway
+  // setup leak. `--quiet` collapses normal output to just the image hash;
+  // `suppressOutput` keeps captured stdio out of the user's terminal.
+  // On failure, surface the captured stderr so the user still gets a
+  // useful diagnostic.
+  const buildResult = dockerBuild(options.dockerfilePath, imageRef, options.rootDir || ROOT, {
+    quiet: true,
+    ignoreError: true,
+    suppressOutput: true,
   });
+  if (buildResult.error || buildResult.status !== 0) {
+    const stderrText = String(buildResult.stderr ?? "").trim();
+    if (stderrText) console.error(stderrText);
+    const detail = buildResult.error
+      ? `: ${buildResult.error.message}`
+      : ` (exit ${buildResult.status ?? "unknown"})`;
+    console.error(`  Failed to build ${label}${detail}`);
+    return null;
+  }
 
   const check = options.requireOpenshellSandboxAbi
     ? imageMeetsMinimumGlibc(imageRef, options.minGlibcVersion || OPENSHELL_SANDBOX_MIN_GLIBC)
     : { ok: true, version: null };
   if (!check.ok) {
     console.error(
-      `  Local ${options.label || "sandbox base image"} ${imageRef} has glibc ` +
+      `  Local ${label} ${imageRef} has glibc ` +
         `${check.version || "unknown"}; expected >= ` +
         `${options.minGlibcVersion || OPENSHELL_SANDBOX_MIN_GLIBC}.`,
     );
