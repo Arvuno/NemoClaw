@@ -80,6 +80,37 @@ do_backup() {
   info "Backup saved to ${dest}/ (${count} items)"
 }
 
+restore_directory() {
+  local sandbox="$1"
+  local src_dir="$2"
+  local dest_dir="$3"
+
+  openshell sandbox exec --name "$sandbox" -- mkdir -p "$dest_dir" >/dev/null \
+    || return 1
+
+  local restored=0
+  local rel src_file target_dir
+  while IFS= read -r -d '' src_file; do
+    rel="${src_file#"${src_dir}/"}"
+    target_dir="${dest_dir}/$(dirname "$rel")"
+    openshell sandbox exec --name "$sandbox" -- mkdir -p "$target_dir" >/dev/null \
+      || return 1
+    openshell sandbox upload "$sandbox" "$src_file" "$target_dir/" \
+      || return 1
+    restored=1
+  done < <(find "$src_dir" -type f -print0)
+
+  # Preserve empty directories too. Directory uploads are unreliable in some
+  # OpenShell versions, so create the tree explicitly and upload files one by one.
+  while IFS= read -r -d '' src_file; do
+    rel="${src_file#"${src_dir}/"}"
+    openshell sandbox exec --name "$sandbox" -- mkdir -p "${dest_dir}/${rel}" >/dev/null \
+      || return 1
+  done < <(find "$src_dir" -mindepth 1 -type d -print0)
+
+  return "$((1 - restored))"
+}
+
 do_restore() {
   local sandbox="$1"
   local ts="${2:-}"
@@ -108,7 +139,7 @@ do_restore() {
 
   for d in "${DIRS[@]}"; do
     if [ -d "${src}/${d}" ]; then
-      if openshell sandbox upload "$sandbox" "${src}/${d}/" "${WORKSPACE_PATH}/${d}/"; then
+      if restore_directory "$sandbox" "${src}/${d}" "${WORKSPACE_PATH}/${d}"; then
         count=$((count + 1))
       else
         warn "Failed to restore ${d}/"

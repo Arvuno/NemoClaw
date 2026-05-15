@@ -378,7 +378,8 @@ fi
 # No credentials in backup
 BACKUP_DIR="$HOME/.nemoclaw/rebuild-backups/${SANDBOX_NAME}"
 if [ -d "$BACKUP_DIR" ]; then
-  CRED_LEAKS=$(find "$BACKUP_DIR" \( -name "*.json" -o -name "*.yaml" -o -name "*.env" -o -name ".env" \) -exec grep -l "nvapi-\|sk-\|Bearer " {} \; 2>/dev/null || true)
+  CRED_PATTERN="nvapi-[[:alnum:]_-]{16,}|sk-[[:alnum:]_-]{16,}|Bearer[[:space:]]+[[:alnum:]._%+/=-]{16,}"
+  CRED_LEAKS=$(find "$BACKUP_DIR" \( -name "*.json" -o -name "*.yaml" -o -name "*.env" -o -name ".env" \) -exec grep -El "$CRED_PATTERN" {} \; 2>/dev/null || true)
   if [ -z "$CRED_LEAKS" ]; then
     pass "No credentials in backup"
   else

@@ -10314,8 +10314,9 @@ const { createSandbox } = require(${onboardPath});
     );
     assert.match(source, /if \(fwdResult && fwdResult\.status !== 0\)/);
     assert.match(source, /if \(rollbackSandboxOnFailure\)/);
-    assert.match(source, /const looksLikePortConflict =/);
+    assert.match(source, /let looksLikePortConflict =/);
     assert.match(source, /eaddrinuse\|address already in use/i);
+    assert.match(source, /Retry the same baked-in dashboard port/);
     assert.match(source, /suppressOutput: true/);
     assert.match(source, /runBackgroundForwardStartWithDiagnostics/);
     assert.doesNotMatch(

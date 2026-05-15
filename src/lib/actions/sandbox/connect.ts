@@ -128,7 +128,7 @@ function runSandboxConnectProbe(sandboxName: string): void {
     process.exit(1);
   }
   if (processCheck.wasRunning) {
-    ensureSandboxInferenceRouteOrExit(sandboxName, { quiet: false });
+    ensureSandboxInferenceRoute(sandboxName, { quiet: true });
     if (processCheck.forwardRecovered) {
       console.log(
         `  Probe complete: ${agentName} gateway is running in '${sandboxName}'; restored dashboard port forward.`,
@@ -139,11 +139,11 @@ function runSandboxConnectProbe(sandboxName: string): void {
     return;
   }
   if (processCheck.recovered) {
-    ensureSandboxInferenceRouteOrExit(sandboxName, { quiet: false });
+    ensureSandboxInferenceRoute(sandboxName, { quiet: true });
     console.log(`  Probe complete: recovered ${agentName} gateway in '${sandboxName}'.`);
     return;
   }
-  ensureSandboxInferenceRouteOrExit(sandboxName, { quiet: false });
+  ensureSandboxInferenceRoute(sandboxName, { quiet: true });
   console.error(
     `  Probe failed: ${agentName} gateway is not running in '${sandboxName}' and automatic recovery failed.`,
   );

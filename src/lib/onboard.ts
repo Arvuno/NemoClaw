@@ -9302,16 +9302,41 @@ function ensureDashboardForward(
   const parsedUrl = new URL(chatUiUrl.includes("://") ? chatUiUrl : `http://${chatUiUrl}`);
   parsedUrl.port = String(actualPort);
   const actualTarget = getDashboardForwardTarget(parsedUrl.toString());
-  runOpenshell(["forward", "stop", String(actualPort)], { ignoreError: true });
-  const { result: fwdResult, diagnostic: fwdDiagnostic } =
+  const startDashboardForward = () =>
     runBackgroundForwardStartWithDiagnostics((stdio, timeout) =>
       runOpenshell(
         ["forward", "start", "--background", actualTarget, sandboxName],
         { ignoreError: true, suppressOutput: true, stdio, timeout },
       ),
     );
+  runOpenshell(["forward", "stop", String(actualPort)], { ignoreError: true });
+  let { result: fwdResult, diagnostic: fwdDiagnostic } = startDashboardForward();
+  let looksLikePortConflict = Boolean(
+    fwdResult &&
+      fwdResult.status !== 0 &&
+      (fwdDiagnostic === "" ||
+        /eaddrinuse|address already in use|port .* in use|bind: .*in use/i.test(fwdDiagnostic)),
+  );
+  for (
+    let attempt = 1;
+    fwdResult && fwdResult.status !== 0 && looksLikePortConflict && attempt <= 3;
+    attempt++
+  ) {
+    // OpenShell may report the previous forward stopped before the host socket
+    // is fully released. Retry the same baked-in dashboard port before rolling
+    // back an otherwise healthy newly-created sandbox (#3260 follow-up).
+    sleep(1);
+    runOpenshell(["forward", "stop", String(actualPort)], { ignoreError: true });
+    ({ result: fwdResult, diagnostic: fwdDiagnostic } = startDashboardForward());
+    looksLikePortConflict = Boolean(
+      fwdResult &&
+        fwdResult.status !== 0 &&
+        (fwdDiagnostic === "" ||
+          /eaddrinuse|address already in use|port .* in use|bind: .*in use/i.test(fwdDiagnostic)),
+    );
+  }
   if (fwdResult && fwdResult.status !== 0) {
-    const looksLikePortConflict =
+    looksLikePortConflict =
       fwdDiagnostic === "" ||
       /eaddrinuse|address already in use|port .* in use|bind: .*in use/i.test(fwdDiagnostic);
     if (rollbackSandboxOnFailure) {

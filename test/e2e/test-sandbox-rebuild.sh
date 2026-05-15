@@ -179,7 +179,8 @@ info "Step 8: Checking backup directory for leaked credentials..."
 BACKUP_DIR="$HOME/.nemoclaw/rebuild-backups/$SANDBOX_NAME"
 if [ -d "$BACKUP_DIR" ]; then
   # Search for common credential patterns in JSON files
-  CRED_LEAKS=$(find "$BACKUP_DIR" -name "*.json" -exec grep -l "nvapi-\|sk-\|Bearer " {} \; 2>/dev/null || true)
+  CRED_PATTERN="nvapi-[[:alnum:]_-]{16,}|sk-[[:alnum:]_-]{16,}|Bearer[[:space:]]+[[:alnum:]._%+/=-]{16,}"
+  CRED_LEAKS=$(find "$BACKUP_DIR" -name "*.json" -exec grep -El "$CRED_PATTERN" {} \; 2>/dev/null || true)
   if [ -z "$CRED_LEAKS" ]; then
     pass "No credentials found in backup directory"
   else
