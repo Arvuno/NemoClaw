@@ -467,8 +467,6 @@ export function buildDockerGpuCloneRunArgs(
   pushStringFlag(args, "--cpuset-mems", host.CpusetMems);
   pushStringFlag(args, "--ipc", host.IpcMode);
   pushStringFlag(args, "--pid", host.PidMode);
-  for (const path of stringArray(host.ReadonlyPaths)) args.push("--security-opt", `readonly-paths=${path}`);
-  for (const path of stringArray(host.MaskedPaths)) args.push("--security-opt", `masked-paths=${path}`);
   if (host.Privileged) args.push("--privileged");
   if (host.Init) args.push("--init");
 
