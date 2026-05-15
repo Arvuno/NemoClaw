@@ -449,9 +449,12 @@ export function buildDockerGpuCloneRunArgs(
     securityOpt.add("apparmor=unconfined");
   }
   for (const opt of securityOpt) args.push("--security-opt", opt);
-  if (networkMode !== "host") {
-    for (const hostEntry of stringArray(host.ExtraHosts)) args.push("--add-host", hostEntry);
-  }
+  // --add-host writes to the container's /etc/hosts (mount namespace), not
+  // the network stack, so it is safe to preserve even when networkMode is
+  // "host".  Dropping it here breaks `host.openshell.internal` resolution on
+  // GPU sandbox recreates and the sandbox cannot reach the host Ollama auth
+  // proxy (#3562, #3568).
+  for (const hostEntry of stringArray(host.ExtraHosts)) args.push("--add-host", hostEntry);
   for (const group of stringArray(host.GroupAdd)) args.push("--group-add", group);
   if (networkMode !== "host") {
     for (const dns of stringArray(host.Dns)) args.push("--dns", dns);
