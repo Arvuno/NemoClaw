@@ -101,6 +101,7 @@ export type DockerGpuPatchResult = {
 export type DockerGpuCloneRunOptions = {
   networkMode?: string | null;
   openshellEndpoint?: string | null;
+  sandboxFallbackDns?: string | null;
 };
 
 export type DockerGpuPatchDiagnostics = {
@@ -354,6 +355,43 @@ export function buildDockerGpuCloneRunOptions(
   return { networkMode: "host", openshellEndpoint: hostEndpoint };
 }
 
+function parseResolvConfNameservers(content: string): string[] {
+  return content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("nameserver"))
+    .map((line) => line.split(/\s+/)[1])
+    .filter((ip): ip is string => Boolean(ip));
+}
+
+// #3579: when the host's /etc/resolv.conf points only at 127.0.0.x (e.g.
+// 127.0.0.53 from systemd-resolved), a sandbox in its own network namespace
+// can't reach that resolver — systemd-resolved listens in the host namespace
+// only. Return the first non-loopback nameserver from
+// /run/systemd/resolve/resolv.conf so the caller can inject it via --dns
+// rather than relying on inherited /etc/resolv.conf.
+export function detectSandboxFallbackDns(
+  deps: { readFile?: (path: string) => string | null } = {},
+): string | null {
+  const readFile =
+    deps.readFile ??
+    ((p: string): string | null => {
+      try {
+        return fs.readFileSync(p, "utf-8");
+      } catch {
+        return null;
+      }
+    });
+  const resolvConf = readFile("/etc/resolv.conf");
+  if (!resolvConf) return null;
+  const nameservers = parseResolvConfNameservers(resolvConf);
+  if (nameservers.length === 0) return null;
+  if (!nameservers.every((ip) => /^127\./.test(ip))) return null;
+  const upstreamFile = readFile("/run/systemd/resolve/resolv.conf");
+  if (!upstreamFile) return null;
+  return parseResolvConfNameservers(upstreamFile).find((ip) => !/^127\./.test(ip)) ?? null;
+}
+
 export function getDockerGpuPatchNetworkMode(
   env: Record<string, string | undefined> = process.env,
 ): "host" | "preserve" {
@@ -456,8 +494,15 @@ export function buildDockerGpuCloneRunArgs(
   for (const hostEntry of stringArray(host.ExtraHosts)) args.push("--add-host", hostEntry);
   for (const group of stringArray(host.GroupAdd)) args.push("--group-add", group);
   if (networkMode !== "host") {
-    for (const dns of stringArray(host.Dns)) args.push("--dns", dns);
+    const dnsServers = stringArray(host.Dns);
+    for (const dns of dnsServers) args.push("--dns", dns);
     for (const dnsSearch of stringArray(host.DnsSearch)) args.push("--dns-search", dnsSearch);
+    // #3579: when the host has only a loopback resolver (systemd-resolved),
+    // inject the real upstream so the sandbox doesn't inherit an unreachable
+    // 127.0.0.53. Only kicks in if OpenShell didn't already set --dns.
+    if (dnsServers.length === 0 && options.sandboxFallbackDns) {
+      args.push("--dns", options.sandboxFallbackDns);
+    }
   }
 
   pushNumberFlag(args, "--memory", host.Memory);
@@ -763,6 +808,8 @@ export function recreateOpenShellDockerSandboxWithGpu(
     }
 
     const cloneOptions = buildDockerGpuCloneRunOptions(inspect);
+    const sandboxFallbackDns = detectSandboxFallbackDns();
+    if (sandboxFallbackDns) cloneOptions.sandboxFallbackDns = sandboxFallbackDns;
     const cloneArgs = buildDockerGpuCloneRunArgs(inspect, selection.mode, cloneOptions);
     const runResult = d.dockerRunDetached(cloneArgs, {
       ignoreError: true,
