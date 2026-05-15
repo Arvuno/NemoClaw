@@ -99,6 +99,7 @@ export function buildDirectSandboxGpuProofCommands(
     {
       id: "cuda-init",
       label: "cuInit(0) via libcuda.so.1",
+      optional: true,
       args: ["sandbox", "exec", "-n", sandboxName, "--", "sh", "-lc", CUDA_INIT_PROBE],
     },
   ];

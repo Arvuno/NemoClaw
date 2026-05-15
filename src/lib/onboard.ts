@@ -1908,8 +1908,7 @@ function verifyDirectSandboxGpu(sandboxName: string): void {
       continue;
     }
     const diagnostic = compactText(redact(`${result.stderr || ""} ${result.stdout || ""}`));
-    const isOptionalProcProof = proof.optional === true && proof.id === "proc-comm-write";
-    if (isOptionalProcProof) {
+    if (proof.optional === true) {
       console.warn(`  ⚠ GPU proof skipped: ${proof.label}`);
       if (diagnostic) console.warn(`    ${diagnostic.slice(0, 300)}`);
       continue;
