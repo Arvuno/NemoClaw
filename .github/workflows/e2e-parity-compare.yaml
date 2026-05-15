@@ -144,11 +144,16 @@ jobs:
             --report "$REPORT" \
             "${STRICT_ARGS[@]}"
 
-      - name: Render coverage report
+      - name: Render parity and coverage reports
         if: always()
         run: |
           mkdir -p .e2e/parity
           bash test/e2e/runtime/coverage-report.sh > .e2e/parity/coverage-report.md
+          npx --no-install tsx scripts/e2e/render-parity-report.ts \
+            --parity-json .e2e/parity/parity-report.json \
+            --coverage-report .e2e/parity/coverage-report.md \
+            --output .e2e/parity/e2e-parity-report.md
+          cat .e2e/parity/e2e-parity-report.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload parity artifacts
         if: always()
