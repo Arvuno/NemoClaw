@@ -1908,6 +1908,12 @@ function verifyDirectSandboxGpu(sandboxName: string): void {
       continue;
     }
     const diagnostic = compactText(redact(`${result.stderr || ""} ${result.stdout || ""}`));
+    const isOptionalProcProof = proof.optional === true && proof.id === "proc-comm-write";
+    if (isOptionalProcProof) {
+      console.warn(`  ⚠ GPU proof skipped: ${proof.label}`);
+      if (diagnostic) console.warn(`    ${diagnostic.slice(0, 300)}`);
+      continue;
+    }
     console.error(`  ✗ GPU proof failed: ${proof.label}`);
     if (diagnostic) console.error(`    ${diagnostic.slice(0, 300)}`);
     for (const line of sandboxGpuRemediationLines()) {

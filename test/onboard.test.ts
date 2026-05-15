@@ -718,6 +718,8 @@ network_policies:
       "/proc/<pid>/task/<tid>/comm write",
       "cuInit(0) via libcuda.so.1",
     ]);
+    expect(commands.map((entry) => entry.id)).toEqual(["nvidia-smi", "proc-comm-write", "cuda-init"]);
+    expect(commands[1].optional).toBe(true);
     expect(commands[0].args).toEqual([
       "sandbox",
       "exec",

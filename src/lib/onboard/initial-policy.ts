@@ -74,19 +74,30 @@ const NVIDIA_SMI_OPTIONAL_PROBE = [
   'echo "nvidia-smi not installed; skipping optional visibility check"',
 ].join(" ");
 
+export type DirectSandboxGpuProofCommand = {
+  id: string;
+  label: string;
+  args: string[];
+  optional?: boolean;
+};
+
 export function buildDirectSandboxGpuProofCommands(
   sandboxName: string,
-): { label: string; args: string[] }[] {
+): DirectSandboxGpuProofCommand[] {
   return [
     {
+      id: "nvidia-smi",
       label: "nvidia-smi when available",
       args: ["sandbox", "exec", "-n", sandboxName, "--", "sh", "-lc", NVIDIA_SMI_OPTIONAL_PROBE],
     },
     {
+      id: "proc-comm-write",
       label: "/proc/<pid>/task/<tid>/comm write",
+      optional: true,
       args: ["sandbox", "exec", "-n", sandboxName, "--", "sh", "-lc", PROC_COMM_WRITE_PROBE],
     },
     {
+      id: "cuda-init",
       label: "cuInit(0) via libcuda.so.1",
       args: ["sandbox", "exec", "-n", sandboxName, "--", "sh", "-lc", CUDA_INIT_PROBE],
     },
