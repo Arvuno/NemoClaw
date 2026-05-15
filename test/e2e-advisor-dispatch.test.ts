@@ -20,6 +20,7 @@ function pullRequest(authorAssociation = "MEMBER", overrides = {}) {
     pull_request: {
       number: 123,
       author_association: authorAssociation,
+      user: { login: "ericksoa" },
       ...overrides,
       head: {
         ref: "feature/e2e-advisor",
@@ -76,6 +77,8 @@ describe("E2E advisor auto-dispatch planning", () => {
       env: {
         GITHUB_EVENT_NAME: "pull_request",
         GITHUB_REPOSITORY: "NVIDIA/NemoClaw",
+        GITHUB_RUN_ID: "456789",
+        GITHUB_RUN_ATTEMPT: "2",
       },
     });
 
@@ -85,10 +88,12 @@ describe("E2E advisor auto-dispatch planning", () => {
       jobs: "network-policy-e2e",
       target_ref: "abc123def456",
       pr_number: "123",
+      advisor_dispatch_id: "advisor-123-456789-2",
     });
+    expect(plan.advisorDispatchId).toBe("advisor-123-456789-2");
   });
 
-  it("skips PRs that are not authored by org members or owners", () => {
+  it("plans dispatch for allowlisted authors whose private org membership appears as contributor", () => {
     const workflowText = fs.readFileSync(
       path.join(ROOT, ".github/workflows/nightly-e2e.yaml"),
       "utf8",
@@ -96,15 +101,38 @@ describe("E2E advisor auto-dispatch planning", () => {
     const plan = planAutoDispatch({
       result: advisorResult(),
       workflowText,
-      event: pullRequest("COLLABORATOR"),
+      event: pullRequest("CONTRIBUTOR", { user: { login: "ericksoa" } }),
       env: {
         GITHUB_EVENT_NAME: "pull_request",
         GITHUB_REPOSITORY: "NVIDIA/NemoClaw",
+        E2E_ADVISOR_AUTO_DISPATCH_ALLOWED_AUTHORS: "octocat,ErickSOA",
+      },
+    });
+
+    expect(plan.status).toBe("ready");
+    expect(plan.authorLogin).toBe("ericksoa");
+    expect(plan.allowedByAuthorAllowlist).toBe(true);
+  });
+
+  it("skips PRs that are not authored by org members, owners, or allowlisted authors", () => {
+    const workflowText = fs.readFileSync(
+      path.join(ROOT, ".github/workflows/nightly-e2e.yaml"),
+      "utf8",
+    );
+    const plan = planAutoDispatch({
+      result: advisorResult(),
+      workflowText,
+      event: pullRequest("COLLABORATOR", { user: { login: "outside-contributor" } }),
+      env: {
+        GITHUB_EVENT_NAME: "pull_request",
+        GITHUB_REPOSITORY: "NVIDIA/NemoClaw",
+        E2E_ADVISOR_AUTO_DISPATCH_ALLOWED_AUTHORS: "ericksoa",
       },
     });
 
     expect(plan.status).toBe("skipped");
     expect(plan.reason).toMatch(/not allowed/);
+    expect(plan.reason).toMatch(/not allowlisted/);
   });
 
   it("skips draft PRs", () => {
@@ -163,11 +191,13 @@ describe("E2E advisor auto-dispatch planning", () => {
         jobs: "network-policy-e2e,cloud_e2e",
         target_ref: "abc123def456",
         pr_number: "123",
+        advisor_dispatch_id: "advisor-123-456789",
       }),
     ).toEqual({
       jobs: "network-policy-e2e,cloud_e2e",
       target_ref: "abc123def456",
       pr_number: "123",
+      advisor_dispatch_id: "advisor-123-456789",
     });
   });
 
@@ -213,6 +243,12 @@ describe("E2E advisor auto-dispatch planning", () => {
       jobs: "network-policy-e2e",
       target_ref: "abc123def456",
       pr_number: "123abc",
+    },
+    {
+      jobs: "network-policy-e2e",
+      target_ref: "abc123def456",
+      pr_number: "123",
+      advisor_dispatch_id: "advisor/123",
     },
   ])("rejects unsafe dispatch inputs %#", (inputs) => {
     expect(() => validateDispatchInputs(inputs)).toThrow(/Refusing to dispatch unsafe/);

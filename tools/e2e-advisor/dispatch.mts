@@ -15,6 +15,7 @@ type PullRequestPayload = {
   number?: number;
   author_association?: string;
   draft?: boolean;
+  user?: { login?: string };
   head?: {
     ref?: string;
     sha?: string;
@@ -43,6 +44,7 @@ type DispatchInputs = {
   jobs: string;
   target_ref: string;
   pr_number: string;
+  advisor_dispatch_id?: string;
 };
 
 type DispatchPlan = {
@@ -58,8 +60,13 @@ type DispatchPlan = {
   dispatchableJobCount?: number;
   prNumber?: number;
   targetRef?: string;
+  advisorDispatchId?: string;
+  runId?: number;
+  runUrl?: string;
   authorAssociation?: string;
+  authorLogin?: string;
   allowedAuthorAssociations?: string[];
+  allowedByAuthorAllowlist?: boolean;
 };
 
 type ParsedArgs = {
@@ -114,10 +121,24 @@ async function main(): Promise<void> {
           inputs: plan.inputs,
           token,
         });
+        let run: { id: number; url: string } | undefined;
+        try {
+          run = await findDispatchedWorkflowRun({
+            repo: plan.repository || "",
+            workflow: plan.workflow,
+            ref: plan.ref,
+            advisorDispatchId: plan.advisorDispatchId || "",
+            token,
+          });
+        } catch (error: unknown) {
+          console.warn(`Could not look up dispatched nightly run: ${error instanceof Error ? error.message : String(error)}`);
+        }
         output = {
           ...plan,
           status: "dispatched",
           reason: `Dispatched ${plan.workflow} for ${plan.jobs?.length || 0} required E2E job(s)`,
+          runId: run?.id,
+          runUrl: run?.url,
         };
       }
     }
@@ -219,13 +240,18 @@ export function planAutoDispatch({
   }
 
   const authorAssociation = pr.author_association || "";
+  const authorLogin = pr.user?.login || "";
   const allowedAssociations = parseCsv(env.E2E_ADVISOR_AUTO_DISPATCH_AUTHOR_ASSOCIATIONS || DEFAULT_ALLOWED_AUTHOR_ASSOCIATIONS);
-  if (!allowedAssociations.includes(authorAssociation)) {
+  const allowedAuthorLogins = parseCsv(env.E2E_ADVISOR_AUTO_DISPATCH_ALLOWED_AUTHORS).map(normalizeLogin);
+  const allowedByAssociation = allowedAssociations.includes(authorAssociation);
+  const allowedByAuthorAllowlist = Boolean(authorLogin && allowedAuthorLogins.includes(normalizeLogin(authorLogin)));
+  if (!allowedByAssociation && !allowedByAuthorAllowlist) {
     return {
       ...base,
-      reason: `PR author association ${authorAssociation || "<unknown>"} is not allowed`,
+      reason: `PR author association ${authorAssociation || "<unknown>"} is not allowed and PR author ${authorLogin || "<unknown>"} is not allowlisted`,
       prNumber: pr.number,
       authorAssociation,
+      authorLogin,
       allowedAuthorAssociations: allowedAssociations,
     };
   }
@@ -236,6 +262,8 @@ export function planAutoDispatch({
       reason: "advisor confidence was low",
       prNumber: pr.number,
       authorAssociation,
+      authorLogin,
+      allowedByAuthorAllowlist,
     };
   }
 
@@ -246,6 +274,8 @@ export function planAutoDispatch({
       reason: "advisor did not require any E2E jobs",
       prNumber: pr.number,
       authorAssociation,
+      authorLogin,
+      allowedByAuthorAllowlist,
     };
   }
 
@@ -260,6 +290,8 @@ export function planAutoDispatch({
       reason: "no required advisor recommendations matched dispatchable jobs in the target workflow",
       prNumber: pr.number,
       authorAssociation,
+      authorLogin,
+      allowedByAuthorAllowlist,
       dispatchableJobCount: dispatchableJobs.length,
       recommendedJobs,
       ignoredJobs,
@@ -273,6 +305,8 @@ export function planAutoDispatch({
       reason: `advisor recommended ${jobs.length} dispatchable jobs, above E2E_ADVISOR_AUTO_DISPATCH_MAX_JOBS=${maxJobs}`,
       prNumber: pr.number,
       authorAssociation,
+      authorLogin,
+      allowedByAuthorAllowlist,
       jobs,
       ignoredJobs,
     };
@@ -280,10 +314,12 @@ export function planAutoDispatch({
 
   const targetRef = pr.head?.sha || pr.head?.ref || "";
   const dispatchRef = env.E2E_ADVISOR_AUTO_DISPATCH_REF || pr.base?.ref || DEFAULT_DISPATCH_REF;
+  const advisorDispatchId = buildAdvisorDispatchId(pr.number, env);
   const inputs = {
     jobs: jobs.join(","),
     target_ref: targetRef,
     pr_number: String(pr.number || ""),
+    advisor_dispatch_id: advisorDispatchId,
   };
 
   return {
@@ -298,8 +334,11 @@ export function planAutoDispatch({
     dispatchableJobCount: dispatchableJobs.length,
     prNumber: pr.number,
     targetRef,
+    advisorDispatchId,
     authorAssociation,
+    authorLogin,
     allowedAuthorAssociations: allowedAssociations,
+    allowedByAuthorAllowlist,
   };
 }
 
@@ -351,6 +390,16 @@ function unique(values: string[]): string[] {
   return [...new Set(values)];
 }
 
+function normalizeLogin(login: string): string {
+  return login.trim().toLowerCase();
+}
+
+function buildAdvisorDispatchId(prNumber: number | undefined, env: StringMap): string {
+  const runId = env.GITHUB_RUN_ID || "local";
+  const attempt = env.GITHUB_RUN_ATTEMPT ? `-${env.GITHUB_RUN_ATTEMPT}` : "";
+  return `advisor-${prNumber || "unknown"}-${runId}${attempt}`;
+}
+
 async function dispatchWorkflow({
   repo,
   workflow,
@@ -392,6 +441,69 @@ async function dispatchWorkflow({
   }
 }
 
+type WorkflowRunSearchResult = {
+  workflow_runs?: Array<{
+    id?: number;
+    html_url?: string;
+    display_title?: string;
+    event?: string;
+  }>;
+};
+
+async function findDispatchedWorkflowRun({
+  repo,
+  workflow,
+  ref,
+  advisorDispatchId,
+  token,
+}: {
+  repo: string;
+  workflow: string;
+  ref: string;
+  advisorDispatchId: string;
+  token: string;
+}): Promise<{ id: number; url: string } | undefined> {
+  if (!advisorDispatchId) return undefined;
+
+  const safeRepo = validateRepository(repo);
+  const safeWorkflow = validateWorkflowFile(workflow);
+  const safeRef = validateGitRef(ref);
+  const params = new URLSearchParams({
+    event: "workflow_dispatch",
+    branch: safeRef,
+    per_page: "20",
+  });
+  const runsUrl = `https://api.github.com/repos/${safeRepo}/actions/workflows/${encodeURIComponent(safeWorkflow)}/runs?${params}`;
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if (attempt > 0) await delay(2000);
+    const response = await fetch(runsUrl, {
+      headers: {
+        "Accept": "application/vnd.github+json",
+        "Authorization": `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "nemoclaw-e2e-advisor-dispatcher",
+      },
+    });
+    if (!response.ok) {
+      console.warn(`Could not look up dispatched nightly run: GitHub API HTTP ${response.status}`);
+      return undefined;
+    }
+
+    const data = await response.json() as WorkflowRunSearchResult;
+    const match = data.workflow_runs?.find(
+      (run) => run.event === "workflow_dispatch" && run.display_title?.includes(advisorDispatchId),
+    );
+    if (match?.id && match.html_url) return { id: match.id, url: match.html_url };
+  }
+
+  return undefined;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function validateRepository(repo: string): string {
   if (repo !== "NVIDIA/NemoClaw") {
     throw new Error("Refusing to dispatch outside NVIDIA/NemoClaw");
@@ -419,10 +531,15 @@ export function validateDispatchInputs(inputs: DispatchInputs): DispatchInputs {
   if (!/^\d+$/.test(inputs.pr_number)) {
     throw new Error("Refusing to dispatch unsafe pr_number input");
   }
+  const advisorDispatchId = inputs.advisor_dispatch_id;
+  if (advisorDispatchId !== undefined && !/^[A-Za-z0-9_-]{1,100}$/.test(advisorDispatchId)) {
+    throw new Error("Refusing to dispatch unsafe advisor_dispatch_id input");
+  }
   return {
     jobs: jobs.join(","),
     target_ref: inputs.target_ref,
     pr_number: inputs.pr_number,
+    ...(advisorDispatchId ? { advisor_dispatch_id: advisorDispatchId } : {}),
   };
 }
 
@@ -443,6 +560,8 @@ function renderDispatchSummary(result: DispatchPlan): string {
   if (result.workflow) lines.push(`Workflow: \`${result.workflow}\``);
   if (result.ref) lines.push(`Dispatch ref: \`${result.ref}\``);
   if (result.targetRef) lines.push(`Target ref: \`${result.targetRef}\``);
+  if (result.advisorDispatchId) lines.push(`Trace ID: \`${result.advisorDispatchId}\``);
+  if (result.runUrl) lines.push(`Nightly run: ${result.runUrl}`);
   if (Array.isArray(result.jobs) && result.jobs.length > 0) {
     lines.push(`Jobs: ${result.jobs.map((job) => `\`${job}\``).join(", ")}`);
   }
