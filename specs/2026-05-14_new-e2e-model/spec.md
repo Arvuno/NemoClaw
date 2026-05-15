@@ -736,7 +736,7 @@ Make the existing coverage and parity data visible by layer.
 - `.e2e/reports/summary.md` shows the layered coverage report for local runs and workflow artifacts.
 - Artifacts still include JSON and raw logs.
 
-## Phase 3: Onboarding Assertion Stage
+## Phase 3: Onboarding Assertion Stage [COMPLETED: 9587add9d]
 
 Add a first-class onboarding assertion stage between onboarding execution and expected-state validation.
 
