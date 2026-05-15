@@ -60,42 +60,6 @@ function parseJson<T>(text: string): T {
   return JSON.parse(text);
 }
 
-// Reflect.get is used throughout the codebase as a type-safe alternative to
-// direct property access on loosely-typed objects.  Unlike an `as Record<…>`
-// cast it never widens the target type and keeps loosely-typed member access
-// explicit. See also: deploy.ts and onboard.ts.
-function readStringProperty(value: object | null, key: string): string | undefined {
-  if (!value) {
-    return undefined;
-  }
-  const property = Reflect.get(value, key);
-  return typeof property === "string" ? property : undefined;
-}
-
-function readStringArrayProperty(value: object | null, key: string): string[] | undefined {
-  if (!value) {
-    return undefined;
-  }
-  const property = Reflect.get(value, key);
-  return Array.isArray(property)
-    ? property.filter((entry): entry is string => typeof entry === "string")
-    : undefined;
-}
-
-function readLinksProperty(value: object | null, key: string): NoticeLink[] | undefined {
-  if (!value) {
-    return undefined;
-  }
-  const property = Reflect.get(value, key);
-  if (!Array.isArray(property)) {
-    return undefined;
-  }
-  return property.map((entry) => ({
-    label: readStringProperty(typeof entry === "object" && entry !== null ? entry : null, "label"),
-    url: readStringProperty(typeof entry === "object" && entry !== null ? entry : null, "url"),
-  }));
-}
-
 export function getUsageNoticeStateFile(): string {
   return path.join(process.env.HOME || os.homedir(), ".nemoclaw", "usage-notice.json");
 }

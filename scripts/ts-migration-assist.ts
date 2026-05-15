@@ -123,10 +123,6 @@ function ensureDotSlash(specifier: string): string {
   return specifier.startsWith(".") ? specifier : `./${specifier}`;
 }
 
-function withoutTsExtension(filePath: string): string {
-  return filePath.replace(/\.ts$/, "");
-}
-
 function isWithin(child: string, parent: string): boolean {
   const relative = path.relative(parent, child);
   return !relative.startsWith("..") && !path.isAbsolute(relative);

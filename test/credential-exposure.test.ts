@@ -27,9 +27,7 @@ const { buildProviderArgs } = require("../dist/lib/onboard/providers.js") as {
 };
 
 const ONBOARD_JS = path.join(import.meta.dirname, "..", "src", "lib", "onboard.ts");
-const ONBOARD_PROVIDERS_JS = path.join(import.meta.dirname, "..", "src", "lib", "onboard-providers.ts");
 const RUNNER_TS = path.join(import.meta.dirname, "..", "nemoclaw", "src", "blueprint", "runner.ts");
-const SERVICES_TS = path.join(import.meta.dirname, "..", "src", "lib", "services.ts");
 
 // Matches --credential followed by a value containing "=" (i.e. KEY=VALUE).
 // Catches quoted KEY=VALUE patterns in JS and Python f-string interpolation.

@@ -350,7 +350,6 @@ const {
   providerNameToOptionKey,
   parsePolicyPresetEnv,
   patchStagedDockerfile,
-  pullAndResolveBaseImageDigest,
   SANDBOX_BASE_IMAGE,
   printSandboxCreateRecoveryHints,
   summarizeCurlFailure,

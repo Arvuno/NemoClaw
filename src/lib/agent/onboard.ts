@@ -12,7 +12,7 @@ import path from "path";
 import { dockerBuild, dockerImageInspect } from "../adapters/docker";
 import { getAgentBranding } from "../cli/branding";
 import { getProviderSelectionConfig } from "../inference/config";
-import type { JsonObject as LooseObject, JsonValue as LooseValue } from "../core/json-types";
+import type { JsonObject as LooseObject } from "../core/json-types";
 import * as onboardSession from "../state/onboard-session";
 import { ROOT, redact, run, shellQuote } from "../runner";
 import {
@@ -335,7 +335,6 @@ export async function handleAgentSetup(
   const {
     step,
     runCaptureOpenshell,
-    openshellShellCommand,
     openshellBinary: openshellBin,
     buildSandboxConfigSyncScript,
     writeSandboxConfigSyncFile,
