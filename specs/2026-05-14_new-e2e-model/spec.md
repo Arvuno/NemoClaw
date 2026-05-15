@@ -796,7 +796,7 @@ Move onboarding lifecycle and provider variants into explicit onboarding profile
 - Coverage report shows onboarding profile coverage independently from base environment coverage.
 - Deferred counts decrease for onboarding lifecycle scripts.
 
-## Phase 5: Post-Onboard Suite Reorganization
+## Phase 5: Post-Onboard Suite Reorganization [COMPLETED: 17aac254e]
 
 Reorganize feature validation into clearer suite families and migrate high-value deferred areas.
 
