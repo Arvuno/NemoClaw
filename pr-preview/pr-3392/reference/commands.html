@@ -1879,55 +1879,59 @@ Set them before running <code class="docutils literal notranslate"><span class="
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code> to enable</p></td>
 <td><p>Auto-accepts confirmation prompts (<code class="docutils literal notranslate"><span class="pre">--yes</span></code> equivalent) including in helpers like the Ollama proxy auth setup.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_NO_EXPRESS</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_NON_INTERACTIVE_SUDO_MODE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">prompt</span></code> or empty/unset</p></td>
+<td><p>When set to <code class="docutils literal notranslate"><span class="pre">prompt</span></code>, allows non-interactive onboarding to use prompt-capable <code class="docutils literal notranslate"><span class="pre">sudo</span></code> for host setup steps that require elevation, which can ask for a password. Empty/unset is the default and uses <code class="docutils literal notranslate"><span class="pre">sudo</span> <span class="pre">-n</span></code>, which fails instead of asking for a password. Any other value is rejected.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_NO_EXPRESS</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code> to enable</p></td>
 <td><p>Installer-only. Skips the DGX Spark and DGX Station express install prompt and continues with the normal interactive onboarding flow.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_EXPERIMENTAL</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_EXPERIMENTAL</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code> to enable</p></td>
 <td><p>Surfaces experimental providers and flows in onboarding.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_IGNORE_RUNTIME_RESOURCES</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_IGNORE_RUNTIME_RESOURCES</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code> to enable</p></td>
 <td><p>Suppresses the under-provisioned runtime warning during preflight. Use only when you know the sandbox host meets the minimums.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_DISABLE_OVERLAY_FIX</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_DISABLE_OVERLAY_FIX</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code> to enable</p></td>
 <td><p>Skips the Docker overlay-fix step during sandbox build. For environments where the fix is incompatible.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_OVERLAY_SNAPSHOTTER</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_OVERLAY_SNAPSHOTTER</span></code></p></td>
 <td><p>snapshotter name</p></td>
 <td><p>Selects the containerd overlay snapshotter for sandbox builds. Empty (default) preserves containerd’s choice.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_SKIP_TELEGRAM_REACHABILITY</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_SKIP_TELEGRAM_REACHABILITY</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code> to enable</p></td>
 <td><p>Skips the Telegram bot reachability probe during onboard (useful in restricted networks).</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_CONFIG_ACCEPT_NEW_PATH</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_CONFIG_ACCEPT_NEW_PATH</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code> to enable</p></td>
 <td><p>Accepts a new sandbox config path without an interactive prompt when the stored path differs from the discovered one.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_SANDBOX_GPU</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_SANDBOX_GPU</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">auto</span></code>, <code class="docutils literal notranslate"><span class="pre">1</span></code>, or <code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
 <td><p>Controls sandbox GPU passthrough during onboarding. <code class="docutils literal notranslate"><span class="pre">auto</span></code> enables GPU passthrough when an NVIDIA GPU is detected, <code class="docutils literal notranslate"><span class="pre">1</span></code> requires GPU passthrough, and <code class="docutils literal notranslate"><span class="pre">0</span></code> forces CPU-only sandbox creation.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_SANDBOX_GPU_DEVICE</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_SANDBOX_GPU_DEVICE</span></code></p></td>
 <td><p>OpenShell GPU device selector</p></td>
 <td><p>Selects the GPU device passed with <code class="docutils literal notranslate"><span class="pre">openshell</span> <span class="pre">sandbox</span> <span class="pre">create</span> <span class="pre">--gpu-device</span></code>. Setting this value enables sandbox GPU passthrough unless <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_SANDBOX_GPU=0</span></code> is also set, which is rejected.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_DOCKER_GPU_PATCH</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_DOCKER_GPU_PATCH</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">0</span></code> to disable, anything else to keep the default</p></td>
 <td><p>Controls the Linux Docker-driver GPU sandbox compatibility patch. Set to <code class="docutils literal notranslate"><span class="pre">0</span></code> only as an escape hatch when the patch fails and you need onboarding to continue without patching the GPU sandbox container.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_OPENSHELL_GATEWAY_BIN</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_OPENSHELL_GATEWAY_BIN</span></code></p></td>
 <td><p>path</p></td>
 <td><p>Advanced override for the <code class="docutils literal notranslate"><span class="pre">openshell-gateway</span></code> binary used by the Linux Docker-driver gateway. Defaults to the binary next to <code class="docutils literal notranslate"><span class="pre">openshell</span></code>, then common install paths.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_OPENSHELL_SANDBOX_BIN</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_OPENSHELL_SANDBOX_BIN</span></code></p></td>
 <td><p>path</p></td>
 <td><p>Advanced override for the <code class="docutils literal notranslate"><span class="pre">openshell-sandbox</span></code> binary passed to the Linux Docker-driver gateway supervisor. Defaults to the binary next to <code class="docutils literal notranslate"><span class="pre">openshell</span></code>, then common install paths.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_OPENSHELL_GATEWAY_STATE_DIR</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEMOCLAW_OPENSHELL_GATEWAY_STATE_DIR</span></code></p></td>
 <td><p>path</p></td>
 <td><p>Advanced override for the Linux Docker-driver gateway pid file and SQLite state directory. Defaults to <code class="docutils literal notranslate"><span class="pre">~/.local/state/nemoclaw/openshell-docker-gateway</span></code>.</p></td>
 </tr>

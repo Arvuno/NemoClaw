@@ -539,7 +539,7 @@ If Docker is installed but your current shell cannot use the Docker socket yet, 
 </pre></div>
 </div>
 <p>On DGX Spark and DGX Station, an interactive installer can offer express install after you accept the third-party software notice.
-Express install switches onboarding to non-interactive mode, applies the suggested security policy, and selects the managed local inference path for that platform.
+Express install switches onboarding to non-interactive mode, allows <code class="docutils literal notranslate"><span class="pre">sudo</span></code> password prompts for required host changes, applies the suggested security policy, and selects the managed local inference path for that platform.
 Set <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_NO_EXPRESS=1</span></code> to skip the express prompt, or set <code class="docutils literal notranslate"><span class="pre">NEMOCLAW_PROVIDER</span></code> before launching the installer when you want to choose a provider yourself.</p>
 <p>The installer auto-launches <code class="docutils literal notranslate"><span class="pre">nemoclaw</span> <span class="pre">onboard</span></code> when it can locate the freshly-installed binary.
 If it cannot locate the binary, or if blocking host preflight checks fail, it does not launch the wizard automatically.
