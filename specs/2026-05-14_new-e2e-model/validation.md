@@ -5,279 +5,265 @@ Test Spec: `specs/2026-05-14_new-e2e-model/tests.md`
 
 ## Overview
 
-**Feature**: Layered E2E scenario model separating base environments, onboarding profiles, test plans, onboarding assertions, expected states, post-onboard suites, and layer-aware reporting.
+**Feature**: Layered scenario model for NemoClaw E2E metadata, plan resolution, coverage, onboarding assertions, suite organization, and workflow summaries.
 
-**Available Tools**: Bash, npm/Vitest scenario framework tests, static workflow YAML checks, TypeScript resolver commands, GitHub Actions summary files when running in CI.
+**Available Tools**: Bash, Vitest, tsx/TypeScript resolver, GitHub Actions workflow lint tests, file-system checks.
 
 ## Coverage Summary
 
 - Happy Paths: 9 scenarios
-- Sad Paths: 8 scenarios
-- Total: 17 scenarios
+- Sad Paths: 7 scenarios
+- Total: 16 scenarios
 
 ---
 
 ## Phase 1: Layered Terminology and Schema Planning - Validation Scenarios
 
-### Scenario 1.1: Legacy Scenario Resolves Through Layered Alias [STATUS: pending]
+### Scenario 1.1: Legacy scenario alias resolves to layered plan [STATUS: pending]
 **Type**: Happy Path
 
-**Given**: `scenarios.yaml` defines layered `base_scenarios`, `onboarding_profiles`, `test_plans`, and `ubuntu-repo-cloud-openclaw` as an alias.
-**When**: A maintainer runs `bash test/e2e/runtime/run-scenario.sh ubuntu-repo-cloud-openclaw --plan-only`.
-**Then**: The command succeeds and prints a plan containing separate base, onboarding, expected-state, onboarding assertion, and suite sections.
+**Given**: existing scenario ID `ubuntu-repo-cloud-openclaw` remains in compatibility metadata
+**When**: `bash test/e2e/runtime/run-scenario.sh ubuntu-repo-cloud-openclaw --plan-only` runs
+**Then**: the command exits 0 and resolved plan output includes separate base, onboarding, expected-state, assertion, and suite fields.
 
 **Validation Steps**:
-1. **Setup**: Bash: ensure dependencies are installed for scenario framework tests.
-2. **Execute**: Bash: run the plan-only command for `ubuntu-repo-cloud-openclaw`.
-3. **Verify**: Bash: assert exit code 0 and inspect plan JSON/text for layered sections.
+1. **Setup**: Bash: ensure dependencies are installed.
+2. **Execute**: Bash: run the plan-only command.
+3. **Verify**: Bash/grep: check exit code and layered keys in output.
 
-**Tools Required**: Bash, TypeScript resolver runtime.
+**Tools Required**: Bash
 
-### Scenario 1.2: New Layered Plan ID Runs Plan-Only [STATUS: pending]
+### Scenario 1.2: Direct layered test plan resolves [STATUS: pending]
 **Type**: Happy Path
 
-**Given**: `ubuntu-repo-docker__cloud-nvidia-openclaw` is a defined test plan.
-**When**: A maintainer runs `bash test/e2e/runtime/run-scenario.sh ubuntu-repo-docker__cloud-nvidia-openclaw --plan-only`.
-**Then**: The command succeeds without performing live install/onboarding and emits the same executable plan shape as the legacy alias.
+**Given**: test plan `ubuntu-repo-docker__cloud-nvidia-openclaw` exists
+**When**: `bash test/e2e/runtime/run-scenario.sh ubuntu-repo-docker__cloud-nvidia-openclaw --plan-only` runs
+**Then**: the command exits 0 and points to the expected base/onboarding definitions.
 
 **Validation Steps**:
-1. **Setup**: Bash: no live credentials or Docker setup required.
-2. **Execute**: Bash: run the layered plan ID with `--plan-only`.
-3. **Verify**: Bash: compare key base/onboarding/expected-state/suite fields against the legacy alias output.
+1. **Setup**: Bash: no sandbox setup required.
+2. **Execute**: Bash: run direct plan-only command.
+3. **Verify**: Bash/grep: assert `ubuntu-repo-docker` and `cloud-nvidia-openclaw` appear.
 
-**Tools Required**: Bash, TypeScript resolver runtime.
+**Tools Required**: Bash
 
-### Scenario 1.3: Missing Layer Reference Fails Fast [STATUS: pending]
+### Scenario 1.3: Broken layered references fail fast [STATUS: pending]
 **Type**: Sad Path
 
-**Given**: A fixture plan references a missing base scenario, onboarding profile, expected state, assertion, or suite.
-**When**: The resolver validates the fixture.
-**Then**: Validation fails before execution with a clear message identifying the missing reference and parent plan.
+**Given**: resolver fixture with a missing base, onboarding profile, expected state, assertion, or suite reference
+**When**: scenario-framework resolver tests execute
+**Then**: each invalid reference fails with a clear error naming the missing key.
 
 **Validation Steps**:
-1. **Setup**: Bash/Vitest: create or load invalid fixture YAML.
-2. **Execute**: npm/Vitest: run scenario resolver validation tests.
-3. **Verify**: npm/Vitest: assert non-zero validation and exact actionable error text.
+1. **Setup**: Vitest fixture via `loadMetadataFromObjects`.
+2. **Execute**: `npx vitest run test/e2e/scenario-framework-tests/e2e-scenario-resolver.test.ts`.
+3. **Verify**: Vitest assertions match error text.
 
-**Tools Required**: npm, Vitest.
+**Tools Required**: Vitest
+
+### Scenario 1.4: Capability and expected-failure metadata are preserved but not enforced [STATUS: pending]
+**Type**: Happy Path
+
+**Given**: GPU/base plans declare `runner_requirements` and no-Docker plan declares `expected_failure`
+**When**: resolver produces plan JSON
+**Then**: metadata is present in output and no live runner capability probe is performed.
+
+**Validation Steps**:
+1. **Setup**: fixture or real metadata with GPU and no-Docker plans.
+2. **Execute**: Vitest resolver tests.
+3. **Verify**: output JSON contains metadata and no capability command is invoked.
+
+**Tools Required**: Vitest
 
 ## Phase 2: Layered Coverage and Gap Reports - Validation Scenarios
 
-### Scenario 2.1: Coverage Report Shows Layered Tables [STATUS: pending]
+### Scenario 2.1: Coverage report shows layered sections [STATUS: pending]
 **Type**: Happy Path
 
-**Given**: Layered scenarios and parity metadata are present.
-**When**: A maintainer runs `bash test/e2e/runtime/coverage-report.sh`.
-**Then**: Output includes base scenario coverage, onboarding profile coverage, test plan coverage, suite coverage, parity by layer, and top deferred gap domains.
+**Given**: layered metadata exists
+**When**: `bash test/e2e/runtime/coverage-report.sh` runs
+**Then**: report includes base scenarios, onboarding profiles, test plans, suites, parity by layer, and top gap domains.
 
 **Validation Steps**:
-1. **Setup**: Bash: ensure parity map and scenarios YAML are available.
+1. **Setup**: Bash: clean `.e2e/reports`.
 2. **Execute**: Bash: run coverage report.
-3. **Verify**: Bash: grep for expected section headings and layer names.
+3. **Verify**: grep report output and `.e2e/reports/summary.md`.
 
-**Tools Required**: Bash.
+**Tools Required**: Bash
 
-### Scenario 2.2: Unknown Parity Layer Is Rejected [STATUS: pending]
+### Scenario 2.2: Transitional parity entries without explicit layer still pass [STATUS: pending]
 **Type**: Sad Path
 
-**Given**: A parity entry has a `layer` value outside the allowed set.
-**When**: Parity map validation runs.
-**Then**: Validation fails and lists allowed layer values.
+**Given**: deferred parity assertion lacks explicit `layer`
+**When**: parity validation runs during transition
+**Then**: validation passes with inferred/default layer instead of failing.
 
 **Validation Steps**:
-1. **Setup**: Vitest: load invalid parity fixture.
-2. **Execute**: npm/Vitest: run parity map validation test.
-3. **Verify**: Vitest: assert failure includes the invalid value and allowed layers.
+1. **Setup**: parity-map fixture without layer.
+2. **Execute**: Vitest parity-map test or `tsx scripts/e2e/check-parity-map.ts`.
+3. **Verify**: successful exit and inferred/default layer in aggregation.
 
-**Tools Required**: npm, Vitest.
+**Tools Required**: Vitest or tsx
 
 ## Phase 3: Onboarding Assertion Stage - Validation Scenarios
 
-### Scenario 3.1: Onboarding Assertions Run Before Expected-State Validation [STATUS: pending]
+### Scenario 3.1: Onboarding assertions run before expected-state validation [STATUS: pending]
 **Type**: Happy Path
 
-**Given**: A plan includes onboarding assertion scripts and expected-state validation.
-**When**: The runner executes the plan with fake or fixture scripts.
-**Then**: Logs show onboarding assertions run after onboarding and before expected-state validation and post-onboard suites.
+**Given**: a plan with stub onboarding assertion scripts and expected-state validation enabled
+**When**: scenario runner executes the plan in test mode
+**Then**: logs show onboarding assertions after onboarding and before expected-state and suite stages.
 
 **Validation Steps**:
-1. **Setup**: Bash/Vitest: create fake assertion, expected-state, and suite commands that log timestamps/order.
-2. **Execute**: npm/Vitest or Bash: run the scenario runner in fixture mode.
-3. **Verify**: Bash/Vitest: assert order is onboarding, onboarding assertions, expected state, suites.
+1. **Setup**: fixture scripts emit ordered markers.
+2. **Execute**: Vitest suite-runner test.
+3. **Verify**: marker order matches required flow.
 
-**Tools Required**: Bash, npm, Vitest.
+**Tools Required**: Vitest, Bash fixtures
 
-### Scenario 3.2: Failed Onboarding Assertion Stops Later Layers [STATUS: pending]
+### Scenario 3.2: Missing onboarding assertion reference fails at plan time [STATUS: pending]
 **Type**: Sad Path
 
-**Given**: An onboarding assertion exits non-zero.
-**When**: The runner executes the plan.
-**Then**: Expected-state validation and suites do not run, and the report identifies `onboarding-assertions` as the failing layer.
+**Given**: a plan references unknown assertion `ghost-assertion`
+**When**: resolver runs
+**Then**: it fails before execution with an error naming `ghost-assertion`.
 
 **Validation Steps**:
-1. **Setup**: Bash/Vitest: configure one assertion script to fail.
-2. **Execute**: npm/Vitest or Bash: run fixture scenario.
-3. **Verify**: Bash/Vitest: assert exit code non-zero, no later-layer markers, and failure layer recorded.
+1. **Setup**: metadata fixture.
+2. **Execute**: Vitest resolver test.
+3. **Verify**: thrown error matches assertion name.
 
-**Tools Required**: Bash, npm, Vitest.
-
-### Scenario 3.3: Negative Preflight Leaves No Ghost State [STATUS: pending]
-**Type**: Sad Path
-
-**Given**: A negative base scenario such as `ubuntu-repo-no-docker` is expected to fail preflight.
-**When**: The runner validates the negative plan in fixture or controlled no-Docker mode.
-**Then**: The onboarding assertion stage verifies no gateway or sandbox ghost state remains.
-
-**Validation Steps**:
-1. **Setup**: Bash: use fixture state directories or controlled no-Docker preflight environment.
-2. **Execute**: Bash: run the negative plan or its fixture equivalent.
-3. **Verify**: Bash: assert absent gateway/sandbox markers and expected failure classification.
-
-**Tools Required**: Bash.
+**Tools Required**: Vitest
 
 ## Phase 4: Onboarding Matrix Expansion - Validation Scenarios
 
-### Scenario 4.1: Representative Onboarding Profiles Are Valid and Reported [STATUS: pending]
+### Scenario 4.1: Onboarding profile coverage is independent from base coverage [STATUS: pending]
 **Type**: Happy Path
 
-**Given**: Profiles exist for OpenAI-compatible, Brave, Telegram, Discord, Slack, Hermes messaging, resume, repair, double-onboard, provider switch, and token rotation.
-**When**: Scenario schema validation and coverage reporting run.
-**Then**: Profiles validate and coverage reports them independently from base environments.
+**Given**: messaging, OpenAI-compatible, Hermes, and lifecycle profiles exist
+**When**: coverage report runs
+**Then**: onboarding coverage table lists profiles independently of base scenario coverage.
 
 **Validation Steps**:
-1. **Setup**: Bash: ensure scenario YAML includes representative profiles.
-2. **Execute**: npm/Vitest: run scenario schema and coverage tests.
-3. **Verify**: Vitest: assert profiles are valid and coverage output includes onboarding profile counts.
+1. **Setup**: real metadata after phase implementation.
+2. **Execute**: coverage-report command.
+3. **Verify**: onboarding profile IDs appear in onboarding section, not only scenario rows.
 
-**Tools Required**: npm, Vitest.
+**Tools Required**: Bash
 
-### Scenario 4.2: Incompatible Base/Profile Combination Is Blocked [STATUS: pending]
+### Scenario 4.2: Unsupported base/onboarding combination is rejected [STATUS: pending]
 **Type**: Sad Path
 
-**Given**: A test plan combines an onboarding profile requiring unavailable runner capabilities or secrets with an incompatible base.
-**When**: The resolver validates the plan.
-**Then**: It fails at plan time with a compatibility error and does not start execution.
+**Given**: metadata combines an unsupported base with an onboarding profile requiring unavailable secrets/capabilities
+**When**: resolver validates the plan
+**Then**: plan resolution fails with a compatibility error.
 
 **Validation Steps**:
-1. **Setup**: Vitest: load incompatible plan fixture.
-2. **Execute**: npm/Vitest: run resolver compatibility validation.
-3. **Verify**: Vitest: assert error identifies required and missing capability/secret.
+1. **Setup**: Vitest fixture.
+2. **Execute**: resolver test.
+3. **Verify**: error names incompatible base/onboarding requirement.
 
-**Tools Required**: npm, Vitest.
+**Tools Required**: Vitest
 
 ## Phase 5: Post-Onboard Suite Reorganization - Validation Scenarios
 
-### Scenario 5.1: New Suite Families Resolve While Old Aliases Still Work [STATUS: pending]
+### Scenario 5.1: Suite family aliases preserve existing behavior [STATUS: pending]
 **Type**: Happy Path
 
-**Given**: Suite families and transitional aliases are defined.
-**When**: The resolver loads plans using both new family IDs and existing suite IDs.
-**Then**: Both resolve to runnable suite definitions without changing install or onboarding behavior.
+**Given**: old suite IDs and new family IDs coexist during migration
+**When**: a legacy plan resolves and suite runner loads suites
+**Then**: old IDs resolve to equivalent family suites without changing install/onboard behavior.
 
 **Validation Steps**:
-1. **Setup**: Vitest: load suite YAML with new families and aliases.
-2. **Execute**: npm/Vitest: run suite resolver tests.
-3. **Verify**: Vitest: assert scripts/requires_state resolve and aliases point to intended suite definitions.
+1. **Setup**: metadata with old and new suite IDs.
+2. **Execute**: Vitest suite-runner and resolver tests.
+3. **Verify**: resolved steps are equivalent and no install/onboard step is present in suites.
 
-**Tools Required**: npm, Vitest.
+**Tools Required**: Vitest
 
-### Scenario 5.2: Feature Suite Boundary Is Enforced [STATUS: pending]
+### Scenario 5.2: Suite attempting to install or onboard is rejected [STATUS: pending]
 **Type**: Sad Path
 
-**Given**: A suite definition attempts to install, onboard, or mutate onboarding choices.
-**When**: Convention lint or suite schema validation runs.
-**Then**: Validation fails because post-onboard suites may only consume context and validate features.
+**Given**: suite metadata includes a step that calls install/onboard paths
+**When**: convention lint tests run
+**Then**: tests fail and identify the invalid suite step.
 
 **Validation Steps**:
-1. **Setup**: Vitest: create suite fixture with disallowed behavior or metadata.
-2. **Execute**: npm/Vitest: run convention lint tests.
-3. **Verify**: Vitest: assert lint failure names the suite and boundary violation.
+1. **Setup**: fixture suite with invalid script path or marker.
+2. **Execute**: convention lint test.
+3. **Verify**: failure message names the suite and forbidden behavior.
 
-**Tools Required**: npm, Vitest.
+**Tools Required**: Vitest
 
 ## Phase 6: Workflow and Report Visibility - Validation Scenarios
 
-### Scenario 6.1: GitHub Actions Scenario Summary Is Visible [STATUS: pending]
+### Scenario 6.1: Workflow summaries include layered reports [STATUS: pending]
 **Type**: Happy Path
 
-**Given**: Scenario workflow runs a layered plan.
-**When**: The workflow completes or fails.
-**Then**: `$GITHUB_STEP_SUMMARY` contains selected base scenario, onboarding profile, expected state, onboarding assertion results, suite results, and artifact references where available.
+**Given**: E2E scenario and parity workflows run in GitHub Actions
+**When**: workflow steps complete
+**Then**: `$GITHUB_STEP_SUMMARY` includes selected base, onboarding, expected state, assertion results, suite results, parity counts, and top gaps.
 
 **Validation Steps**:
-1. **Setup**: Static workflow test or local run with `GITHUB_STEP_SUMMARY` pointing to a temp file.
-2. **Execute**: npm/Vitest or Bash: run workflow-summary/render-summary path.
-3. **Verify**: Bash/Vitest: assert summary markdown contains required sections.
+1. **Setup**: workflow lint fixture or local temp `$GITHUB_STEP_SUMMARY`.
+2. **Execute**: workflow test scripts.
+3. **Verify**: summary file contains required sections.
 
-**Tools Required**: Bash, npm, Vitest.
+**Tools Required**: Vitest, Bash
 
-### Scenario 6.2: Gap Reports Are Generated in JSON and Markdown [STATUS: pending]
-**Type**: Happy Path
-
-**Given**: Parity metadata includes layer and gap domain information.
-**When**: Gap reporting runs.
-**Then**: `.e2e/reports/gap-report.json` and `.e2e/reports/gap-report.md` are generated with mapped/deferred/retired counts and top deferred layers/domains.
-
-**Validation Steps**:
-1. **Setup**: Bash: use representative parity map fixture.
-2. **Execute**: Bash or npm: run gap report generation.
-3. **Verify**: Bash: assert both files exist and include expected counts/domains.
-
-**Tools Required**: Bash, npm.
-
-### Scenario 6.3: Failed Run Preserves Failing Layer [STATUS: pending]
+### Scenario 6.2: Failed run records failing layer [STATUS: pending]
 **Type**: Sad Path
 
-**Given**: Fixture runs fail in base, onboarding, expected-state, and suite stages.
-**When**: Reports are generated for each failure.
-**Then**: Each report clearly identifies the failing layer without requiring artifact download.
+**Given**: a fixture scenario fails during base, onboarding, expected-state, or suite stage
+**When**: runner writes reports
+**Then**: report identifies the failing layer without requiring artifact download.
 
 **Validation Steps**:
-1. **Setup**: Vitest: configure fake failing stages.
-2. **Execute**: npm/Vitest: run report generation tests.
-3. **Verify**: Vitest: assert layer-specific failure fields and summary text.
+1. **Setup**: stub failure at each layer.
+2. **Execute**: runner/report tests.
+3. **Verify**: `summary.md` and JSON report contain `failing_layer`.
 
-**Tools Required**: npm, Vitest.
+**Tools Required**: Vitest, Bash fixtures
 
 ## Phase 7: Clean the House - Validation Scenarios
 
-### Scenario 7.1: Layered Model Is the Documented Source of Truth [STATUS: pending]
+### Scenario 7.1: Layered model is the documented source of truth [STATUS: pending]
 **Type**: Happy Path
 
-**Given**: Transitional migration is complete.
-**When**: Documentation and metadata hygiene checks run.
-**Then**: README and MIGRATION describe the layered model, and duplicate legacy definitions exist only with explicit compatibility reasons.
+**Given**: migration cleanup is complete
+**When**: metadata hygiene tests and docs checks run
+**Then**: no unexplained duplicate scenario definitions remain and docs describe the layered model.
 
 **Validation Steps**:
-1. **Setup**: Bash: inspect docs and scenario YAML.
-2. **Execute**: npm/Vitest: run metadata final hygiene and convention lint tests.
-3. **Verify**: Vitest: assert docs coverage and no unexplained duplicates.
+1. **Setup**: real repository metadata.
+2. **Execute**: `npx vitest run test/e2e/scenario-framework-tests/e2e-metadata-final-hygiene.test.ts` and docs-related checks.
+3. **Verify**: tests pass and docs contain base/onboarding/test plan terminology.
 
-**Tools Required**: Bash, npm, Vitest.
+**Tools Required**: Vitest, Bash
 
-### Scenario 7.2: New Legacy E2E Entrypoints Are Rejected [STATUS: pending]
+### Scenario 7.2: New legacy E2E entrypoints are blocked [STATUS: pending]
 **Type**: Sad Path
 
-**Given**: A new unallowlisted `test/e2e/test-*.sh` entrypoint is added for migrated functionality.
-**When**: Convention lint runs.
-**Then**: It fails and directs contributors to the layered scenario model instead.
+**Given**: a new `test/e2e/test-*.sh` entrypoint is added outside approved compatibility paths
+**When**: convention lint runs
+**Then**: it fails and instructs contributors to use layered metadata/suites instead.
 
 **Validation Steps**:
-1. **Setup**: Vitest: use file-list fixture containing a new legacy entrypoint.
-2. **Execute**: npm/Vitest: run convention lint.
-3. **Verify**: Vitest: assert lint failure names the file and replacement path.
+1. **Setup**: fixture or temporary file in lint test.
+2. **Execute**: `npx vitest run test/e2e/scenario-framework-tests/e2e-convention-lint.test.ts`.
+3. **Verify**: failure names forbidden entrypoint pattern.
 
-**Tools Required**: npm, Vitest.
+**Tools Required**: Vitest
 
 ## Summary
 
 | Phase | Happy | Sad | Total | Passed | Failed | Pending |
-|-------|-------|-----|-------|--------|--------|---------|
-| Phase 1 | 2 | 1 | 3 | 0 | 0 | 3 |
+|-------|------:|----:|------:|-------:|-------:|--------:|
+| Phase 1 | 3 | 1 | 4 | 0 | 0 | 4 |
 | Phase 2 | 1 | 1 | 2 | 0 | 0 | 2 |
-| Phase 3 | 1 | 2 | 3 | 0 | 0 | 3 |
+| Phase 3 | 1 | 1 | 2 | 0 | 0 | 2 |
 | Phase 4 | 1 | 1 | 2 | 0 | 0 | 2 |
 | Phase 5 | 1 | 1 | 2 | 0 | 0 | 2 |
-| Phase 6 | 2 | 1 | 3 | 0 | 0 | 3 |
+| Phase 6 | 1 | 1 | 2 | 0 | 0 | 2 |
 | Phase 7 | 1 | 1 | 2 | 0 | 0 | 2 |
-| **Total** | **9** | **8** | **17** | **0** | **0** | **17** |
+| **Total** | **9** | **7** | **16** | **0** | **0** | **16** |
