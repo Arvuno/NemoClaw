@@ -1498,6 +1498,8 @@ function hydrateCredentialEnv(envName: string | null | undefined): string | null
   return resolveProviderCredential(envName);
 }
 
+globalThis.__nemoclawHydrateCredentialEnv = hydrateCredentialEnv;
+
 const {
   getCurlTimingArgs,
   summarizeCurlFailure,
@@ -2041,19 +2043,6 @@ function isInferenceRouteReady(provider: string, model: string): boolean {
   return Boolean(live && live.provider === provider && live.model === model);
 }
 
-const {
-  verifyOnboardInferenceSmoke: verifyOnboardInferenceSmokeWithDeps,
-  shouldSmokeOpenAiLikeOnboardRoute,
-} = require("./onboard/inference-smoke");
-
-function verifyOnboardInferenceSmoke(options: {
-  provider: string;
-  model: string;
-  endpointUrl?: string | null;
-  credentialEnv?: string | null;
-}): void {
-  verifyOnboardInferenceSmokeWithDeps(options, { hydrateCredentialEnv });
-}
 
 function verifyCompatibleEndpointSandboxSmoke(options: {
   sandboxName: string;
@@ -10874,6 +10863,7 @@ module.exports = {
   hasResponsesToolCall,
   hasChatCompletionsToolCall,
   hasChatCompletionsToolCallLeak,
+  verifyOnboardInferenceSmoke,
   upsertProvider,
   normalizeHermesAuthMethod,
   hashCredential,
@@ -10894,6 +10884,4 @@ module.exports = {
   checkTelegramReachability,
   TELEGRAM_NETWORK_CURL_CODES,
   verifyCompatibleEndpointSandboxSmoke,
-  verifyOnboardInferenceSmoke,
-  shouldSmokeOpenAiLikeOnboardRoute,
 };

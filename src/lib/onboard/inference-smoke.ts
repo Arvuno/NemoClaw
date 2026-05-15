@@ -20,7 +20,8 @@ function verifyOnboardInferenceSmoke(options, deps = {}) {
   if (!shouldSmokeOpenAiLikeOnboardRoute(options.provider)) return;
   if (process.env.VITEST === "true") return;
 
-  const hydrateCredentialEnv = deps.hydrateCredentialEnv || (() => null);
+  const hydrateCredentialEnv =
+    deps.hydrateCredentialEnv || globalThis.__nemoclawHydrateCredentialEnv || (() => null);
   const endpointUrl = options.endpointUrl || INFERENCE_ROUTE_URL;
   const credentialEnv = options.credentialEnv || null;
   const apiKey = credentialEnv
