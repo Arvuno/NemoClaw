@@ -243,7 +243,11 @@ else
     echo "run-scenario: onboarding ${ONBOARDING_ID} failed with status ${onboard_status}" >&2
     exit "${onboard_status}"
   fi
-  e2e_gateway_assert_healthy
+  if [[ "${RUNTIME_ID}" == "gpu-docker-cdi" && ! e2e_env_is_dry_run ]]; then
+    echo "run-scenario: GPU Docker CDI uses host-network gateway; validating gateway from suites"
+  else
+    e2e_gateway_assert_healthy
+  fi
   e2e_sandbox_assert_running
 fi
 
