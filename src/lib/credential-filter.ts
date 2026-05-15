@@ -42,6 +42,20 @@ const CREDENTIAL_PLACEHOLDER = "[STRIPPED_BY_MIGRATION]";
 export const CREDENTIAL_SENSITIVE_BASENAMES = new Set(["auth-profiles.json"]);
 
 /**
+ * Dependency lockfiles may contain package metadata that resembles credentials
+ * (for example package names or tarball URLs with `sk-` substrings). They do
+ * not store NemoClaw runtime credentials and should not fail snapshot leak
+ * checks.
+ */
+const SNAPSHOT_CREDENTIAL_SCAN_EXCLUDED_BASENAMES = new Set([
+  "package-lock.json",
+  "npm-shrinkwrap.json",
+  "yarn.lock",
+  "pnpm-lock.yaml",
+  "pnpm-lock.yml",
+]);
+
+/**
  * Credential field names that MUST be stripped from config files.
  */
 const CREDENTIAL_FIELDS = new Set([
@@ -150,4 +164,14 @@ export function sanitizeConfigFile(configPath: string): void {
  */
 export function isSensitiveFile(filename: string): boolean {
   return CREDENTIAL_SENSITIVE_BASENAMES.has(filename.toLowerCase());
+}
+
+/**
+ * Return whether a snapshot file should be scanned for credential-looking
+ * payloads by coarse-grained E2E leak checks.
+ */
+export function shouldScanSnapshotFileForCredentials(filename: string): boolean {
+  const basename = filename.toLowerCase();
+  if (SNAPSHOT_CREDENTIAL_SCAN_EXCLUDED_BASENAMES.has(basename)) return false;
+  return basename === ".env" || basename.endsWith(".env") || basename.endsWith(".json");
 }
