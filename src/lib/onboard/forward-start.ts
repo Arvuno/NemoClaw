@@ -38,7 +38,7 @@ function readDiagnosticFile(filePath: string): string {
 }
 
 export function looksLikeForwardPortConflict(diagnostic: string): boolean {
-  return diagnostic === "" || /eaddrinuse|address already in use|port .* in use|bind: .*in use/i.test(diagnostic);
+  return /eaddrinuse|address already in use|port .* in use|bind: .*in use/i.test(diagnostic);
 }
 
 export function runBackgroundForwardStartWithDiagnostics(

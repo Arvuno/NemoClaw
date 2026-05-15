@@ -106,6 +106,7 @@ restore_directory() {
     rel="${src_file#"${src_dir}/"}"
     openshell sandbox exec --name "$sandbox" -- mkdir -p "${dest_dir}/${rel}" >/dev/null \
       || return 1
+    restored=1
   done < <(find "$src_dir" -mindepth 1 -type d -print0)
 
   return "$((1 - restored))"
