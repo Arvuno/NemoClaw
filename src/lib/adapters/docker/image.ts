@@ -13,6 +13,14 @@ export function dockerBuild(
   opts: DockerBuildOptions = {},
 ) {
   const { quiet, ...rest } = opts;
+  // Dockerfile.base relies on `RUN --mount=type=bind`, which is BuildKit-only.
+  // Hosts whose Docker daemon defaults to the legacy builder (e.g. fresh
+  // Debian/Ubuntu Docker 29 without /etc/docker/daemon.json) abort the
+  // sandbox-base local rebuild with "the --mount option requires BuildKit"
+  // (#3583). Force-enable BuildKit for every `dockerBuild` callsite so the
+  // rebuild path works regardless of daemon defaults.
+  const env: NodeJS.ProcessEnv = { ...(rest.env ?? {}) };
+  if (env.DOCKER_BUILDKIT === undefined) env.DOCKER_BUILDKIT = "1";
   const args = [
     "build",
     ...(quiet ? ["--quiet"] : []),
@@ -22,7 +30,7 @@ export function dockerBuild(
     tag,
     contextDir,
   ];
-  return dockerRun(args, rest);
+  return dockerRun(args, { ...rest, env });
 }
 
 export function dockerRmi(imageRef: string, opts: DockerRunOptions = {}) {
