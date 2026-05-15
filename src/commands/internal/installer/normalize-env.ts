@@ -28,7 +28,7 @@ export default class InternalInstallerNormalizeEnvCommand extends NemoClawComman
       NEMOCLAW_PROVIDER: flags.provider ?? process.env.NEMOCLAW_PROVIDER,
     });
 
-    if (flags.json) console.log(JSON.stringify(normalized, null, 2));
+    if (flags.json) this.logJson(normalized);
     else console.log(`ref=${normalized.installRef} provider=${normalized.provider.normalized ?? ""}`);
   }
 }

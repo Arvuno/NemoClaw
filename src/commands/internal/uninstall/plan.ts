@@ -30,7 +30,7 @@ export default class InternalUninstallPlanCommand extends NemoClawCommand {
       gatewayName: flags.gateway,
       keepOpenShell: flags["keep-openshell"] ?? false,
     });
-    if (flags.json) console.log(JSON.stringify(plan, null, 2));
+    if (flags.json) this.logJson(plan);
     else console.log(`Uninstall plan: ${plan.steps.length} steps for gateway '${plan.gatewayName}'`);
   }
 }

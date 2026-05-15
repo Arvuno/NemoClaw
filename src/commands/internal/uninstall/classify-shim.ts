@@ -23,7 +23,7 @@ export default class InternalUninstallClassifyShimCommand extends NemoClawComman
   public async run(): Promise<void> {
     const { args, flags } = await this.parse(InternalUninstallClassifyShimCommand);
     const classification = classifyShimPath(args.path);
-    if (flags.json) console.log(JSON.stringify(classification, null, 2));
+    if (flags.json) this.logJson(classification);
     else console.log(`${classification.kind}: ${classification.reason}`);
   }
 }

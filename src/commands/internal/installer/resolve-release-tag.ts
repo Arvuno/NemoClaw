@@ -26,7 +26,7 @@ export default class InternalInstallerResolveReleaseTagCommand extends NemoClawC
       NEMOCLAW_INSTALL_TAG: flags["install-tag"] ?? process.env.NEMOCLAW_INSTALL_TAG,
     });
 
-    if (flags.json) console.log(JSON.stringify({ installRef }, null, 2));
+    if (flags.json) this.logJson({ installRef });
     else console.log(installRef);
   }
 }

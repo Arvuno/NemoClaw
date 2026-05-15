@@ -43,7 +43,7 @@ export default class InternalInstallerPlanCommand extends NemoClawCommand {
       stampedVersion: flags["stamped-version"],
     });
 
-    if (flags.json) console.log(JSON.stringify(plan, null, 2));
+    if (flags.json) this.logJson(plan);
     else console.log(`Installer plan: ref '${plan.installRef}', version '${plan.installerVersion}'`);
   }
 }
