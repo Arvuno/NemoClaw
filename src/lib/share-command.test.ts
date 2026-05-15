@@ -270,13 +270,15 @@ describe("ShareCommand mount/status actions", () => {
 
   it("exits when the target local mount is already mounted", async () => {
     const deps = makeDeps();
+    const localMount = "/tmp/mounted";
     spawnSyncMock.mockImplementation((cmd: string, args: string[]) => {
       if (cmd === "sh" && args[1] === "command -v sshfs") return { status: 0, stdout: "sshfs\n" };
       if (cmd === "mountpoint") return { status: 0, stdout: "", stderr: "" };
+      if (cmd === "mount") return { status: 0, stdout: mountedAt(localMount), stderr: "" };
       return { status: 1, stdout: "", stderr: "" };
     });
 
-    await expect(runShareMount({ sandboxName: "alpha", localMount: "/tmp/mounted" }, deps)).rejects.toThrow(
+    await expect(runShareMount({ sandboxName: "alpha", localMount }, deps)).rejects.toThrow(
       "process.exit:1",
     );
     expect(deps.ensureLive).not.toHaveBeenCalled();
