@@ -28,9 +28,10 @@ section() {
 info() { printf '\033[1;34m  [info]\033[0m %s\n' "$1"; }
 
 is_routed_pong_response() {
-  python3 - <<'PY'
+  local raw="$1"
+  python3 - "$raw" <<'PY'
 import json, re, sys
-raw = sys.stdin.read()
+raw = sys.argv[1]
 try:
     data = json.loads(raw)
 except Exception:
@@ -169,7 +170,7 @@ for _ in $(seq 1 3); do
     2>&1 || true)"
   printf '%s\n' "$response" >"$RESPONSE_LOG"
   redact_file "$RESPONSE_LOG"
-  if is_routed_pong_response <<<"$response"; then
+  if is_routed_pong_response "$response"; then
     pass "inference.local returned a routed Model Router completion"
     break
   fi
@@ -179,7 +180,7 @@ for _ in $(seq 1 3); do
   sleep 5
 done
 
-if is_routed_pong_response <<<"$response"; then
+if is_routed_pong_response "$response"; then
   :
 else
   fail "Model Router inference.local did not return a routed completion; expected #3255 main-equivalent failure"
