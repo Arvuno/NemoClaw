@@ -48,9 +48,9 @@ npm run build:cli
 info "Invoking setupInference() with a gateway route that is configured but runtime-broken"
 set +e
 NEMOCLAW_NON_INTERACTIVE=1 \
-NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 \
-NEMOCLAW_ONBOARD_INFERENCE_SMOKE_E2E=1 \
-node <<'NODE' 2>&1 | tee /tmp/nemoclaw-e2e-onboard-inference-smoke-node.log
+  NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 \
+  NEMOCLAW_ONBOARD_INFERENCE_SMOKE_E2E=1 \
+  node <<'NODE' 2>&1 | tee /tmp/nemoclaw-e2e-onboard-inference-smoke-node.log
 const Module = require("module");
 const originalLoad = Module._load;
 const calls = [];
