@@ -51,14 +51,6 @@ fail() {
   ((TOTAL += 1))
   echo -e "${RED}  FAIL${NC} $1 — $2" | tee -a "$LOG_FILE"
 }
-# Record a skipped test.
-# shellcheck disable=SC2329
-skip() {
-  ((SKIP += 1))
-  ((TOTAL += 1))
-  echo -e "${YELLOW}  SKIP${NC} $1 — $2" | tee -a "$LOG_FILE"
-}
-
 # ── Config ───────────────────────────────────────────────────────────────────
 SANDBOX_NAME="${NEMOCLAW_SANDBOX_NAME:-e2e-state-backup}"
 LOG_FILE="test-state-backup-restore-$(date +%Y%m%d-%H%M%S).log"
