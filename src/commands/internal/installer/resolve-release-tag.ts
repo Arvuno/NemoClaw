@@ -14,7 +14,6 @@ export default class InternalInstallerResolveReleaseTagCommand extends NemoClawC
   static usage = ["internal installer resolve-release-tag [--json]"];
   static examples = ["<%= config.bin %> internal installer resolve-release-tag --install-ref v0.1.0"];
   static flags = {
-    help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Print the resolved ref as JSON" }),
     "install-ref": Flags.string({ description: "NEMOCLAW_INSTALL_REF value" }),
     "install-tag": Flags.string({ description: "NEMOCLAW_INSTALL_TAG value" }),

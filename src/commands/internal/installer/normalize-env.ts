@@ -14,7 +14,6 @@ export default class InternalInstallerNormalizeEnvCommand extends NemoClawComman
   static usage = ["internal installer normalize-env [--json]"];
   static examples = ["<%= config.bin %> internal installer normalize-env --provider cloud --json"];
   static flags = {
-    help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Print normalized values as JSON" }),
     "install-ref": Flags.string({ description: "NEMOCLAW_INSTALL_REF value" }),
     "install-tag": Flags.string({ description: "NEMOCLAW_INSTALL_TAG value" }),

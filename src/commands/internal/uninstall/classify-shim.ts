@@ -17,7 +17,6 @@ export default class InternalUninstallClassifyShimCommand extends NemoClawComman
     path: Args.string({ description: "Shim path to classify", required: true }),
   };
   static flags = {
-    help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Print classification as JSON" }),
   };
 
