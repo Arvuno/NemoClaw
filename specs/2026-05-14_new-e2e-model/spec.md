@@ -667,7 +667,7 @@ Future filter environment variables are intentionally out of scope until a concr
 
 ## Implementation Phases
 
-## Phase 1: Layered Terminology and Schema Planning
+## Phase 1: Layered Terminology and Schema Planning [COMPLETED: 57cd725]
 
 Introduce the layered terminology and schema support while preserving current scenario IDs and behavior. This phase is intentionally documentation-first plus plan-only resolver work: future contributors should learn the new mental model before feature migration continues.
 
