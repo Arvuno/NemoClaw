@@ -11,9 +11,20 @@ PASS=0
 FAIL=0
 TOTAL=0
 
-pass() { ((PASS++)); ((TOTAL++)); echo "  OK: $1"; }
-fail() { ((FAIL++)); ((TOTAL++)); echo "  ERROR: $1"; }
-section() { echo ""; printf '\033[1;36m=== %s ===\033[0m\n' "$1"; }
+pass() {
+  ((PASS++))
+  ((TOTAL++))
+  echo "  OK: $1"
+}
+fail() {
+  ((FAIL++))
+  ((TOTAL++))
+  echo "  ERROR: $1"
+}
+section() {
+  echo ""
+  printf '\033[1;36m=== %s ===\033[0m\n' "$1"
+}
 info() { printf '\033[1;34m  [info]\033[0m %s\n' "$1"; }
 
 is_routed_pong_response() {
@@ -153,8 +164,8 @@ response=""
 for _ in $(seq 1 3); do
   response="$(openshell sandbox exec --name "$SANDBOX_NAME" -- \
     curl -sk --max-time 90 https://inference.local/v1/chat/completions \
-      -H 'Content-Type: application/json' \
-      -d '{"model":"nvidia-routed","messages":[{"role":"user","content":"Reply with exactly one word: PONG"}],"max_tokens":50}' \
+    -H 'Content-Type: application/json' \
+    -d '{"model":"nvidia-routed","messages":[{"role":"user","content":"Reply with exactly one word: PONG"}],"max_tokens":50}' \
     2>&1 || true)"
   printf '%s\n' "$response" >"$RESPONSE_LOG"
   redact_file "$RESPONSE_LOG"
