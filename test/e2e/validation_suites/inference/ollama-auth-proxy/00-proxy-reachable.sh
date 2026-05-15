@@ -25,7 +25,7 @@ name="$(e2e_context_get E2E_SANDBOX_NAME)"
 # live and enforcing auth). Do not use curl -f here.
 status="$(openshell sandbox exec --name "${name}" -- curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "http://inference-local/api/tags" 2>/dev/null || echo 000)"
 case "${status}" in
-  200|401|403)
+  200 | 401 | 403)
     echo "ollama-proxy:proxy-reachable status=${status}"
     ;;
   *)
