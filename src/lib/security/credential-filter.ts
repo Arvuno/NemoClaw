@@ -11,6 +11,7 @@
 // They are injected at runtime via OpenShell's provider credential mechanism.
 
 import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { basename } from "node:path";
 
 function parseJson<T>(text: string): T {
   return JSON.parse(text);
@@ -171,7 +172,7 @@ export function isSensitiveFile(filename: string): boolean {
  * payloads by coarse-grained E2E leak checks.
  */
 export function shouldScanSnapshotFileForCredentials(filename: string): boolean {
-  const basename = filename.toLowerCase();
-  if (SNAPSHOT_CREDENTIAL_SCAN_EXCLUDED_BASENAMES.has(basename)) return false;
-  return basename === ".env" || basename.endsWith(".env") || basename.endsWith(".json");
+  const normalizedBasename = basename(filename).toLowerCase();
+  if (SNAPSHOT_CREDENTIAL_SCAN_EXCLUDED_BASENAMES.has(normalizedBasename)) return false;
+  return normalizedBasename === ".env" || normalizedBasename.endsWith(".env") || normalizedBasename.endsWith(".json");
 }

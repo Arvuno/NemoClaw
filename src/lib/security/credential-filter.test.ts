@@ -162,4 +162,9 @@ describe("shouldScanSnapshotFileForCredentials", () => {
     expect(shouldScanSnapshotFileForCredentials("yarn.lock")).toBe(false);
     expect(shouldScanSnapshotFileForCredentials("pnpm-lock.yaml")).toBe(false);
   });
+
+  it("applies lockfile exclusions to paths by basename", () => {
+    expect(shouldScanSnapshotFileForCredentials("/tmp/snapshot/package-lock.json")).toBe(false);
+    expect(shouldScanSnapshotFileForCredentials("/tmp/snapshot/config.json")).toBe(true);
+  });
 });
