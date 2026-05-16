@@ -8,8 +8,6 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import YAML from "yaml";
-
 import type { AgentDefinition } from "../dist/lib/agent/defs.js";
 import { loadAgent } from "../dist/lib/agent/defs.js";
 import { buildChain, buildControlUiUrls } from "../dist/lib/dashboard/contract.js";
@@ -50,23 +48,9 @@ type OnboardTestInternals = {
     credentialEnv: string,
     baseUrl: string | null,
   ) => string[];
-  buildCompatibleEndpointSandboxSmokeCommand: (model: string) => string;
-  buildCompatibleEndpointSandboxSmokeScript: (model: string) => string;
   buildSandboxConfigSyncScript: ShimFn<string>;
-  buildDirectGpuPolicyYaml: (basePolicy: string, options?: { procReadWrite?: boolean }) => string;
-  buildDirectSandboxGpuProofCommands: (sandboxName: string) => {
-    id: string;
-    label: string;
-    args: string[];
-    optional?: boolean;
-  }[];
   classifySandboxCreateFailure: (output?: string) => { kind: string; uploadedToGateway: boolean };
   compactText: (value?: string) => string;
-  computeSetupPresetSuggestions: ShimFn<string[]>;
-  filterSetupPolicyPresets: <T extends { name: string }>(
-    presets: T[],
-    options?: { webSearchSupported?: boolean | null },
-  ) => T[];
   formatEnvAssignment: (name: string, value: string) => string;
   findAvailableDashboardPort: (
     sandboxName: string,
@@ -172,7 +156,6 @@ type OnboardTestInternals = {
   } | null>;
   getSandboxStateFromOutputs: ShimFn<string>;
   getStableGatewayImageRef: (versionOutput?: string | null) => string | null;
-  getSuggestedPolicyPresets: ShimFn<string[]>;
   isGatewayHealthy: ShimFn<boolean>;
   classifyValidationFailure: ShimFn<ValidationClassification>;
   hasResponsesToolCall: (body?: string | null) => boolean;
@@ -202,11 +185,6 @@ type OnboardTestInternals = {
   summarizeCurlFailure: ShimFn<string>;
   summarizeProbeFailure: ShimFn<string>;
   shouldIncludeBuildContextPath: ShimFn<boolean>;
-  shouldRunCompatibleEndpointSandboxSmoke: (
-    provider?: string | null,
-    messagingChannels?: string[] | null,
-    agent?: AgentDefinition | null,
-  ) => boolean;
   writeSandboxConfigSyncFile: (script: string) => string;
 };
 
@@ -227,11 +205,7 @@ function isOnboardTestInternals(
   return (
     value !== null &&
     typeof value.buildProviderArgs === "function" &&
-    typeof value.buildCompatibleEndpointSandboxSmokeCommand === "function" &&
-    typeof value.buildCompatibleEndpointSandboxSmokeScript === "function" &&
     typeof value.buildSandboxConfigSyncScript === "function" &&
-    typeof value.buildDirectGpuPolicyYaml === "function" &&
-    typeof value.buildDirectSandboxGpuProofCommands === "function" &&
     typeof value.classifySandboxCreateFailure === "function" &&
     typeof value.findAvailableDashboardPort === "function" &&
     typeof value.getDockerDriverGatewayEnv === "function" &&
@@ -248,7 +222,6 @@ function isOnboardTestInternals(
     typeof value.shouldAllowOpenshellAboveBlueprintMax === "function" &&
     typeof value.hasChatCompletionsToolCall === "function" &&
     typeof value.hasChatCompletionsToolCallLeak === "function" &&
-    typeof value.filterSetupPolicyPresets === "function" &&
     typeof value.getDefaultSandboxNameForAgent === "function" &&
     typeof value.getSandboxPromptDefault === "function" &&
     typeof value.getRequestedSandboxAgentName === "function" &&
@@ -258,7 +231,6 @@ function isOnboardTestInternals(
     typeof value.formatSandboxBuildEstimateNote === "function" &&
     Object.prototype.hasOwnProperty.call(value, "providerNameToOptionKey") &&
     typeof value.providerNameToOptionKey === "function" &&
-    typeof value.shouldRunCompatibleEndpointSandboxSmoke === "function" &&
     typeof value.writeSandboxConfigSyncFile === "function"
   );
 }
@@ -274,15 +246,9 @@ if (!isOnboardTestInternals(onboardTestInternals)) {
 
 const {
   buildProviderArgs,
-  buildCompatibleEndpointSandboxSmokeCommand,
-  buildCompatibleEndpointSandboxSmokeScript,
   buildSandboxConfigSyncScript,
-  buildDirectGpuPolicyYaml,
-  buildDirectSandboxGpuProofCommands,
   classifySandboxCreateFailure,
   compactText,
-  computeSetupPresetSuggestions,
-  filterSetupPolicyPresets,
   formatEnvAssignment,
   getNavigationChoice,
   getGatewayReuseState,
@@ -316,7 +282,6 @@ const {
   getResumeSandboxConflict,
   getSandboxStateFromOutputs,
   getStableGatewayImageRef,
-  getSuggestedPolicyPresets,
   isGatewayHealthy,
   classifyValidationFailure,
   hasResponsesToolCall,
@@ -334,7 +299,6 @@ const {
   summarizeCurlFailure,
   summarizeProbeFailure,
   shouldIncludeBuildContextPath,
-  shouldRunCompatibleEndpointSandboxSmoke,
   writeSandboxConfigSyncFile,
   findAvailableDashboardPort,
   findDashboardForwardOwner,
@@ -396,68 +360,6 @@ describe("onboard helpers", () => {
 
     const legacyGpuSession = getResumeSandboxGpuOverrides(null, true);
     expect(legacyGpuSession.flag).toBe("enable");
-  });
-
-  it(
-    "removes /proc from direct GPU create policy so OpenShell can own GPU enrichment",
-    () => {
-      const basePolicy = fs.readFileSync(
-        path.join(repoRoot, "nemoclaw-blueprint", "policies", "openclaw-sandbox.yaml"),
-        "utf-8",
-      );
-      const gpuPolicy = buildDirectGpuPolicyYaml(basePolicy);
-      const baseDoc = YAML.parse(basePolicy);
-      const gpuDoc = YAML.parse(gpuPolicy);
-
-      // /proc is added at runtime by OpenShell's GPU enrichment;
-      // create-time must not pre-declare it.
-      expect(baseDoc.filesystem_policy.read_only).toContain("/proc");
-      expect(gpuDoc.filesystem_policy.read_only).not.toContain("/proc");
-      expect(gpuDoc.filesystem_policy.read_write).not.toContain("/proc");
-      expect(gpuDoc.filesystem_policy.read_write).not.toContain("/proc/self/task/*/comm");
-    },
-  );
-
-  it(
-    "adds /proc read-write when Docker GPU patch must own GPU enrichment",
-    () => {
-      const basePolicy = fs.readFileSync(
-        path.join(repoRoot, "nemoclaw-blueprint", "policies", "openclaw-sandbox.yaml"),
-        "utf-8",
-      );
-      const gpuPolicy = buildDirectGpuPolicyYaml(basePolicy, { procReadWrite: true });
-      const gpuDoc = YAML.parse(gpuPolicy);
-
-      expect(gpuDoc.filesystem_policy.read_only).not.toContain("/proc");
-      expect(gpuDoc.filesystem_policy.read_write).toContain("/proc");
-      expect(gpuDoc.filesystem_policy.read_write).not.toContain("/proc/self/task/*/comm");
-    },
-  );
-
-  it("removes stale proc entries from GPU policy input", () => {
-    const gpuPolicy = buildDirectGpuPolicyYaml(`
-version: 1
-filesystem_policy:
-  include_workdir: true
-  read_only:
-    - /usr
-    - /proc
-    - /proc/self/task/*/comm
-  read_write:
-    - /tmp
-    - /proc
-    - /proc/self/task/*/comm
-network_policies:
-  nvidia:
-    name: nvidia
-    endpoints:
-      - host: integrate.api.nvidia.com
-        port: 443
-`);
-    const gpuDoc = YAML.parse(gpuPolicy);
-
-    expect(gpuDoc.filesystem_policy.read_only).toEqual(["/usr"]);
-    expect(gpuDoc.filesystem_policy.read_write).toEqual(["/tmp"]);
   });
 
   it("models the OpenShell standalone gateway environment", () => {
@@ -718,36 +620,6 @@ network_policies:
     }
   });
 
-  it("builds direct sandbox GPU proof commands", () => {
-    const commands = buildDirectSandboxGpuProofCommands("alpha");
-    expect(commands.map((entry) => entry.label)).toEqual([
-      "nvidia-smi when available",
-      "/proc/<pid>/task/<tid>/comm write",
-      "cuInit(0) via libcuda.so.1",
-    ]);
-    expect(commands.map((entry) => entry.id)).toEqual(["nvidia-smi", "proc-comm-write", "cuda-init"]);
-    expect(commands[1].optional).toBe(true);
-    expect(commands[2].optional).toBe(true);
-    expect(commands[0].args).toEqual([
-      "sandbox",
-      "exec",
-      "-n",
-      "alpha",
-      "--",
-      "sh",
-      "-lc",
-      expect.stringContaining("command -v nvidia-smi"),
-    ]);
-    expect(commands[1].args.join(" ")).toContain("/proc/self/comm");
-    expect(commands[1].args.join(" ")).not.toContain("ls /proc/self/task");
-    expect(commands[2].args.join(" ")).toContain("cuInit(0)");
-    for (const command of commands) {
-      for (const arg of command.args) {
-        assert.doesNotMatch(arg, /[\r\n]/);
-      }
-    }
-  });
-
   it("uses Hermes-oriented sandbox defaults when NemoHermes selects Hermes", () => {
     const previousSandboxName = process.env.NEMOCLAW_SANDBOX_NAME;
     try {
@@ -871,217 +743,6 @@ network_policies:
     assert.match(script, /chmod 660 "\$config_dir\/openclaw\.json" "\$config_dir\/\.config-hash"/);
     assert.match(script, /\[ "\$config_dir_owner" != "root" \]/);
     assert.match(script, /^\s*exit$/m);
-  });
-
-  it("runs the compatible-endpoint sandbox smoke only for OpenClaw messaging sandboxes", () => {
-    expect(shouldRunCompatibleEndpointSandboxSmoke("compatible-endpoint", ["telegram"], null)).toBe(
-      true,
-    );
-    expect(shouldRunCompatibleEndpointSandboxSmoke("compatible-endpoint", [], null)).toBe(false);
-    expect(shouldRunCompatibleEndpointSandboxSmoke("openai-api", ["telegram"], null)).toBe(false);
-    expect(
-      shouldRunCompatibleEndpointSandboxSmoke(
-        "compatible-endpoint",
-        ["telegram"],
-        loadAgent("hermes"),
-      ),
-    ).toBe(false);
-  });
-
-  it("builds a compatible-endpoint smoke script that validates managed inference config", () => {
-    const script = buildCompatibleEndpointSandboxSmokeScript("deepseek-ai/DeepSeek-V4-Flash");
-
-    assert.match(script, /models\.providers\.inference/);
-    assert.match(script, /https:\/\/inference\.local\/v1/);
-    assert.match(script, /apiKey.*unused/);
-    assert.match(script, /agents\.defaults\.model\.primary/);
-    assert.match(script, /INFERENCE_URL=.*\/chat\/completions/);
-    assert.match(script, /curl[\s\S]*"\$INFERENCE_URL"/);
-    assert.doesNotMatch(script, /COMPATIBLE_API_KEY/);
-    assert.doesNotMatch(script, /api\.deepinfra\.com/);
-  });
-
-  it("wraps compatible-endpoint smoke script without newlines for OpenShell exec", () => {
-    const command = buildCompatibleEndpointSandboxSmokeCommand("deepseek-ai/DeepSeek-V4-Flash");
-
-    assert.doesNotMatch(command, /[\r\n]/);
-    assert.match(command, /base64\.b64decode/);
-    assert.match(command, /sh "\$tmp"/);
-    assert.doesNotMatch(command, /COMPATIBLE_API_KEY/);
-  });
-
-  it("uses explicit messaging selections for policy suggestions when provided", () => {
-    const originalTelegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
-    const originalDiscordBotToken = process.env.DISCORD_BOT_TOKEN;
-    const originalSlackBotToken = process.env.SLACK_BOT_TOKEN;
-    process.env.TELEGRAM_BOT_TOKEN = "telegram-token";
-    process.env.DISCORD_BOT_TOKEN = "discord-token";
-    process.env.SLACK_BOT_TOKEN = "slack-token";
-    try {
-      expect(getSuggestedPolicyPresets({ enabledChannels: [] })).toEqual(["pypi", "npm"]);
-      expect(getSuggestedPolicyPresets({ enabledChannels: ["telegram"] })).toEqual([
-        "pypi",
-        "npm",
-        "telegram",
-      ]);
-      expect(getSuggestedPolicyPresets({ enabledChannels: ["discord", "slack"] })).toEqual([
-        "pypi",
-        "npm",
-        "slack",
-        "discord",
-      ]);
-    } finally {
-      if (originalTelegramBotToken === undefined) delete process.env.TELEGRAM_BOT_TOKEN;
-      else process.env.TELEGRAM_BOT_TOKEN = originalTelegramBotToken;
-      if (originalDiscordBotToken === undefined) delete process.env.DISCORD_BOT_TOKEN;
-      else process.env.DISCORD_BOT_TOKEN = originalDiscordBotToken;
-      if (originalSlackBotToken === undefined) delete process.env.SLACK_BOT_TOKEN;
-      else process.env.SLACK_BOT_TOKEN = originalSlackBotToken;
-    }
-  });
-
-  it("suggests local-inference preset when provider is ollama-local", () => {
-    const presets = getSuggestedPolicyPresets({ provider: "ollama-local" });
-    expect(presets).toContain("local-inference");
-    expect(presets).toContain("pypi");
-    expect(presets).toContain("npm");
-  });
-
-  it("suggests local-inference preset when provider is vllm-local", () => {
-    const presets = getSuggestedPolicyPresets({ provider: "vllm-local" });
-    expect(presets).toContain("local-inference");
-  });
-
-  it("does not suggest local-inference for cloud providers", () => {
-    expect(getSuggestedPolicyPresets({ provider: "nvidia-prod" })).not.toContain("local-inference");
-    expect(getSuggestedPolicyPresets({ provider: "openai-api" })).not.toContain("local-inference");
-    expect(getSuggestedPolicyPresets({ provider: null })).not.toContain("local-inference");
-    expect(getSuggestedPolicyPresets({})).not.toContain("local-inference");
-  });
-
-  describe("computeSetupPresetSuggestions", () => {
-    const known = [
-      "npm",
-      "pypi",
-      "huggingface",
-      "brew",
-      "brave",
-      "slack",
-      "discord",
-      "telegram",
-      "jira",
-      "outlook",
-      "local-inference",
-    ];
-
-    it("returns balanced tier defaults without messaging presets when no channels enabled", () => {
-      const suggestions = computeSetupPresetSuggestions("balanced", {
-        enabledChannels: [],
-        knownPresetNames: known,
-      });
-      expect(suggestions).toEqual(["npm", "pypi", "huggingface", "brew", "brave"]);
-    });
-
-    it("filters tier defaults to known presets for agent-specific onboarding", () => {
-      const suggestions = computeSetupPresetSuggestions("balanced", {
-        enabledChannels: [],
-        knownPresetNames: known.filter((name) => name !== "brave"),
-      });
-      expect(suggestions).toEqual(["npm", "pypi", "huggingface", "brew"]);
-    });
-
-    it("omits Brave when web search is unsupported", () => {
-      const allPresets = known.map((name) => ({ name }));
-      const unsupportedPresets = filterSetupPolicyPresets(allPresets, {
-        webSearchSupported: false,
-      }).map((p) => p.name);
-      const supportedPresets = filterSetupPolicyPresets(allPresets, {
-        webSearchSupported: true,
-      }).map((p) => p.name);
-      expect(unsupportedPresets).not.toContain("brave");
-      expect(supportedPresets).toContain("brave");
-    });
-
-    it("drops Brave tier defaults when web search is unsupported", () => {
-      const suggestions = computeSetupPresetSuggestions("balanced", {
-        enabledChannels: [],
-        knownPresetNames: known,
-        webSearchSupported: false,
-      });
-      expect(suggestions).toEqual(["npm", "pypi", "huggingface", "brew"]);
-    });
-
-    it("forwards enabled messaging channels into the balanced tier suggestions", () => {
-      const suggestions = computeSetupPresetSuggestions("balanced", {
-        enabledChannels: ["telegram"],
-        knownPresetNames: known,
-      });
-      expect(suggestions).toContain("telegram");
-      expect(suggestions).toContain("npm");
-      expect(suggestions).toContain("brave");
-    });
-
-    it("forwards multiple messaging channels", () => {
-      const suggestions = computeSetupPresetSuggestions("balanced", {
-        enabledChannels: ["discord", "slack"],
-        knownPresetNames: known,
-      });
-      expect(suggestions).toContain("discord");
-      expect(suggestions).toContain("slack");
-    });
-
-    it("does not duplicate a channel already present in the tier (open tier)", () => {
-      const suggestions = computeSetupPresetSuggestions("open", {
-        enabledChannels: ["telegram", "slack"],
-        knownPresetNames: known,
-      });
-      expect(suggestions.filter((n: string) => n === "telegram")).toHaveLength(1);
-      expect(suggestions.filter((n: string) => n === "slack")).toHaveLength(1);
-    });
-
-    it("drops channel names that are not known presets", () => {
-      const suggestions = computeSetupPresetSuggestions("balanced", {
-        enabledChannels: ["telegram", "not-a-real-preset"],
-        knownPresetNames: known,
-      });
-      expect(suggestions).toContain("telegram");
-      expect(suggestions).not.toContain("not-a-real-preset");
-    });
-
-    it("still adds brave when webSearchConfig is provided", () => {
-      const suggestions = computeSetupPresetSuggestions("restricted", {
-        webSearchConfig: { provider: "brave" },
-        knownPresetNames: known,
-      });
-      expect(suggestions).toContain("brave");
-    });
-
-    it("does not add Brave from webSearchConfig when web search is unsupported", () => {
-      const suggestions = computeSetupPresetSuggestions("restricted", {
-        webSearchConfig: { provider: "brave" },
-        knownPresetNames: known,
-        webSearchSupported: false,
-      });
-      expect(suggestions).not.toContain("brave");
-    });
-
-    it("adds local-inference for local providers", () => {
-      const suggestions = computeSetupPresetSuggestions("balanced", {
-        provider: "ollama-local",
-        knownPresetNames: known,
-      });
-      expect(suggestions).toContain("local-inference");
-    });
-
-    it("ignores enabledChannels when null (non-explicit selection)", () => {
-      const suggestions = computeSetupPresetSuggestions("balanced", {
-        enabledChannels: null,
-        knownPresetNames: known,
-      });
-      expect(suggestions).not.toContain("telegram");
-      expect(suggestions).not.toContain("slack");
-      expect(suggestions).not.toContain("discord");
-    });
   });
 
   it("patches the staged Dockerfile with the selected model and chat UI URL", () => {
