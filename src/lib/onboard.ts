@@ -6590,7 +6590,7 @@ async function setupNim(
       let recoveredModel: string | null = null;
       hermesAuthMethod = null;
 
-      if (isNonInteractive()) {
+      if (isNonInteractive() || requestedProvider) {
         let providerKey = requestedProvider;
         if (!providerKey) {
           const recordedProvider = readRecordedProvider(sandboxName);
