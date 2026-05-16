@@ -3,7 +3,6 @@
 
 import { spawnSync } from "node:child_process";
 
-import { Flags } from "@oclif/core";
 import { NemoClawCommand } from "../cli/nemoclaw-oclif-command";
 
 import { getVersion } from "../core/version";
@@ -17,7 +16,6 @@ export default class UninstallCliCommand extends NemoClawCommand {
   static usage = ["uninstall [flags]"];
   static examples = ["<%= config.bin %> uninstall --yes"];
   static flags = {
-    help: Flags.help({ char: "h" }),
   };
 
   public async run(): Promise<void> {
@@ -31,7 +29,10 @@ export default class UninstallCliCommand extends NemoClawCommand {
       spawnSyncImpl: spawnSync,
       log: console.log,
       error: console.error,
-      exit: (code: number) => process.exit(code),
+      exit: (code: number): never => {
+        this.setExitCode(code);
+        return undefined as never;
+      },
     });
   }
 }

@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Flags } from "@oclif/core";
 import { NemoClawCommand } from "../../cli/nemoclaw-oclif-command";
 
 import { CLI_NAME } from "../../cli/branding";
@@ -17,12 +16,11 @@ export default class CredentialsListCommand extends NemoClawCommand {
   static usage = ["credentials list"];
   static examples = ["<%= config.bin %> credentials list"];
   static flags = {
-    help: Flags.help({ char: "h" }),
   };
 
   public async run(): Promise<void> {
     await this.parse(CredentialsListCommand);
-    await recoverGatewayOrExit("query");
+    if (!(await recoverGatewayOrExit("query", (lines) => this.failWithLines(lines)))) return;
 
     const result = runOpenshellProviderCommand(["provider", "list", "--names"], {
       ignoreError: true,
@@ -30,9 +28,11 @@ export default class CredentialsListCommand extends NemoClawCommand {
       timeout: OPENSHELL_OPERATION_TIMEOUT_MS,
     });
     if (result.status !== 0) {
-      console.error("  Could not query OpenShell gateway. Is it running?");
-      console.error(`  Run 'openshell gateway start --name nemoclaw' or '${CLI_NAME} onboard' first.`);
-      process.exit(1);
+      this.failWithLines([
+        "  Could not query OpenShell gateway. Is it running?",
+        `  Run 'openshell gateway start --name nemoclaw' or '${CLI_NAME} onboard' first.`,
+      ]);
+      return;
     }
 
     const allNames = String(result.stdout || "")

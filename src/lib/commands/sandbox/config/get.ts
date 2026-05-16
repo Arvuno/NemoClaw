@@ -22,7 +22,6 @@ export default class SandboxConfigGetCommand extends NemoClawCommand {
     sandboxName: sandboxNameArg,
   };
   static flags = {
-    help: Flags.help({ char: "h" }),
     key: Flags.string({ description: "Dotpath to read from the sanitized config" }),
     format: Flags.string({
       description: "Output format",
@@ -39,7 +38,7 @@ export default class SandboxConfigGetCommand extends NemoClawCommand {
   }
 }
 
-export function printConfigUsageAndExit(): never {
+export function printConfigUsageAndExit(): void {
   console.error(`  Usage: ${CLI_NAME} <name> config get [--key dotpath] [--format json|yaml]`);
-  process.exit(1);
+  process.exitCode = 1;
 }

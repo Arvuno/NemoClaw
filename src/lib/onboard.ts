@@ -17,9 +17,7 @@ const {
 }: typeof import("./onboard/branding") = require("./onboard/branding");
 const { cleanupTempDir }: typeof import("./onboard/temp-files") = require("./onboard/temp-files");
 const { stopStaleDashboardListenersForSandbox } = require("./onboard/stale-gateway-cleanup");
-const {
-  runBackgroundForwardStartWithDiagnostics,
-}: typeof import("./onboard/forward-start") = require("./onboard/forward-start");
+const { looksLikeForwardPortConflict, runBackgroundForwardStartWithPortReleaseRetries }: typeof import("./onboard/forward-start") = require("./onboard/forward-start");
 const {
   ensureOllamaLoopbackSystemdOverride,
 }: typeof import("./onboard/ollama-systemd") = require("./onboard/ollama-systemd");
@@ -364,6 +362,7 @@ import type {
   OpenShellInstallResult,
 } from "./onboard/openshell-install";
 import { decidePolicyCarryForward } from "./onboard/policy-carryforward";
+import { resolveSandboxGpuMode, type SandboxGpuFlag, type SandboxGpuMode } from "./onboard/sandbox-gpu-mode";
 import type { SelectionDrift } from "./onboard/selection-drift";
 import type {
   ModelCatalogFetchResult,
@@ -1240,9 +1239,6 @@ function shouldAllowOpenshellAboveBlueprintMax(
   return shouldUseOpenshellDevChannel(platform, env) && isOpenshellDevVersion(versionOutput);
 }
 
-type SandboxGpuMode = "auto" | "1" | "0";
-type SandboxGpuFlag = "enable" | "disable" | null;
-
 type SandboxGpuConfig = {
   mode: SandboxGpuMode;
   hostGpuDetected: boolean;
@@ -1287,9 +1283,7 @@ function resolveSandboxGpuConfig(
     errors.push("NEMOCLAW_SANDBOX_GPU must be one of: auto, 1, 0.");
   }
 
-  let mode: SandboxGpuMode = envMode ?? "auto";
-  if (options.flag === "enable") mode = "1";
-  if (options.flag === "disable") mode = "0";
+  let mode = resolveSandboxGpuMode({ envMode, gpu, flag: options.flag });
 
   const device = (options.device ?? env.NEMOCLAW_SANDBOX_GPU_DEVICE ?? "").trim() || null;
   if (device && mode === "0") {
@@ -2367,15 +2361,12 @@ const {
   hasChatCompletionsToolCall,
   hasChatCompletionsToolCallLeak,
   shouldRequireResponsesToolCalling,
+  verifyOnboardInferenceSmoke,
   getProbeAuthMode,
   getValidationProbeCurlArgs,
   probeOpenAiLikeEndpoint,
   probeAnthropicEndpoint,
 } = require("./inference/onboard-probes");
-
-// shouldSkipResponsesProbe and isNvcfFunctionNotFoundForAccount /
-// nvcfFunctionNotFoundMessage — see validation import above. They live in
-// src/lib/validation.ts so they can be unit-tested independently.
 
 async function validateOpenAiLikeSelection(
   label: string,
@@ -7708,6 +7699,7 @@ async function setupInference(
     }
 
     verifyInferenceRoute(provider, model);
+    verifyOnboardInferenceSmoke({ provider, model, endpointUrl, credentialEnv });
     if (sandboxName) {
       registry.updateSandbox(sandboxName, { model, provider });
     }
@@ -7983,6 +7975,7 @@ async function setupInference(
   }
 
   verifyInferenceRoute(provider, model);
+  verifyOnboardInferenceSmoke({ provider, model, endpointUrl, credentialEnv });
   if (sandboxName) {
     registry.updateSandbox(sandboxName, { model, provider });
   }
@@ -9304,17 +9297,16 @@ function ensureDashboardForward(
   parsedUrl.port = String(actualPort);
   const actualTarget = getDashboardForwardTarget(parsedUrl.toString());
   runOpenshell(["forward", "stop", String(actualPort)], { ignoreError: true });
-  const { result: fwdResult, diagnostic: fwdDiagnostic } =
-    runBackgroundForwardStartWithDiagnostics((stdio, timeout) =>
+  const { result: fwdResult, diagnostic: fwdDiagnostic } = runBackgroundForwardStartWithPortReleaseRetries(
+    (stdio, timeout) =>
       runOpenshell(
         ["forward", "start", "--background", actualTarget, sandboxName],
         { ignoreError: true, suppressOutput: true, stdio, timeout },
       ),
-    );
+    () => { sleep(1); runOpenshell(["forward", "stop", String(actualPort)], { ignoreError: true }); },
+  );
   if (fwdResult && fwdResult.status !== 0) {
-    const looksLikePortConflict =
-      fwdDiagnostic === "" ||
-      /eaddrinuse|address already in use|port .* in use|bind: .*in use/i.test(fwdDiagnostic);
+    const looksLikePortConflict = looksLikeForwardPortConflict(fwdDiagnostic);
     if (rollbackSandboxOnFailure) {
       // The sandbox was just created, committed to actualPort via its
       // baked-in CHAT_UI_URL and NEMOCLAW_DASHBOARD_PORT env. Silently
@@ -10036,6 +10028,8 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
             ? "  GPU passthrough requested; passing --gpu to OpenShell gateway and sandbox creation."
             : "  NVIDIA GPU detected; enabling OpenShell GPU passthrough. Use --no-gpu to opt out.",
       );
+    } else if (gpu?.platform === "jetson") {
+      note("  GPU sandbox passthrough disabled by default on Jetson.");
     } else if (process.platform === "linux") {
       // Hint when hardware is present but drivers are missing.
       try {
