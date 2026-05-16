@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import { loadAgent } from "../dist/lib/agent/defs.js";
-import { NAME_ALLOWED_FORMAT } from "../dist/lib/name-validation.js";
+import { getNameValidationGuidance, NAME_ALLOWED_FORMAT } from "../dist/lib/name-validation.js";
 
 const {
   getDefaultSandboxNameForAgent,
@@ -74,7 +74,16 @@ describe("onboard sandbox naming helpers", () => {
 
   it("exposes the full allowed sandbox name format", () => {
     expect(NAME_ALLOWED_FORMAT).toBe(
-      "lowercase, starts with a letter, letters/numbers/internal hyphens only, ends with letter/number",
+      "1-63 characters, lowercase, starts with a letter, letters/numbers/internal hyphens only, ends with letter/number",
     );
+  });
+
+  it("explains sandbox name length and allowed format violations", () => {
+    expect(getNameValidationGuidance("sandbox name", "a".repeat(64))).toEqual([
+      "Sandbox names must be 63 characters or fewer.",
+      `Allowed format: ${NAME_ALLOWED_FORMAT}.`,
+    ]);
+    expect(getNameValidationGuidance("sandbox name", "bad name", { includeAllowedFormat: false }))
+      .toEqual(["Sandbox names cannot contain spaces."]);
   });
 });
