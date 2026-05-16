@@ -177,7 +177,7 @@ describe("sandbox oclif command adapters", () => {
     await ShieldsUpCommand.run(["alpha"], rootDir);
     await ShieldsStatusCommand.run(["alpha"], rootDir);
 
-    expect(mocks.runSandboxDoctor).toHaveBeenCalledWith("alpha", ["--json"]);
+    expect(mocks.runSandboxDoctor).toHaveBeenCalledWith("alpha", ["--json"], { quietJson: true });
     expect(mocks.shieldsDown).toHaveBeenCalledWith("alpha", {
       timeout: "5m",
       reason: "debugging",
