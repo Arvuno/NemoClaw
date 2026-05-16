@@ -349,6 +349,7 @@ import {
   type SandboxGpuFlag,
 } from "./onboard/sandbox-gpu-mode";
 import type { SelectionDrift } from "./onboard/selection-drift";
+import { formatOnboardConfigSummary, formatSandboxBuildEstimateNote } from "./onboard/summary";
 import type {
   ModelValidationResult,
   ValidationFailureLike,
@@ -4727,99 +4728,6 @@ async function promptValidatedSandboxName(agent: AgentDefinition | null = null) 
 }
 
 // ── Step 5: Sandbox ──────────────────────────────────────────────
-
-type OnboardConfigSummary = {
-  provider: string | null;
-  model: string | null;
-  credentialEnv?: string | null;
-  hermesAuthMethod?: HermesAuthMethod | string | null;
-  webSearchConfig?: WebSearchConfig | null;
-  enabledChannels?: string[] | null;
-  sandboxName: string;
-  notes?: string[] | null;
-};
-
-/**
- * Render the configuration summary shown before the destructive sandbox build.
- * Extracted from confirmOnboardConfiguration() for direct unit testing — see #2165.
- *
- * Fields:
- * - credentialEnv:    env-var name of the API key (e.g. "NVIDIA_API_KEY").
- *                     Rendered with the fixed credentials.json location so
- *                     users can see where the key was stored.
- * - notes:            additional bullet lines shown under the summary,
- *                     such as a sandbox build-time estimate. Each note is
- *                     rendered as "Note: <text>" so it stays visually
- *                     distinct.
- */
-function formatSandboxBuildEstimateNote(host: ReturnType<typeof assessHost>): string | null {
-  if (host.isContainerRuntimeUnderProvisioned) {
-    return (
-      "Container runtime is under-provisioned; the sandbox build may take 30+ minutes " +
-      "or stall. See preflight warning above."
-    );
-  }
-  const cpus = host.dockerCpus;
-  const memBytes = host.dockerMemTotalBytes;
-  if (typeof cpus === "number" && typeof memBytes === "number") {
-    const memGiB = memBytes / 1024 ** 3;
-    if (cpus >= 8 && memGiB >= 16) {
-      return "Sandbox build typically takes 3–8 minutes on this host.";
-    }
-    return "Sandbox build typically takes 5–15 minutes on this host.";
-  }
-  return null;
-}
-
-function formatOnboardConfigSummary({
-  provider,
-  model,
-  credentialEnv = null,
-  hermesAuthMethod = null,
-  webSearchConfig = null,
-  enabledChannels = null,
-  sandboxName,
-  notes = [],
-}: OnboardConfigSummary): string {
-  const bar = `  ${"─".repeat(50)}`;
-  const messaging =
-    Array.isArray(enabledChannels) && enabledChannels.length > 0
-      ? enabledChannels.join(", ")
-      : "none";
-  const webSearch =
-    webSearchConfig && webSearchConfig.fetchEnabled === true ? "enabled" : "disabled";
-  const effectiveHermesAuthMethod =
-    normalizeHermesAuthMethod(hermesAuthMethod) ||
-    (provider === hermesProviderAuth.HERMES_PROVIDER_NAME &&
-    credentialEnv === HERMES_NOUS_API_KEY_CREDENTIAL_ENV
-      ? HERMES_AUTH_METHOD_API_KEY
-      : HERMES_AUTH_METHOD_OAUTH);
-  const apiKeyLine =
-    provider === hermesProviderAuth.HERMES_PROVIDER_NAME
-      ? effectiveHermesAuthMethod === HERMES_AUTH_METHOD_API_KEY
-        ? "  Nous API key: host-managed; sandbox receives inference placeholder only"
-        : "  Nous OAuth:    host-managed; sandbox receives inference placeholder only"
-      : credentialEnv
-        ? `  API key:       ${credentialEnv} (staged for OpenShell gateway registration)`
-        : `  API key:       (not required for ${provider ?? "this provider"})`;
-  const noteLines = (Array.isArray(notes) ? notes : [])
-    .filter((n) => typeof n === "string" && n.length > 0)
-    .map((n) => `  Note:          ${n}`);
-  return [
-    "",
-    bar,
-    "  Review configuration",
-    bar,
-    `  Provider:      ${provider ?? "(unset)"}`,
-    `  Model:         ${model ?? "(unset)"}`,
-    apiKeyLine,
-    `  Web search:    ${webSearch}`,
-    `  Messaging:     ${messaging}`,
-    `  Sandbox name:  ${sandboxName}`,
-    ...noteLines,
-    bar,
-  ].join("\n");
-}
 
 async function createSandbox(
   gpu: ReturnType<typeof nim.detectGpu>,
@@ -10530,8 +10438,6 @@ module.exports = {
   readRecordedProvider,
   readRecordedModel,
   readRecordedNimContainer,
-  formatOnboardConfigSummary,
-  formatSandboxBuildEstimateNote,
   isInferenceRouteReady,
   shouldRunCompatibleEndpointSandboxSmoke,
   isNonInteractive,
