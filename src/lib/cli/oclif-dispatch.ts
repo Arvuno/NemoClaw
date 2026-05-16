@@ -22,12 +22,6 @@ export type UsageErrorDispatch = {
   lines: string[];
 };
 
-export type UnknownSubcommandDispatch = {
-  kind: "unknownSubcommand";
-  command: "credentials";
-  subcommand: string;
-};
-
 export type UnknownActionDispatch = {
   kind: "unknownAction";
   action: string;
@@ -37,7 +31,6 @@ export type DispatchResult =
   | OclifDispatch
   | HelpDispatch
   | UsageErrorDispatch
-  | UnknownSubcommandDispatch
   | UnknownActionDispatch;
 
 type LegacyRoute = {
@@ -77,7 +70,9 @@ function globalTokensFromUsage(usage: string): string[] {
   return literalTokensFromUsage(usage, /^nemoclaw\s+/);
 }
 
-function publicUsageFromCommand(command: ReturnType<typeof sandboxCommands>[number]): string {
+function publicUsageFromCommand(
+  command: ReturnType<typeof sandboxCommands>[number] | ReturnType<typeof globalCommands>[number],
+): string {
   const usage = command.usage.replace(/^nemoclaw\s+/, "");
   return command.flags ? `${usage} ${command.flags}` : usage;
 }
@@ -110,6 +105,13 @@ function globalRoutes(): GlobalRoute[] {
     .sort((a, b) => b.tokens.length - a.tokens.length);
 }
 
+function globalParentPublicUsage(topic: string): string[] {
+  const lines = globalCommands()
+    .filter((command) => globalTokensFromUsage(command.usage)[0] === topic)
+    .map((command) => publicUsageFromCommand(command));
+  return [...new Set(lines)];
+}
+
 function startsWithTokens(tokens: readonly string[], prefix: readonly string[]): boolean {
   return prefix.every((token, index) => tokens[index] === token);
 }
@@ -129,6 +131,16 @@ function oclif(commandId: string, args: string[]): OclifDispatch {
   return { kind: "oclif", commandId, args };
 }
 
+function globalParentHelp(topic: string, message?: string): HelpDispatch {
+  return {
+    kind: "help",
+    commandId: topic,
+    publicUsage: globalParentPublicUsage(topic),
+    exitCode: message ? 1 : undefined,
+    message,
+  };
+}
+
 export function resolveGlobalOclifDispatch(cmd: string, args: string[]): DispatchResult {
   const inputTokens = [cmd, ...args];
   for (const route of globalRoutes()) {
@@ -136,24 +148,12 @@ export function resolveGlobalOclifDispatch(cmd: string, args: string[]): Dispatc
     return oclif(route.commandId, inputTokens.slice(route.tokens.length));
   }
 
-  if (cmd === "tunnel") {
-    return { kind: "usageError", lines: ["tunnel <start|stop>"] };
-  }
-
-  if (cmd === "inference") {
-    return {
-      kind: "usageError",
-      lines: [
-        "inference get [--json]",
-        "inference set --provider <provider> --model <model> [--sandbox <name>] [--no-verify]",
-      ],
-    };
-  }
-
-  if (cmd === "credentials") {
-    const sub = args[0];
-    if (!sub || sub === "help" || sub === "--help" || sub === "-h") return oclif("credentials", []);
-    return { kind: "unknownSubcommand", command: "credentials", subcommand: sub };
+  if (cmd === "tunnel" || cmd === "inference" || cmd === "credentials") {
+    const subcommand = args[0];
+    if (!subcommand || subcommand === "help" || subcommand === "--help" || subcommand === "-h") {
+      return globalParentHelp(cmd);
+    }
+    return globalParentHelp(cmd, `Unknown ${cmd} subcommand: ${subcommand}`);
   }
 
   if (cmd === "version") {

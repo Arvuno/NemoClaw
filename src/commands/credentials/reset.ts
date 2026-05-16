@@ -8,6 +8,7 @@ export default withCommandDisplay(Command, [
   {
     usage: "nemoclaw credentials reset",
     description: "Remove a stored credential so onboard re-prompts",
+    flags: "<PROVIDER> [--yes|-y]",
     group: "Credentials",
     scope: "global",
     order: 39,

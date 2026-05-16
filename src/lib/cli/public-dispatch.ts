@@ -110,10 +110,6 @@ async function runDispatchResult(
       return;
     case "usageError":
       printDispatchUsageError(result, opts.sandboxName);
-    case "unknownSubcommand":
-      console.error(`  Unknown ${result.command} subcommand: ${result.subcommand}`);
-      console.error(`  Run '${CLI_NAME} ${result.command} help' for usage.`);
-      process.exit(1);
     case "unknownAction":
       console.error(`  Unknown action: ${result.action}`);
       console.error(`  Valid actions: ${VALID_SANDBOX_ACTIONS}`);

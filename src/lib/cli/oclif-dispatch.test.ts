@@ -44,22 +44,30 @@ describe("resolveGlobalOclifDispatch", () => {
     });
   });
 
-  it("returns usage and unknown-subcommand dispatches for unsupported global forms", () => {
+  it("returns metadata-derived parent help for unsupported global forms", () => {
     expect(resolveGlobalOclifDispatch("tunnel", ["restart"])).toEqual({
-      kind: "usageError",
-      lines: ["tunnel <start|stop>"],
+      kind: "help",
+      commandId: "tunnel",
+      publicUsage: ["tunnel start", "tunnel stop"],
+      exitCode: 1,
+      message: "Unknown tunnel subcommand: restart",
     });
     expect(resolveGlobalOclifDispatch("inference", ["bogus"])).toEqual({
-      kind: "usageError",
-      lines: [
+      kind: "help",
+      commandId: "inference",
+      publicUsage: [
         "inference get [--json]",
         "inference set --provider <provider> --model <model> [--sandbox <name>] [--no-verify]",
       ],
+      exitCode: 1,
+      message: "Unknown inference subcommand: bogus",
     });
     expect(resolveGlobalOclifDispatch("credentials", ["bogus"])).toEqual({
-      kind: "unknownSubcommand",
-      command: "credentials",
-      subcommand: "bogus",
+      kind: "help",
+      commandId: "credentials",
+      publicUsage: ["credentials list", "credentials reset <PROVIDER> [--yes|-y]"],
+      exitCode: 1,
+      message: "Unknown credentials subcommand: bogus",
     });
     expect(resolveGlobalOclifDispatch("bogus", [])).toEqual({ kind: "usageError", lines: [] });
   });

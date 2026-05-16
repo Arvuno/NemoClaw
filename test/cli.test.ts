@@ -941,9 +941,9 @@ describe("CLI dispatch", () => {
   it("credentials help exits 0 and shows credential subcommands", () => {
     const r = run("credentials --help");
     expect(r.code).toBe(0);
-    expect(r.out).toContain("Usage: nemoclaw credentials <subcommand>");
-    expect(r.out).toContain("list");
-    expect(r.out).toContain("reset <PROVIDER> [--yes]");
+    expect(r.out).toContain("Usage:");
+    expect(r.out).toContain("nemoclaw credentials list");
+    expect(r.out).toContain("nemoclaw credentials reset <PROVIDER> [--yes|-y]");
   });
 
   it("credentials list --help exits 0 and shows list usage", () => {
