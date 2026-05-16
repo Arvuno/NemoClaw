@@ -11,6 +11,14 @@ export default class VersionCommand extends NemoClawCommand {
   static summary = "Show version";
   static display = [
     {
+      usage: "nemoclaw version",
+      description: "Show version",
+      group: "Getting Started",
+      hidden: true,
+      scope: "global",
+      order: 46,
+    },
+    {
       usage: "nemoclaw --version",
       description: "Show version",
       group: "Getting Started",

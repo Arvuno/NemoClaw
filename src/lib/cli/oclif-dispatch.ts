@@ -156,10 +156,6 @@ export function resolveGlobalOclifDispatch(cmd: string, args: string[]): Dispatc
     return globalParentHelp(cmd, `Unknown ${cmd} subcommand: ${subcommand}`);
   }
 
-  if (cmd === "version") {
-    return oclif("root:version", []);
-  }
-
   return { kind: "usageError", lines: [] };
 }
 
