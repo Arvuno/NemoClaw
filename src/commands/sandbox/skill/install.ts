@@ -1,4 +1,50 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-export { default } from "../../../lib/commands/sandbox/skill/install";
+import { Args } from "@oclif/core";
+import { NemoClawCommand } from "../../../lib/cli/nemoclaw-oclif-command";
+
+import { getSkillInstallRuntimeBridge } from "../../../lib/commands/sandbox/skill/common";
+
+export default class SkillInstallCliCommand extends NemoClawCommand {
+  static id = "sandbox:skill:install";
+  static strict = true;
+  static summary = "Deploy a skill directory to the sandbox";
+  static description = "Validate a local SKILL.md directory and upload it to a running sandbox.";
+  static usage = ["<name> <path>"];
+  static examples = [
+    "<%= config.bin %> sandbox skill install alpha ./my-skill",
+    "<%= config.bin %> sandbox skill install alpha ./my-skill/SKILL.md",
+  ];
+  static display = [
+    {
+      usage: "nemoclaw <name> skill install",
+      description: "Deploy a skill directory to the sandbox",
+      group: "Skills",
+      scope: "sandbox",
+      order: 16,
+    },
+  ];
+  static args = {
+    sandboxName: Args.string({
+      name: "sandbox",
+      description: "Sandbox name",
+      required: true,
+    }),
+    skillPath: Args.string({
+      name: "path",
+      description: "Skill directory or direct path to SKILL.md",
+      required: true,
+    }),
+  };
+  static flags = {
+  };
+
+  public async run(): Promise<void> {
+    const { args } = await this.parse(SkillInstallCliCommand);
+    await getSkillInstallRuntimeBridge().sandboxSkillInstall(args.sandboxName, [
+      "install",
+      args.skillPath,
+    ]);
+  }
+}

@@ -8,7 +8,7 @@
 ## Primary layers
 
 ```text
-src/lib/commands/**  oclif adapter classes and parser glue
+src/commands/**      oclif adapter classes and parser glue
 src/lib/actions/**   workflow orchestration and user-facing command behavior
 src/lib/domain/**    pure decisions, policy, classification, and planning
 src/lib/adapters/**  host boundaries: process, fs, Docker, OpenShell, HTTP
@@ -31,6 +31,7 @@ Some older modules are still too large or coupled to split directly into actions
 
 ```text
 src/lib/agent/**        agent definition, agent-specific onboarding, runtime helpers
+src/lib/commands/**     shared parser helpers pending feature-folder migration
 src/lib/credentials/**  credential storage and credential command support
 src/lib/dashboard/**    dashboard contract, health, and recovery helpers
 src/lib/deploy/**       deploy/build-image support that is not yet action-shaped

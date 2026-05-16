@@ -1,4 +1,34 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-export { default } from "../../../lib/commands/sandbox/shields/status";
+import { NemoClawCommand } from "../../../lib/cli/nemoclaw-oclif-command";
+
+import * as shields from "../../../lib/shields/index";
+import { sandboxNameArg } from "../../../lib/commands/sandbox/common";
+
+export default class ShieldsStatusCommand extends NemoClawCommand {
+  static id = "sandbox:shields:status";
+  static hidden = true;
+  static strict = true;
+  static summary = "Show current shields state";
+  static description = "Show current sandbox shields state.";
+  static usage = ["<name>"];
+  static display = [
+    {
+      usage: "nemoclaw <name> shields status",
+      description: "Show current shields state",
+      group: "Sandbox Management",
+      hidden: true,
+      scope: "sandbox",
+      order: 27,
+    },
+  ];
+  static args = { sandboxName: sandboxNameArg };
+  static flags = {
+  };
+
+  public async run(): Promise<void> {
+    const { args } = await this.parse(ShieldsStatusCommand);
+    shields.shieldsStatus(args.sandboxName);
+  }
+}

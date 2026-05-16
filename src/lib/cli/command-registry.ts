@@ -5,10 +5,9 @@
  * Public command display registry derived from oclif command metadata.
  *
  * The command entries shown in root help, docs checks, and legacy dispatch
- * helpers are colocated with the oclif command entrypoints under
- * `src/commands/**` via `withCommandDisplay(...)`. This module projects that
- * metadata into the historical `CommandDef` shape while command discovery
- * itself stays owned by oclif.
+ * helpers are exposed through the oclif command entrypoints under
+ * `src/commands/**`. This module projects that metadata into the historical
+ * `CommandDef` shape while command discovery itself stays owned by oclif.
  *
  * Usage strings use "nemoclaw" as a canonical placeholder. The exported
  * {@link brandedUsage} helper replaces it with the active CLI_NAME

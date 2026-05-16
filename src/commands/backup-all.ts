@@ -1,4 +1,29 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-export { default } from "../lib/commands/maintenance/backup-all";
+import { runBackupAllAction } from "../lib/actions/global";
+import { NemoClawCommand } from "../lib/cli/nemoclaw-oclif-command";
+
+export default class BackupAllCommand extends NemoClawCommand {
+  static id = "backup-all";
+  static strict = true;
+  static summary = "Back up all sandbox state before upgrade";
+  static description = "Back up registered, running sandbox state before upgrading.";
+  static usage = ["backup-all"];
+  static examples = ["<%= config.bin %> backup-all"];
+  static display = [
+    {
+      usage: "nemoclaw backup-all",
+      description: "Back up all sandbox state before upgrade",
+      group: "Backup",
+      scope: "global",
+      order: 40,
+    },
+  ];
+  static flags = {};
+
+  public async run(): Promise<void> {
+    await this.parse(BackupAllCommand);
+    runBackupAllAction();
+  }
+}

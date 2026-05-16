@@ -1,4 +1,35 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-export { default } from "../../lib/commands/sandbox/status";
+import { NemoClawCommand } from "../../lib/cli/nemoclaw-oclif-command";
+
+import { showSandboxStatus } from "../../lib/actions/sandbox/status";
+import { sandboxNameArg } from "../../lib/commands/sandbox/common";
+
+export default class SandboxStatusCommand extends NemoClawCommand {
+  static id = "sandbox:status";
+  static strict = true;
+  static summary = "Sandbox health and NIM status";
+  static description = "Show sandbox health, OpenShell gateway state, and local NIM status.";
+  static usage = ["<name>"];
+  static examples = ["<%= config.bin %> sandbox status alpha"];
+  static display = [
+    {
+      usage: "nemoclaw <name> status",
+      description: "Sandbox health + NIM status",
+      group: "Sandbox Management",
+      scope: "sandbox",
+      order: 4,
+    },
+  ];
+  static args = {
+    sandboxName: sandboxNameArg,
+  };
+  static flags = {
+  };
+
+  public async run(): Promise<void> {
+    const { args } = await this.parse(SandboxStatusCommand);
+    await showSandboxStatus(args.sandboxName);
+  }
+}

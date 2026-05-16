@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runOnboardAction } from "../actions/global";
-import OnboardCliCommand from "./onboard";
+import OnboardCliCommand from "../../commands/onboard";
 
 vi.mock("../actions/global", () => ({
   runOnboardAction: vi.fn().mockResolvedValue(undefined),

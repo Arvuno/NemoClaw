@@ -3,9 +3,9 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import SkillCliCommand from "./skill";
+import SkillCliCommand from "../../../commands/sandbox/skill";
 import { setSkillInstallRuntimeBridgeFactoryForTest } from "./skill/common";
-import SkillInstallCliCommand from "./skill/install";
+import SkillInstallCliCommand from "../../../commands/sandbox/skill/install";
 
 const rootDir = process.cwd();
 

@@ -3,11 +3,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import SnapshotCommand from "./snapshot";
+import SnapshotCommand from "../../../commands/sandbox/snapshot";
 import { setSnapshotRuntimeBridgeFactoryForTest } from "./snapshot/common";
-import SnapshotCreateCommand from "./snapshot/create";
-import SnapshotListCommand from "./snapshot/list";
-import SnapshotRestoreCommand from "./snapshot/restore";
+import SnapshotCreateCommand from "../../../commands/sandbox/snapshot/create";
+import SnapshotListCommand from "../../../commands/sandbox/snapshot/list";
+import SnapshotRestoreCommand from "../../../commands/sandbox/snapshot/restore";
 
 const rootDir = process.cwd();
 

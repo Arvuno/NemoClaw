@@ -3,11 +3,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import ChannelsAddCommand from "./add";
+import ChannelsAddCommand from "../../../../commands/sandbox/channels/add";
 import { setChannelsRuntimeBridgeFactoryForTest } from "./common";
-import ChannelsRemoveCommand from "./remove";
-import ChannelsStartCommand from "./start";
-import ChannelsStopCommand from "./stop";
+import ChannelsRemoveCommand from "../../../../commands/sandbox/channels/remove";
+import ChannelsStartCommand from "../../../../commands/sandbox/channels/start";
+import ChannelsStopCommand from "../../../../commands/sandbox/channels/stop";
 
 const rootDir = process.cwd();
 

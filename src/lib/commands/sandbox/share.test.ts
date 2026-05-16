@@ -35,10 +35,10 @@ vi.mock("../../share-command", () => ({
   ShareCommandError: mocks.ShareCommandError,
 }));
 
-import ShareCommand from "./share";
-import ShareMountCommand from "./share/mount";
-import ShareStatusCommand from "./share/status";
-import ShareUnmountCommand from "./share/unmount";
+import ShareCommand from "../../../commands/sandbox/share";
+import ShareMountCommand from "../../../commands/sandbox/share/mount";
+import ShareStatusCommand from "../../../commands/sandbox/share/status";
+import ShareUnmountCommand from "../../../commands/sandbox/share/unmount";
 
 const rootDir = process.cwd();
 

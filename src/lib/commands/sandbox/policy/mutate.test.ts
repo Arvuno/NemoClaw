@@ -3,9 +3,9 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import PolicyAddCommand from "./add";
+import PolicyAddCommand from "../../../../commands/sandbox/policy/add";
 import { setPolicyRuntimeBridgeFactoryForTest } from "./common";
-import PolicyRemoveCommand from "./remove";
+import PolicyRemoveCommand from "../../../../commands/sandbox/policy/remove";
 
 const rootDir = process.cwd();
 

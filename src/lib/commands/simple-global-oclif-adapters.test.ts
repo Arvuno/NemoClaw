@@ -66,16 +66,16 @@ vi.mock("../uninstall-command", () => ({
 }));
 vi.mock("../core/version", () => ({ getVersion: mocks.getVersion }));
 
-import DebugCliCommand from "./debug";
-import DeployCliCommand from "./deploy";
-import GatewayTokenCliCommand, { setGatewayTokenRuntimeBridgeFactoryForTest } from "./gateway-token";
-import DeprecatedStartCommand from "./deprecated/start";
-import DeprecatedStopCommand from "./deprecated/stop";
-import RootHelpCommand from "./root/help";
-import VersionCommand from "./root/version";
-import TunnelStartCommand from "./tunnel/start";
-import TunnelStopCommand from "./tunnel/stop";
-import UninstallCliCommand from "./uninstall";
+import DebugCliCommand from "../../commands/debug";
+import DeployCliCommand from "../../commands/deploy";
+import GatewayTokenCliCommand, { setGatewayTokenRuntimeBridgeFactoryForTest } from "../../commands/sandbox/gateway/token";
+import DeprecatedStartCommand from "../../commands/start";
+import DeprecatedStopCommand from "../../commands/stop";
+import RootHelpCommand from "../../commands/root/help";
+import VersionCommand from "../../commands/root/version";
+import TunnelStartCommand from "../../commands/tunnel/start";
+import TunnelStopCommand from "../../commands/tunnel/stop";
+import UninstallCliCommand from "../../commands/uninstall";
 
 const rootDir = process.cwd();
 

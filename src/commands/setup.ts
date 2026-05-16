@@ -1,4 +1,36 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-export { default } from "../lib/commands/setup";
+import { NemoClawCommand } from "../lib/cli/nemoclaw-oclif-command";
+
+import { runSetupAction } from "../lib/actions/global";
+import { buildOnboardFlags, type OnboardFlags, toLegacyOnboardArgs } from "../lib/commands/onboard/common";
+
+export default class SetupCliCommand extends NemoClawCommand {
+  static id = "setup";
+  static strict = true;
+  static summary = "Deprecated alias for nemoclaw onboard";
+  static description = "Deprecated alias for onboard.";
+  static usage = ["setup [flags]"];
+  static examples = ["<%= config.bin %> setup --name alpha"];
+  static display = [
+    {
+      usage: "nemoclaw setup",
+      description: "Deprecated alias for nemoclaw onboard",
+      group: "Compatibility Commands",
+      deprecated: true,
+      scope: "global",
+      order: 29,
+    },
+  ];
+  static flags = buildOnboardFlags();
+
+  public async run(): Promise<void> {
+    if (this.argv.includes("--help") || this.argv.includes("-h")) {
+      await runSetupAction(["--help"]);
+      return;
+    }
+    const { flags } = await this.parse(SetupCliCommand);
+    await runSetupAction(toLegacyOnboardArgs(flags as OnboardFlags));
+  }
+}

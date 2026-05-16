@@ -8,9 +8,9 @@
 // for product compatibility: the public sandbox grammar is
 // `nemoclaw <sandbox-name> <action>` while the oclif-native command IDs are
 // `sandbox:<action>` and parse as `nemoclaw sandbox <action> <sandbox-name>`.
-// Keep new command behavior in src/lib/commands/** and src/lib/actions/**; keep
-// this file limited to argv normalization, compatibility routing, suggestions,
-// and registry-aware sandbox-name checks.
+// Keep new command adapters in src/commands/** and product behavior in
+// src/lib/actions/**; keep this file limited to argv normalization,
+// compatibility routing, suggestions, and registry-aware sandbox-name checks.
 const { ROOT, validateName } = require("../runner");
 const { CLI_NAME } = require("./branding");
 const { help } = require("../actions/root-help");
