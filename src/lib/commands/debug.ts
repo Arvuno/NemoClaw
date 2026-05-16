@@ -86,7 +86,7 @@ export default class DebugCliCommand extends NemoClawCommand {
     {
       usage: "nemoclaw debug",
       description: "Collect diagnostics for bug reports",
-      flags: "[--quick] [--sandbox NAME]",
+      flags: "[--quick] [--output FILE|-o FILE] [--sandbox NAME]",
       group: "Troubleshooting",
       scope: "global",
       order: 37,

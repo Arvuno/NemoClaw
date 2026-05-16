@@ -43,7 +43,14 @@ function publicRouteTokens(publicUsage: string): string[] {
   const route = tokens[0] === "<name>" ? tokens.slice(1) : tokens;
   const literals: string[] = [];
   for (const token of route) {
-    if (token.startsWith("[") || token.startsWith("<") || token.startsWith("-")) break;
+    if (
+      token.startsWith("[") ||
+      token.startsWith("<") ||
+      token.startsWith("(") ||
+      token.startsWith("-")
+    ) {
+      break;
+    }
     literals.push(token);
   }
   return literals;

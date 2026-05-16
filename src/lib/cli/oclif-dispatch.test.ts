@@ -198,6 +198,8 @@ describe("resolveLegacySandboxDispatch", () => {
     expect(resolveLegacySandboxDispatch("alpha", "config", ["bogus"])).toEqual({
       kind: "help",
       commandId: "sandbox:config",
+      exitCode: 1,
+      message: "Unknown config subcommand: bogus",
       publicUsage: [
         "<name> config get [--key <dotpath>] [--format json|yaml]",
         "<name> config set --key <dotpath> --value <value> [--restart] [--config-accept-new-path]",
@@ -207,6 +209,8 @@ describe("resolveLegacySandboxDispatch", () => {
     expect(resolveLegacySandboxDispatch("alpha", "shields", ["bogus"])).toEqual({
       kind: "help",
       commandId: "sandbox:shields",
+      exitCode: 1,
+      message: "Unknown shields subcommand: bogus",
       publicUsage: [
         "<name> shields down [--timeout 5m] [--reason <text>] [--policy permissive]",
         "<name> shields up",

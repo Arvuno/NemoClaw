@@ -205,7 +205,9 @@ export function resolveLegacySandboxDispatch(
   }
 
   if (action === "config" || action === "shields") {
-    return parentHelp(action);
+    if (actionArgs.length === 0 || hasHelpFlag(actionArgs)) return parentHelp(action);
+    const subcommand = actionArgs[0] ?? "";
+    return parentHelp(action, `Unknown ${action} subcommand: ${subcommand}`);
   }
 
   if (action === "share" && hasHelpFlag(actionArgs)) {

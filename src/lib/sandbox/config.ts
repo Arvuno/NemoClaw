@@ -818,7 +818,7 @@ async function configSet(sandboxName: string, opts: ConfigSetOpts = {}): Promise
   if (opts.key.startsWith("gateway.") || opts.key === "gateway") {
     configFail([
       "  Cannot modify the gateway section directly.",
-      "  Use `nemoclaw config rotate-token` for credential changes.",
+      "  Use `nemoclaw <name> config rotate-token` for credential changes.",
     ]);
   }
 

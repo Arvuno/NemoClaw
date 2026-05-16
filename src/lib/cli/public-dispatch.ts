@@ -130,6 +130,7 @@ async function runDispatchResult(
       return;
     case "usageError":
       printDispatchUsageError(result, opts.sandboxName);
+      return;
     case "unknownAction":
       console.error(`  Unknown action: ${result.action}`);
       console.error(`  Valid actions: ${VALID_SANDBOX_ACTIONS}`);
@@ -171,7 +172,7 @@ export async function dispatchCli(argv: string[] = process.argv.slice(2)): Promi
   }
 
   const cmd = normalized.sandboxName;
-  const args = argv.slice(1);
+  const rawArgsAfterCmd = argv.slice(1);
   const requestedSandboxAction = normalized.action;
   const requestedSandboxActionArgs = normalized.actionArgs;
   if (normalized.connectHelpRequested) {
@@ -208,7 +209,7 @@ export async function dispatchCli(argv: string[] = process.argv.slice(2)): Promi
     validateName(cmd, "sandbox name");
     await registryRecovery().recoverRegistryEntries({ requestedSandboxName: cmd });
     if (!registry().getSandbox(cmd)) {
-      if (args.length === 0) {
+      if (rawArgsAfterCmd.length === 0) {
         const suggestion = suggestGlobalCommand(cmd);
         if (suggestion) {
           console.error(`  Unknown command: ${cmd}`);
@@ -222,8 +223,9 @@ export async function dispatchCli(argv: string[] = process.argv.slice(2)): Promi
         console.error("");
         console.error(`  Registered sandboxes: ${allNames.join(", ")}`);
         console.error(`  Run '${CLI_NAME} list' to see all sandboxes.`);
-        const reorderedCandidate =
-          args[0] === "connect" ? findRegisteredSandboxName(args.slice(1)) : null;
+        const reorderedCandidate = rawArgsAfterCmd[0] === "connect"
+          ? findRegisteredSandboxName(rawArgsAfterCmd.slice(1))
+          : null;
         if (reorderedCandidate) {
           console.error("");
           printConnectOrderHint(reorderedCandidate);
@@ -235,7 +237,8 @@ export async function dispatchCli(argv: string[] = process.argv.slice(2)): Promi
     }
   }
 
-  if (!registry().getSandbox(cmd)) {
+  const sandbox = registry().getSandbox(cmd);
+  if (!sandbox) {
     const suggestion = suggestGlobalCommand(cmd);
     if (suggestion) {
       console.error(`  Unknown command: ${cmd}`);
@@ -244,7 +247,6 @@ export async function dispatchCli(argv: string[] = process.argv.slice(2)): Promi
     }
   }
 
-  const sandbox = registry().getSandbox(cmd);
   if (sandbox) {
     validateName(cmd, "sandbox name");
     const action = requestedSandboxAction;
