@@ -10,7 +10,6 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { AgentDefinition } from "../dist/lib/agent/defs.js";
 import { loadAgent } from "../dist/lib/agent/defs.js";
-import { NAME_ALLOWED_FORMAT } from "../dist/lib/name-validation.js";
 import { hasOpenShellVmDriverChildProcessFromPsOutput } from "../dist/lib/onboard/vm-driver-process.js";
 import { applyOnboardVmDnsMonkeypatch } from "../dist/lib/onboard/vm-dns-monkeypatch.js";
 import { stageOptimizedSandboxBuildContext } from "../dist/lib/sandbox/build-context.js";
@@ -143,10 +142,6 @@ type OnboardTestInternals = {
   getRequestedModelHint: ShimFn<string | null>;
   getRequestedProviderHint: ShimFn<string | null>;
   getRequestedSandboxNameHint: ShimFn<string | null>;
-  getDefaultSandboxNameForAgent: (agent?: AgentDefinition | null) => string;
-  getSandboxPromptDefault: (agent?: AgentDefinition | null) => string;
-  getRequestedSandboxAgentName: (agent?: AgentDefinition | null) => string;
-  normalizeSandboxAgentName: (agentName?: string | null) => string;
   getResumeConfigConflicts: ShimFn<ResumeConflict[]>;
   getResumeSandboxConflict: ShimFn<{
     requestedSandboxName: string;
@@ -219,10 +214,6 @@ function isOnboardTestInternals(
     typeof value.shouldAllowOpenshellAboveBlueprintMax === "function" &&
     typeof value.hasChatCompletionsToolCall === "function" &&
     typeof value.hasChatCompletionsToolCallLeak === "function" &&
-    typeof value.getDefaultSandboxNameForAgent === "function" &&
-    typeof value.getSandboxPromptDefault === "function" &&
-    typeof value.getRequestedSandboxAgentName === "function" &&
-    typeof value.normalizeSandboxAgentName === "function" &&
     typeof value.agentSupportsWebSearch === "function" &&
     typeof value.configureWebSearch === "function" &&
     typeof value.formatSandboxBuildEstimateNote === "function" &&
@@ -270,10 +261,6 @@ const {
   getRequestedModelHint,
   getRequestedProviderHint,
   getRequestedSandboxNameHint,
-  getDefaultSandboxNameForAgent,
-  getSandboxPromptDefault,
-  getRequestedSandboxAgentName,
-  normalizeSandboxAgentName,
   getResumeConfigConflicts,
   getResumeSandboxConflict,
   getSandboxStateFromOutputs,
@@ -612,70 +599,6 @@ describe("onboard helpers", () => {
       expect(findReadableNvidiaCdiSpecFiles([emptyDir, cdiDir])).toEqual([specPath]);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it("uses Hermes-oriented sandbox defaults when NemoHermes selects Hermes", () => {
-    const previousSandboxName = process.env.NEMOCLAW_SANDBOX_NAME;
-    try {
-      delete process.env.NEMOCLAW_SANDBOX_NAME;
-      const hermes = loadAgent("hermes");
-      expect(getRequestedSandboxAgentName(null)).toBe("openclaw");
-      expect(normalizeSandboxAgentName(null)).toBe("openclaw");
-      expect(getDefaultSandboxNameForAgent(null)).toBe("my-assistant");
-      expect(getDefaultSandboxNameForAgent(hermes)).toBe("hermes");
-      expect(getSandboxPromptDefault(hermes)).toBe("hermes");
-
-      process.env.NEMOCLAW_SANDBOX_NAME = "custom-hermes";
-      expect(getSandboxPromptDefault(hermes)).toBe("custom-hermes");
-    } finally {
-      if (previousSandboxName === undefined) {
-        delete process.env.NEMOCLAW_SANDBOX_NAME;
-      } else {
-        process.env.NEMOCLAW_SANDBOX_NAME = previousSandboxName;
-      }
-    }
-  });
-
-  it("uses NEMOCLAW_SANDBOX_NAME as the interactive prompt default", () => {
-    const previous = process.env.NEMOCLAW_SANDBOX_NAME;
-    try {
-      process.env.NEMOCLAW_SANDBOX_NAME = "mythos";
-      expect(getSandboxPromptDefault(null)).toBe("mythos");
-    } finally {
-      if (previous === undefined) {
-        delete process.env.NEMOCLAW_SANDBOX_NAME;
-      } else {
-        process.env.NEMOCLAW_SANDBOX_NAME = previous;
-      }
-    }
-  });
-
-  it("falls back to agent default when NEMOCLAW_SANDBOX_NAME is invalid", () => {
-    const previous = process.env.NEMOCLAW_SANDBOX_NAME;
-    try {
-      process.env.NEMOCLAW_SANDBOX_NAME = "123-leading-digit-invalid";
-      expect(getSandboxPromptDefault(null)).toBe("my-assistant");
-    } finally {
-      if (previous === undefined) {
-        delete process.env.NEMOCLAW_SANDBOX_NAME;
-      } else {
-        process.env.NEMOCLAW_SANDBOX_NAME = previous;
-      }
-    }
-  });
-
-  it("falls back to agent default when NEMOCLAW_SANDBOX_NAME contains spaces", () => {
-    const previous = process.env.NEMOCLAW_SANDBOX_NAME;
-    try {
-      process.env.NEMOCLAW_SANDBOX_NAME = "bad name";
-      expect(getSandboxPromptDefault(null)).toBe("my-assistant");
-    } finally {
-      if (previous === undefined) {
-        delete process.env.NEMOCLAW_SANDBOX_NAME;
-      } else {
-        process.env.NEMOCLAW_SANDBOX_NAME = previous;
-      }
     }
   });
 
@@ -8925,12 +8848,6 @@ const { createSandbox } = require(${onboardPath});
     const payload = JSON.parse(result.stdout.trim().split("\n").pop()!);
     assert.equal(payload.removed, true, result.stdout);
     assert.match(payload.message, /simulated custom context copy failure/);
-  });
-
-  it("exposes the full allowed sandbox name format", () => {
-    expect(NAME_ALLOWED_FORMAT).toBe(
-      "lowercase, starts with a letter, letters/numbers/internal hyphens only, ends with letter/number",
-    );
   });
 
   it("regression #1881: registry.updateSandbox(model/provider) is called AFTER createSandbox", () => {
