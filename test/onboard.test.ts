@@ -81,9 +81,6 @@ type OnboardTestInternals = {
     arch?: NodeJS.Architecture,
   ) => boolean;
   getSandboxInferenceConfig: ShimFn<SandboxInferenceConfig>;
-  getInstalledOpenshellVersion: (versionOutput?: string | null) => string | null;
-  getBlueprintMinOpenshellVersion: (rootDir?: string) => string | null;
-  getBlueprintMaxOpenshellVersion: (rootDir?: string) => string | null;
   getDockerDriverGatewayEnv: (
     versionOutput?: string | null,
     platform?: NodeJS.Platform,
@@ -138,7 +135,6 @@ type OnboardTestInternals = {
     platform?: NodeJS.Platform,
     env?: NodeJS.ProcessEnv,
   ) => boolean;
-  versionGte: (left?: string | null, right?: string | null) => boolean;
   getRequestedModelHint: ShimFn<string | null>;
   getRequestedProviderHint: ShimFn<string | null>;
   getRequestedSandboxNameHint: ShimFn<string | null>;
@@ -148,7 +144,6 @@ type OnboardTestInternals = {
     recordedSandboxName: string;
   } | null>;
   getSandboxStateFromOutputs: ShimFn<string>;
-  getStableGatewayImageRef: (versionOutput?: string | null) => string | null;
   isGatewayHealthy: ShimFn<boolean>;
   classifyValidationFailure: ShimFn<ValidationClassification>;
   hasResponsesToolCall: (body?: string | null) => boolean;
@@ -243,9 +238,6 @@ const {
   getFutureShellPathHint,
   areRequiredDockerDriverBinariesPresent,
   getSandboxInferenceConfig,
-  getInstalledOpenshellVersion,
-  getBlueprintMinOpenshellVersion,
-  getBlueprintMaxOpenshellVersion,
   getDockerDriverGatewayEnv,
   getGatewayStartEnv,
   shouldRequireDockerDriverEnv,
@@ -257,14 +249,12 @@ const {
   resolveSandboxGpuConfig,
   getResumeSandboxGpuOverrides,
   shouldAllowOpenshellAboveBlueprintMax,
-  versionGte,
   getRequestedModelHint,
   getRequestedProviderHint,
   getRequestedSandboxNameHint,
   getResumeConfigConflicts,
   getResumeSandboxConflict,
   getSandboxStateFromOutputs,
-  getStableGatewayImageRef,
   isGatewayHealthy,
   classifyValidationFailure,
   hasResponsesToolCall,
@@ -1891,426 +1881,6 @@ const { loadAgent } = require(${agentDefsPath});
       inferenceApi: "openai-responses",
       inferenceCompat: null,
     });
-  });
-
-  it("regression #1317: versionGte handles equal, greater, and lesser semvers", () => {
-    expect(versionGte("0.1.0", "0.1.0")).toBe(true);
-    expect(versionGte("0.1.0", "0.0.20")).toBe(true);
-    expect(versionGte("0.0.20", "0.1.0")).toBe(false);
-    expect(versionGte("1.2.3", "1.2.4")).toBe(false);
-    expect(versionGte("1.2.4", "1.2.3")).toBe(true);
-    expect(versionGte("0.0.21", "0.0.20")).toBe(true);
-    // Defensive: missing components default to 0
-    expect(versionGte("1.0", "1.0.0")).toBe(true);
-    expect(versionGte("", "0.0.0")).toBe(true);
-  });
-
-  it("regression #1317: getBlueprintMinOpenshellVersion reads min_openshell_version from blueprint.yaml", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-blueprint-min-version-"));
-    const blueprintDir = path.join(tmpDir, "nemoclaw-blueprint");
-    fs.mkdirSync(blueprintDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(blueprintDir, "blueprint.yaml"),
-      [
-        'version: "0.1.0"',
-        'min_openshell_version: "0.1.0"',
-        'min_openclaw_version: "2026.3.0"',
-      ].join("\n"),
-    );
-    try {
-      expect(getBlueprintMinOpenshellVersion(tmpDir)).toBe("0.1.0");
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it("regression #1317: getBlueprintMinOpenshellVersion returns null on missing or unparseable blueprint", () => {
-    // Missing directory
-    const missingDir = path.join(
-      os.tmpdir(),
-      "nemoclaw-blueprint-missing-" + Date.now().toString(),
-    );
-    expect(getBlueprintMinOpenshellVersion(missingDir)).toBe(null);
-
-    // Present file, missing field — must NOT block onboard
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-blueprint-no-field-"));
-    const blueprintDir = path.join(tmpDir, "nemoclaw-blueprint");
-    fs.mkdirSync(blueprintDir, { recursive: true });
-    fs.writeFileSync(path.join(blueprintDir, "blueprint.yaml"), 'version: "0.1.0"\n');
-    try {
-      expect(getBlueprintMinOpenshellVersion(tmpDir)).toBe(null);
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-
-    // Present file, malformed YAML — must NOT throw, just return null
-    const badDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-blueprint-bad-yaml-"));
-    const badBlueprintDir = path.join(badDir, "nemoclaw-blueprint");
-    fs.mkdirSync(badBlueprintDir, { recursive: true });
-    fs.writeFileSync(path.join(badBlueprintDir, "blueprint.yaml"), "this is: : not valid: yaml: [");
-    try {
-      expect(getBlueprintMinOpenshellVersion(badDir)).toBe(null);
-    } finally {
-      fs.rmSync(badDir, { recursive: true, force: true });
-    }
-
-    // Present file, non-string value (yaml parses unquoted 1.5 as number) —
-    // must NOT block onboard, just return null
-    const wrongTypeDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-blueprint-wrong-type-"));
-    const wrongTypeBlueprintDir = path.join(wrongTypeDir, "nemoclaw-blueprint");
-    fs.mkdirSync(wrongTypeBlueprintDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(wrongTypeBlueprintDir, "blueprint.yaml"),
-      "min_openshell_version: 1.5\n",
-    );
-    try {
-      expect(getBlueprintMinOpenshellVersion(wrongTypeDir)).toBe(null);
-    } finally {
-      fs.rmSync(wrongTypeDir, { recursive: true, force: true });
-    }
-
-    // Present file, string value that doesn't look like x.y.z — must NOT
-    // block onboard. Defends against typos like "latest" or "0.1".
-    const badShapeDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-blueprint-bad-shape-"));
-    const badShapeBlueprintDir = path.join(badShapeDir, "nemoclaw-blueprint");
-    fs.mkdirSync(badShapeBlueprintDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(badShapeBlueprintDir, "blueprint.yaml"),
-      'min_openshell_version: "latest"\n',
-    );
-    try {
-      expect(getBlueprintMinOpenshellVersion(badShapeDir)).toBe(null);
-    } finally {
-      fs.rmSync(badShapeDir, { recursive: true, force: true });
-    }
-  });
-
-  it("regression #1317: shipped blueprint.yaml exposes a parseable min_openshell_version", () => {
-    // Sanity check against the real on-disk blueprint so a future edit that
-    // accidentally drops or breaks the field is caught by CI rather than at
-    // a user's onboard time.
-    const repoRoot = path.resolve(import.meta.dirname, "..");
-    const v = getBlueprintMinOpenshellVersion(repoRoot);
-    expect(v).not.toBe(null);
-    if (!v) {
-      throw new Error("expected min_openshell_version in shipped blueprint");
-    }
-    expect(/^[0-9]+\.[0-9]+\.[0-9]+/.test(v)).toBe(true);
-  });
-
-  it("getBlueprintMaxOpenshellVersion reads max_openshell_version from blueprint.yaml", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-blueprint-max-version-"));
-    const blueprintDir = path.join(tmpDir, "nemoclaw-blueprint");
-    fs.mkdirSync(blueprintDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(blueprintDir, "blueprint.yaml"),
-      [
-        'version: "0.1.0"',
-        'min_openshell_version: "0.0.32"',
-        'max_openshell_version: "0.0.32"',
-        'min_openclaw_version: "2026.3.0"',
-      ].join("\n"),
-    );
-    try {
-      expect(getBlueprintMaxOpenshellVersion(tmpDir)).toBe("0.0.32");
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it("getBlueprintMaxOpenshellVersion returns null on missing or unparseable blueprint", () => {
-    // Missing directory
-    const missingDir = path.join(
-      os.tmpdir(),
-      "nemoclaw-blueprint-max-missing-" + Date.now().toString(),
-    );
-    expect(getBlueprintMaxOpenshellVersion(missingDir)).toBe(null);
-
-    // Present file, missing field — must NOT block onboard
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-blueprint-no-max-field-"));
-    const blueprintDir = path.join(tmpDir, "nemoclaw-blueprint");
-    fs.mkdirSync(blueprintDir, { recursive: true });
-    fs.writeFileSync(path.join(blueprintDir, "blueprint.yaml"), 'version: "0.1.0"\n');
-    try {
-      expect(getBlueprintMaxOpenshellVersion(tmpDir)).toBe(null);
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it("shipped blueprint.yaml exposes a parseable max_openshell_version", () => {
-    const repoRoot = path.resolve(import.meta.dirname, "..");
-    const v = getBlueprintMaxOpenshellVersion(repoRoot);
-    expect(v).not.toBe(null);
-    if (!v) {
-      throw new Error("expected max_openshell_version in shipped blueprint");
-    }
-    expect(/^[0-9]+\.[0-9]+\.[0-9]+/.test(v)).toBe(true);
-  });
-
-  it("max_openshell_version is greater than or equal to min_openshell_version in shipped blueprint", () => {
-    const repoRoot = path.resolve(import.meta.dirname, "..");
-    const min = getBlueprintMinOpenshellVersion(repoRoot);
-    const max = getBlueprintMaxOpenshellVersion(repoRoot);
-    expect(min).not.toBe(null);
-    expect(max).not.toBe(null);
-    expect(versionGte(max, min)).toBe(true);
-  });
-
-  describe("resolveOpenshellInstallVersion (#3404)", () => {
-    const installModule = require("../dist/lib/onboard/openshell-install") as {
-      parseOpenshellReleaseTag: (tag: unknown) => string | null;
-      resolveOpenshellInstallVersion: (
-        available: readonly string[],
-        options: { max: string | null },
-        helpers: { versionGte: (a: string, b: string) => boolean },
-      ) => {
-        kind: "pin" | "no-max" | "incompatible";
-        version?: string;
-        latest?: string | null;
-        max?: string;
-        message?: string;
-        reason?: "latest" | "max-cap";
-      };
-    };
-    const helpers = { versionGte };
-
-    it("picks the highest available release ≤ max when latest exceeds max", () => {
-      const result = installModule.resolveOpenshellInstallVersion(
-        ["v0.0.34", "0.0.35", "v0.0.38"],
-        { max: "0.0.36" },
-        helpers,
-      );
-      expect(result.kind).toBe("pin");
-      expect(result.version).toBe("0.0.35");
-      expect(result.reason).toBe("max-cap");
-      expect(result.latest).toBe("0.0.38");
-    });
-
-    it("picks latest unchanged when latest is ≤ max", () => {
-      const result = installModule.resolveOpenshellInstallVersion(
-        ["v0.0.34", "0.0.35", "v0.0.36"],
-        { max: "0.0.39" },
-        helpers,
-      );
-      expect(result.kind).toBe("pin");
-      expect(result.version).toBe("0.0.36");
-      expect(result.reason).toBe("latest");
-      expect(result.latest).toBe("0.0.36");
-    });
-
-    it("returns an incompatible resolution when no release ≤ max exists", () => {
-      const result = installModule.resolveOpenshellInstallVersion(
-        ["v0.0.38", "0.0.39"],
-        { max: "0.0.36" },
-        helpers,
-      );
-      expect(result.kind).toBe("incompatible");
-      expect(result.latest).toBe("0.0.39");
-      expect(result.max).toBe("0.0.36");
-      expect(result.message).toContain("0.0.39");
-      expect(result.message).toContain("0.0.36");
-    });
-
-    it("falls back to legacy fetch behaviour when max is missing", () => {
-      const result = installModule.resolveOpenshellInstallVersion(
-        ["v0.0.38", "0.0.39"],
-        { max: null },
-        helpers,
-      );
-      expect(result.kind).toBe("no-max");
-      expect(result.latest).toBe("0.0.39");
-    });
-
-    it("falls back to legacy fetch when max is malformed", () => {
-      for (const max of ["", "-1.0.0", "not-a-version", "v"] as const) {
-        const result = installModule.resolveOpenshellInstallVersion(
-          ["v0.0.38"],
-          { max },
-          helpers,
-        );
-        expect(result.kind).toBe("no-max");
-      }
-    });
-
-    it("silently drops malformed entries from the available list", () => {
-      const result = installModule.resolveOpenshellInstallVersion(
-        ["", "v0.0.35", "-1.0.0", "not-a-version", "v0.0.34"],
-        { max: "0.0.36" },
-        helpers,
-      );
-      expect(result.kind).toBe("pin");
-      expect(result.version).toBe("0.0.35");
-    });
-
-    it("parseOpenshellReleaseTag strips leading v and rejects malformed input", () => {
-      expect(installModule.parseOpenshellReleaseTag("v0.0.39")).toBe("0.0.39");
-      expect(installModule.parseOpenshellReleaseTag("0.0.39")).toBe("0.0.39");
-      expect(installModule.parseOpenshellReleaseTag("")).toBe(null);
-      expect(installModule.parseOpenshellReleaseTag("   ")).toBe(null);
-      expect(installModule.parseOpenshellReleaseTag("-1.0.0")).toBe(null);
-      expect(installModule.parseOpenshellReleaseTag("0.0")).toBe(null);
-      expect(installModule.parseOpenshellReleaseTag(42)).toBe(null);
-      expect(installModule.parseOpenshellReleaseTag(null)).toBe(null);
-    });
-
-    it("matches the DGX Spark repro: latest=0.0.38 max=0.0.36 picks 0.0.36", () => {
-      const result = installModule.resolveOpenshellInstallVersion(
-        ["v0.0.36", "v0.0.37", "v0.0.38"],
-        { max: "0.0.36" },
-        helpers,
-      );
-      expect(result.kind).toBe("pin");
-      expect(result.version).toBe("0.0.36");
-      expect(result.reason).toBe("max-cap");
-    });
-  });
-
-  describe("resolveOpenshellInstallPin (#3404 orchestrator)", () => {
-    const pinModule = require("../dist/lib/onboard/openshell-pin") as {
-      resolveOpenshellInstallPin: (deps: {
-        getBlueprintMaxOpenshellVersion: () => string | null;
-        versionGte: (a: string, b: string) => boolean;
-        listReleases?: () => string[] | null;
-        log?: (m: string) => void;
-      }) => { kind: "pin" | "no-max" | "incompatible"; version?: string; message?: string };
-    };
-
-    it("returns no-max when the blueprint has no max_openshell_version", () => {
-      const result = pinModule.resolveOpenshellInstallPin({
-        getBlueprintMaxOpenshellVersion: () => null,
-        versionGte,
-        listReleases: () => ["v0.0.38"],
-      });
-      expect(result.kind).toBe("no-max");
-    });
-
-    it("falls back to no-max when GitHub fetch fails (offline)", () => {
-      const result = pinModule.resolveOpenshellInstallPin({
-        getBlueprintMaxOpenshellVersion: () => "0.0.36",
-        versionGte,
-        listReleases: () => null,
-      });
-      expect(result.kind).toBe("no-max");
-    });
-
-    it("falls back to no-max when GitHub returns an empty list", () => {
-      const result = pinModule.resolveOpenshellInstallPin({
-        getBlueprintMaxOpenshellVersion: () => "0.0.36",
-        versionGte,
-        listReleases: () => [],
-      });
-      expect(result.kind).toBe("no-max");
-    });
-
-    it("pins to highest ≤ max when releases exceed the cap (QA repro)", () => {
-      const logged: string[] = [];
-      const result = pinModule.resolveOpenshellInstallPin({
-        getBlueprintMaxOpenshellVersion: () => "0.0.36",
-        versionGte,
-        listReleases: () => ["v0.0.36", "v0.0.37", "v0.0.38"],
-        log: (m) => logged.push(m),
-      });
-      expect(result.kind).toBe("pin");
-      expect(result.version).toBe("0.0.36");
-      expect(logged.join("\n")).toContain("0.0.36");
-      expect(logged.join("\n")).toContain("0.0.38");
-    });
-
-    it("surfaces incompatible when no published release ≤ max exists", () => {
-      const result = pinModule.resolveOpenshellInstallPin({
-        getBlueprintMaxOpenshellVersion: () => "0.0.36",
-        versionGte,
-        listReleases: () => ["v0.0.38", "v0.0.39"],
-      });
-      expect(result.kind).toBe("incompatible");
-      expect(result.message ?? "").toContain("0.0.36");
-      expect(result.message ?? "").toContain("0.0.39");
-    });
-  });
-
-  describe("computeOpenshellInstallEnv overlays MIN/MAX/PIN (#3404 widening)", () => {
-    const pinModule = require("../dist/lib/onboard/openshell-pin") as {
-      computeOpenshellInstallEnv: (
-        baseEnv: Record<string, string | undefined>,
-        deps: {
-          getBlueprintMinOpenshellVersion?: () => string | null;
-          getBlueprintMaxOpenshellVersion: () => string | null;
-          versionGte: (a: string, b: string) => boolean;
-          listReleases?: () => string[] | null;
-          log?: (m: string) => void;
-        },
-      ) => { env: Record<string, string | undefined> | null };
-    };
-
-    it("overlays MIN/MAX/PIN env vars from blueprint when latest exceeds max", () => {
-      const result = pinModule.computeOpenshellInstallEnv(
-        { EXISTING: "preserved" },
-        {
-          getBlueprintMinOpenshellVersion: () => "0.0.39",
-          getBlueprintMaxOpenshellVersion: () => "0.0.39",
-          versionGte,
-          listReleases: () => ["v0.0.38", "v0.0.39", "v0.0.42"],
-        },
-      );
-      expect(result.env).not.toBe(null);
-      expect(result.env?.EXISTING).toBe("preserved");
-      expect(result.env?.NEMOCLAW_OPENSHELL_MIN_VERSION).toBe("0.0.39");
-      expect(result.env?.NEMOCLAW_OPENSHELL_MAX_VERSION).toBe("0.0.39");
-      expect(result.env?.NEMOCLAW_OPENSHELL_PIN_VERSION).toBe("0.0.39");
-    });
-
-    it("overlays MIN/MAX but no PIN when GitHub fetch fails (offline)", () => {
-      const result = pinModule.computeOpenshellInstallEnv(
-        {},
-        {
-          getBlueprintMinOpenshellVersion: () => "0.0.39",
-          getBlueprintMaxOpenshellVersion: () => "0.0.39",
-          versionGte,
-          listReleases: () => null,
-        },
-      );
-      expect(result.env).not.toBe(null);
-      expect(result.env?.NEMOCLAW_OPENSHELL_MIN_VERSION).toBe("0.0.39");
-      expect(result.env?.NEMOCLAW_OPENSHELL_MAX_VERSION).toBe("0.0.39");
-      expect(result.env?.NEMOCLAW_OPENSHELL_PIN_VERSION).toBeUndefined();
-    });
-
-    it("returns the base env unchanged when blueprint exposes no min/max", () => {
-      const baseEnv = { ONLY_THIS: "value" };
-      const result = pinModule.computeOpenshellInstallEnv(baseEnv, {
-        getBlueprintMinOpenshellVersion: () => null,
-        getBlueprintMaxOpenshellVersion: () => null,
-        versionGte,
-        listReleases: () => ["v0.0.38"],
-      });
-      expect(result.env).toBe(baseEnv);
-    });
-
-    it("aborts (env=null) when no release ≤ max exists", () => {
-      const result = pinModule.computeOpenshellInstallEnv(
-        {},
-        {
-          getBlueprintMaxOpenshellVersion: () => "0.0.36",
-          versionGte,
-          listReleases: () => ["v0.0.38", "v0.0.39"],
-        },
-      );
-      expect(result.env).toBe(null);
-    });
-  });
-
-  it("pins the gateway image to the installed OpenShell release version", () => {
-    expect(getInstalledOpenshellVersion("openshell 0.0.12")).toBe("0.0.12");
-    expect(getInstalledOpenshellVersion("openshell 0.0.13-dev.8+gbbcaed2ea")).toBe("0.0.13");
-    expect(getInstalledOpenshellVersion("bogus")).toBe(null);
-    expect(getStableGatewayImageRef("openshell 0.0.12")).toBe(
-      "ghcr.io/nvidia/openshell/cluster:0.0.12",
-    );
-    expect(getStableGatewayImageRef("openshell 0.0.13-dev.8+gbbcaed2ea")).toBe(
-      "ghcr.io/nvidia/openshell/cluster:0.0.13",
-    );
-    expect(getStableGatewayImageRef("bogus")).toBe(null);
   });
 
   it("treats the gateway as healthy only when nemoclaw is running and connected", () => {
