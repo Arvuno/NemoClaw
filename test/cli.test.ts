@@ -953,11 +953,11 @@ describe("CLI dispatch", () => {
     expect(r.out).toContain("List provider credentials");
   });
 
-  it("credentials reset without provider keeps provider-specific usage", () => {
+  it("credentials reset without provider uses oclif required-arg validation", () => {
     const r = run("credentials reset --yes");
-    expect(r.code).toBe(1);
-    expect(r.out).toContain("Usage: nemoclaw credentials reset <PROVIDER> [--yes]");
-    expect(r.out).toContain("PROVIDER is an OpenShell provider name");
+    expect(r.code).toBe(2);
+    expect(r.out).toContain("Missing 1 required arg");
+    expect(r.out).toContain("provider  OpenShell provider name");
   });
 
   it("maintenance command help exits 0 and shows migrated usage", () => {

@@ -209,18 +209,22 @@ describe("runRegisteredOclifCommand", () => {
     expect(exit).toHaveBeenCalledWith(1);
   });
 
-  it("rethrows other oclif error classes that carry oclif.exit", async () => {
-    // RequiredArgsError and friends ride the same `oclif.exit` channel as
-    // ExitError but carry a user-visible message that oclif's own handler
-    // is responsible for printing. Don't swallow those.
+  it("formats required-argument parse errors and exits with the oclif exit code", async () => {
     class RequiredArgsError extends Error {
       oclif = { exit: 2 };
     }
     const error = new RequiredArgsError("Missing 1 required arg: path");
     runCommandMock.mockRejectedValue(error);
+    const errorLine = vi.fn();
+    const exit = vi.fn((code: number): never => {
+      throw new Error(`exit:${code}`);
+    });
 
-    await expect(runRegisteredOclifCommand("skill:install", [], { rootDir: "/repo" })).rejects.toBe(
-      error,
-    );
+    await expect(
+      runRegisteredOclifCommand("skill:install", [], { rootDir: "/repo", error: errorLine, exit }),
+    ).rejects.toThrow("exit:2");
+
+    expect(errorLine).toHaveBeenCalledWith("  Missing 1 required arg: path");
+    expect(exit).toHaveBeenCalledWith(2);
   });
 });

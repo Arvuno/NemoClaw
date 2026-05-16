@@ -25,7 +25,7 @@ export default class CredentialsResetCommand extends NemoClawCommand {
     provider: Args.string({
       name: "PROVIDER",
       description: "OpenShell provider name",
-      required: false,
+      required: true,
     }),
   };
   static flags = {
@@ -35,14 +35,6 @@ export default class CredentialsResetCommand extends NemoClawCommand {
   public async run(): Promise<void> {
     const { args, flags } = await this.parse(CredentialsResetCommand);
     const key = args.provider;
-
-    if (!key || key.startsWith("-")) {
-      this.failWithLines([
-        `  Usage: ${CLI_NAME} credentials reset <PROVIDER> [--yes]`,
-        `  PROVIDER is an OpenShell provider name. Run '${CLI_NAME} credentials list' first.`,
-      ]);
-      return;
-    }
 
     if (isBridgeProviderName(key)) {
       this.failWithLines([
