@@ -21,6 +21,16 @@ export default class CredentialsResetCommand extends NemoClawCommand {
     "<%= config.bin %> credentials reset nvidia-prod",
     "<%= config.bin %> credentials reset nvidia-prod --yes",
   ];
+  static display = [
+    {
+      usage: "nemoclaw credentials reset",
+      description: "Remove a stored credential so onboard re-prompts",
+      flags: "<PROVIDER> [--yes|-y]",
+      group: "Credentials",
+      scope: "global",
+      order: 39,
+    },
+  ];
   static args = {
     provider: Args.string({
       name: "PROVIDER",
