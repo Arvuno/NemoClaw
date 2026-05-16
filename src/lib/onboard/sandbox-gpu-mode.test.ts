@@ -38,7 +38,14 @@ describe("sandbox GPU mode helpers", () => {
     const jetson = gpu({ platform: "jetson" });
     expect(resolveSandboxGpuConfig(jetson, { env: {} }).sandboxGpuEnabled).toBe(false);
     expect(
-      resolveSandboxGpuConfig(jetson, { env: { NEMOCLAW_SANDBOX_GPU: "1" } }).sandboxGpuEnabled,
+      resolveSandboxGpuConfig(jetson, {
+        env: { NEMOCLAW_SANDBOX_GPU_DEVICE: "nvidia.com/gpu=0" },
+      }).sandboxGpuEnabled,
+    ).toBe(false);
+    expect(
+      resolveSandboxGpuConfig(jetson, {
+        env: { NEMOCLAW_SANDBOX_GPU: "1", NEMOCLAW_SANDBOX_GPU_DEVICE: "nvidia.com/gpu=0" },
+      }).sandboxGpuEnabled,
     ).toBe(true);
     expect(resolveSandboxGpuConfig(jetson, { flag: "enable", env: {} }).mode).toBe("1");
   });

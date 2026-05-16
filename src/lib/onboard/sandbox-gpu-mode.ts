@@ -69,7 +69,7 @@ export function resolveSandboxGpuConfig(
   if (device && mode === "0") {
     errors.push("NEMOCLAW_SANDBOX_GPU_DEVICE cannot be used when sandbox GPU mode is 0.");
   }
-  if (device && options.flag !== "disable" && envMode !== "0") {
+  if (device && (options.flag === "enable" || envMode === "1")) {
     mode = "1";
   }
 
