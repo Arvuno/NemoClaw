@@ -3,6 +3,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+import { sandboxCommands } from "./command-registry";
 import { renderPublicOclifHelp } from "./public-oclif-help";
 
 describe("renderPublicOclifHelp", () => {
@@ -19,6 +20,23 @@ describe("renderPublicOclifHelp", () => {
       expect(output).toContain("$ nemoclaw alpha logs --follow");
       expect(output).not.toContain("$ nemoclaw sandbox logs alpha --follow");
       expect(output).not.toContain("sandbox:logs");
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("rewrites sandbox command examples away from oclif-native grammar", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      for (const command of sandboxCommands()) {
+        const usage = command.usage.replace(/^nemoclaw\s+/, "");
+        renderPublicOclifHelp(
+          command.commandId,
+          command.flags ? `${usage} ${command.flags}` : usage,
+        );
+      }
+      const output = log.mock.calls.map((call) => String(call[0])).join("\n");
+      expect(output).not.toContain("$ nemoclaw sandbox ");
     } finally {
       log.mockRestore();
     }
