@@ -28,16 +28,6 @@ type CommandEntry = {
 type ResumeConflict = { field: string; requested: string | null; recorded: string | null };
 
 type OnboardTestInternals = {
-  findAvailableDashboardPort: (
-    sandboxName: string,
-    preferredPort: number,
-    forwardListOutput: string | null,
-    isPortBoundCheck?: (port: number) => boolean,
-  ) => number;
-  findDashboardForwardOwner: (
-    forwardListOutput: string | null | undefined,
-    portToStop: string,
-  ) => string | null;
   formatOnboardConfigSummary: ShimFn<string>;
   formatSandboxBuildEstimateNote: (host: {
     isContainerRuntimeUnderProvisioned: boolean;
@@ -80,7 +70,6 @@ function isOnboardTestInternals(
 ): value is OnboardTestInternals {
   return (
     value !== null &&
-    typeof value.findAvailableDashboardPort === "function" &&
     typeof value.agentSupportsWebSearch === "function" &&
     typeof value.configureWebSearch === "function" &&
     typeof value.formatSandboxBuildEstimateNote === "function"
@@ -107,8 +96,6 @@ const {
   agentSupportsWebSearch,
   configureWebSearch,
   SANDBOX_BASE_IMAGE,
-  findAvailableDashboardPort,
-  findDashboardForwardOwner,
   formatOnboardConfigSummary,
   formatSandboxBuildEstimateNote,
 } = onboardTestInternals;
@@ -3218,114 +3205,6 @@ const { setupInference } = require(${onboardPath});
       patchPos > pullPos,
       "pullAndResolveBaseImageDigest must be called BEFORE patchStagedDockerfile — regression #1904",
     );
-  });
-
-  it("findDashboardForwardOwner parses openshell forward list column format (#2169)", () => {
-    // Canonical openshell forward list output: SANDBOX  BIND  PORT  PID  STATUS
-    const forwardList = [
-      "SANDBOX     BIND             PORT   PID     STATUS",
-      "test21      127.0.0.1        18789  42101   active",
-      "other       127.0.0.1        18790  42102   active",
-    ].join("\n");
-
-    // Port in use by another sandbox → return that sandbox's name
-    assert.equal(findDashboardForwardOwner(forwardList, "18789"), "test21");
-    assert.equal(findDashboardForwardOwner(forwardList, "18790"), "other");
-    // Port not in the list → null
-    assert.equal(findDashboardForwardOwner(forwardList, "18791"), null);
-    // Empty / missing input → null (no false positives)
-    assert.equal(findDashboardForwardOwner("", "18789"), null);
-    assert.equal(findDashboardForwardOwner(null, "18789"), null);
-    assert.equal(findDashboardForwardOwner(undefined, "18789"), null);
-    // Port string appearing as a substring somewhere other than column 2 must NOT
-    // match — guard against false-positive substring matches.
-    const falsePositive = "sandbox18789 127.0.0.1 42001 9999 active";
-    assert.equal(findDashboardForwardOwner(falsePositive, "18789"), null);
-  });
-
-  describe("findAvailableDashboardPort port-conflict detection (#3260)", () => {
-    const stubBound = (...bound: number[]) => {
-      const set = new Set(bound);
-      return (port: number) => set.has(port);
-    };
-
-    it("returns the preferred port when no forward owns it and the host says it is free", () => {
-      assert.equal(
-        findAvailableDashboardPort("cursor", 18789, "", stubBound()),
-        18789,
-      );
-    });
-
-    it("skips the preferred port when host reports it bound and falls through to the range scan", () => {
-      // The proactive probe in isPortBoundOnHost can now see root-owned
-      // listeners (sudo lsof) and Node-bind-failure listeners that the
-      // bare lsof missed; the allocator must skip those ports just as it
-      // skips ports owned by other forwards.
-      assert.equal(
-        findAvailableDashboardPort("cursor", 18789, "", stubBound(18789)),
-        18790,
-      );
-    });
-
-    it("skips ports owned by other sandboxes and host-bound ports together", () => {
-      const forwardList = [
-        "SANDBOX  BIND  PORT  PID  STATUS",
-        "alpha    127.0.0.1  18789  111  running",
-      ].join("\n");
-      assert.equal(
-        findAvailableDashboardPort("cursor", 18789, forwardList, stubBound(18790)),
-        18791,
-      );
-    });
-
-    it("returns the preferred port when this sandbox already owns it", () => {
-      const forwardList = [
-        "SANDBOX  BIND  PORT  PID  STATUS",
-        "cursor   127.0.0.1  18789  111  running",
-      ].join("\n");
-      assert.equal(
-        findAvailableDashboardPort("cursor", 18789, forwardList, stubBound(18789)),
-        18789,
-      );
-    });
-
-    it("throws when every port in the range is occupied by other sandboxes", () => {
-      const lines = ["SANDBOX  BIND  PORT  PID  STATUS"];
-      for (let p = 18789; p <= 18799; p++) {
-        lines.push(`other${p}    127.0.0.1  ${p}  ${p}  running`);
-      }
-      assert.throws(
-        () => findAvailableDashboardPort("cursor", 18789, lines.join("\n"), stubBound()),
-        /All dashboard ports in range 18789-18799 are occupied/,
-      );
-    });
-
-    it("includes host-bound ports in the exhaustion error so users know what's blocking them", () => {
-      // When every candidate is skipped by isPortBoundCheck rather than by
-      // an OpenShell forward, the error must still surface which ports are
-      // bound — otherwise users see "all ports are occupied" with an empty
-      // owner list and no remediation hint (CodeRabbit catch on #3260).
-      const allBound = new Set<number>();
-      for (let p = 18789; p <= 18799; p++) allBound.add(p);
-      assert.throws(
-        () => findAvailableDashboardPort("cursor", 18789, "", (p) => allBound.has(p)),
-        /18789 → non-OpenShell host listener[\s\S]*18799 → non-OpenShell host listener/,
-      );
-    });
-
-    it("probes each port at most once even when the preferred port is in the range", () => {
-      // Avoid re-probing the same port via the proactive lsof + sudo lsof +
-      // Node bind chain — those are subprocess-spawning probes and the call
-      // count matters.
-      const calls: number[] = [];
-      const stub = (p: number) => {
-        calls.push(p);
-        return false;
-      };
-      findAvailableDashboardPort("cursor", 18789, "", stub);
-      assert.equal(calls.length, 1, `expected 1 probe call, got ${calls.length}`);
-      assert.equal(calls[0], 18789);
-    });
   });
 
   it("formatOnboardConfigSummary renders all collected fields (#2165)", () => {

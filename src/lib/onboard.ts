@@ -264,6 +264,7 @@ const tiers: typeof import("./policy/tiers") = require("./policy/tiers");
 const { ensureUsageNoticeConsent } = require("./onboard/usage-notice");
 const {
   findAvailableDashboardPort,
+  findDashboardForwardOwner,
   getOccupiedPorts,
   isLiveForwardStatus,
 } = require("./onboard/dashboard-port") as typeof import("./onboard/dashboard-port");
@@ -8858,24 +8859,6 @@ const CONTROL_UI_PORT = DASHBOARD_PORT;
 
 // Dashboard helpers — delegated to src/lib/dashboard/contract.ts
 const { buildChain, buildControlUiUrls } = dashboardContract;
-
-// Parses `openshell forward list` output and returns the sandbox currently
-// owning `portToStop`, or null. Exported for unit testing — see #2169.
-// Columns: SANDBOX  BIND  PORT  PID  STATUS (whitespace-separated).
-function findDashboardForwardOwner(
-  forwardListOutput: string | null | undefined,
-  portToStop: string,
-): string | null {
-  if (!forwardListOutput) return null;
-  const portLine = forwardListOutput
-    .split("\n")
-    .map((l) => l.trim())
-    .find((l) => {
-      const parts = l.split(/\s+/);
-      return parts[2] === portToStop;
-    });
-  return portLine ? (portLine.split(/\s+/)[0] ?? null) : null;
-}
 
 function findForwardEntry(
   forwardListOutput: string | null | undefined,

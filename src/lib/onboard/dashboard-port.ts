@@ -139,6 +139,21 @@ export function isPortBoundOnHost(port: number): boolean {
  * to spawn real lsof / Node probes; production callers leave it at the
  * default.
  */
+export function findDashboardForwardOwner(
+  forwardListOutput: string | null | undefined,
+  portToStop: string,
+): string | null {
+  if (!forwardListOutput) return null;
+  const portLine = forwardListOutput
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => {
+      const parts = line.split(/\s+/);
+      return parts[2] === portToStop;
+    });
+  return portLine ? (portLine.split(/\s+/)[0] ?? null) : null;
+}
+
 export function findAvailableDashboardPort(
   sandboxName: string,
   preferredPort: number,
