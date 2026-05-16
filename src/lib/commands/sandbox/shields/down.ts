@@ -15,6 +15,17 @@ export default class ShieldsDownCommand extends NemoClawCommand {
   static summary = "Lower sandbox security shields";
   static description = "Temporarily lower sandbox shields.";
   static usage = ["<name> [--timeout 5m] [--reason <text>] [--policy permissive]"];
+  static display = [
+    {
+      usage: "nemoclaw <name> shields down",
+      description: "Lower sandbox security shields",
+      flags: "[--timeout 5m] [--reason <text>] [--policy permissive]",
+      group: "Sandbox Management",
+      hidden: true,
+      scope: "sandbox",
+      order: 25,
+    },
+  ];
   static args = { sandboxName: sandboxNameArg };
   static flags = {
     timeout: shieldsTimeoutDurationFlag({ description: "Duration before shields are restored" }),

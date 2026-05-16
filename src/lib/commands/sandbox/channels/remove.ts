@@ -17,6 +17,16 @@ export default class ChannelsRemoveCommand extends NemoClawCommand {
   static description = "Remove credentials for a messaging channel and queue a sandbox rebuild.";
   static usage = ["<name> <channel> [--dry-run]"];
   static examples = ["<%= config.bin %> sandbox channels remove alpha slack --dry-run"];
+  static display = [
+    {
+      usage: "nemoclaw <name> channels remove",
+      description: "Remove a configured messaging channel",
+      flags: "<channel> [--dry-run]",
+      group: "Messaging Channels",
+      scope: "sandbox",
+      order: 22,
+    },
+  ];
   static args = channelMutationArgs;
   static flags = channelMutationFlags;
 

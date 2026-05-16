@@ -17,6 +17,16 @@ export default class ChannelsStopCommand extends NemoClawCommand {
   static description = "Disable a messaging channel while keeping credentials in the gateway.";
   static usage = ["<name> <channel> [--dry-run]"];
   static examples = ["<%= config.bin %> sandbox channels stop alpha discord"];
+  static display = [
+    {
+      usage: "nemoclaw <name> channels stop",
+      description: "Disable channel (keeps credentials)",
+      flags: "<channel> [--dry-run]",
+      group: "Messaging Channels",
+      scope: "sandbox",
+      order: 23,
+    },
+  ];
   static args = channelMutationArgs;
   static flags = channelMutationFlags;
 

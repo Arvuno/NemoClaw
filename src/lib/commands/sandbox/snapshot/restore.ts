@@ -17,6 +17,16 @@ export default class SnapshotRestoreCommand extends NemoClawCommand {
     "<%= config.bin %> sandbox snapshot restore alpha v2",
     "<%= config.bin %> sandbox snapshot restore alpha before-upgrade --to beta",
   ];
+  static display = [
+    {
+      usage: "nemoclaw <name> snapshot restore",
+      description: "Restore state from a snapshot",
+      flags: "[selector] [--to <dst>]",
+      group: "Sandbox Management",
+      scope: "sandbox",
+      order: 9,
+    },
+  ];
   static args = {
     sandboxName: sandboxNameArg,
     selector: Args.string({

@@ -24,6 +24,16 @@ export default class PolicyAddCommand extends NemoClawCommand {
     "<%= config.bin %> sandbox policy add alpha --from-file ./policy.yaml --dry-run",
     "<%= config.bin %> sandbox policy add alpha --from-dir ./policies --yes",
   ];
+  static display = [
+    {
+      usage: "nemoclaw <name> policy-add",
+      description: "Add a network or filesystem policy preset",
+      flags: "(--yes, -y, --dry-run, --from-file <path>, --from-dir <path>)",
+      group: "Policy Presets",
+      scope: "sandbox",
+      order: 17,
+    },
+  ];
   static args = policyMutationArgs;
   static flags = {
     ...policyMutationFlags,

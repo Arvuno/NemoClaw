@@ -17,6 +17,16 @@ export default class ShareMountCommand extends NemoClawCommand {
     "<%= config.bin %> sandbox share mount alpha",
     "<%= config.bin %> sandbox share mount alpha /workspace ~/mnt/alpha",
   ];
+  static display = [
+    {
+      usage: "nemoclaw <name> share mount",
+      description: "Mount sandbox filesystem on the host via SSHFS",
+      flags: "[sandbox-path] [local-mount-point]",
+      group: "Sandbox Management",
+      scope: "sandbox",
+      order: 10,
+    },
+  ];
   static args = {
     sandboxName: sandboxNameArg,
     sandboxPath: Args.string({

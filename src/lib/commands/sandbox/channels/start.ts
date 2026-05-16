@@ -17,6 +17,16 @@ export default class ChannelsStartCommand extends NemoClawCommand {
   static description = "Re-enable a previously stopped messaging channel.";
   static usage = ["<name> <channel> [--dry-run]"];
   static examples = ["<%= config.bin %> sandbox channels start alpha discord"];
+  static display = [
+    {
+      usage: "nemoclaw <name> channels start",
+      description: "Re-enable a previously stopped channel",
+      flags: "<channel> [--dry-run]",
+      group: "Messaging Channels",
+      scope: "sandbox",
+      order: 24,
+    },
+  ];
   static args = channelMutationArgs;
   static flags = channelMutationFlags;
 

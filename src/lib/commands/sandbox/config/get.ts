@@ -18,6 +18,17 @@ export default class SandboxConfigGetCommand extends NemoClawCommand {
     "<%= config.bin %> sandbox config get alpha",
     "<%= config.bin %> sandbox config get alpha --key model --format yaml",
   ];
+  static display = [
+    {
+      usage: "nemoclaw <name> config get",
+      description: "Get sandbox configuration",
+      flags: "[--key <dotpath>] [--format json|yaml]",
+      group: "Sandbox Management",
+      hidden: true,
+      scope: "sandbox",
+      order: 28,
+    },
+  ];
   static args = {
     sandboxName: sandboxNameArg,
   };

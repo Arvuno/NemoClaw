@@ -16,6 +16,15 @@ export default class SkillInstallCliCommand extends NemoClawCommand {
     "<%= config.bin %> sandbox skill install alpha ./my-skill",
     "<%= config.bin %> sandbox skill install alpha ./my-skill/SKILL.md",
   ];
+  static display = [
+    {
+      usage: "nemoclaw <name> skill install",
+      description: "Deploy a skill directory to the sandbox",
+      group: "Skills",
+      scope: "sandbox",
+      order: 16,
+    },
+  ];
   static args = {
     sandboxName: Args.string({
       name: "sandbox",

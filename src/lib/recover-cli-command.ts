@@ -14,6 +14,15 @@ export default class RecoverCliCommand extends NemoClawCommand {
     "Re-run the sandbox-side gateway recovery and re-establish the host-side dashboard port-forward without opening an SSH session. Equivalent to `connect --probe-only`; safe to re-run.";
   static usage = ["<name> recover"];
   static examples = ["<%= config.bin %> alpha recover"];
+  static display = [
+    {
+      usage: "nemoclaw <name> recover",
+      description: "Restart the sandbox gateway and dashboard port-forward",
+      group: "Sandbox Management",
+      scope: "sandbox",
+      order: 3.5,
+    },
+  ];
   static args = {
     sandboxName: Args.string({ name: "sandbox", description: "Sandbox name", required: true }),
   };

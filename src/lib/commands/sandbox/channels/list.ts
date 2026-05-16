@@ -13,6 +13,15 @@ export default class SandboxChannelsListCommand extends NemoClawCommand {
   static description = "List supported messaging channels for a sandbox.";
   static usage = ["<name>"];
   static examples = ["<%= config.bin %> sandbox channels list alpha"];
+  static display = [
+    {
+      usage: "nemoclaw <name> channels list",
+      description: "List supported messaging channels",
+      group: "Messaging Channels",
+      scope: "sandbox",
+      order: 20,
+    },
+  ];
   static args = {
     sandboxName: sandboxNameArg,
   };
