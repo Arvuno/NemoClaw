@@ -13,6 +13,7 @@ import {
   sandboxActionTokens,
   GROUP_ORDER,
 } from "./command-registry";
+import { getRegisteredOclifCommandsMetadata } from "./oclif-metadata";
 
 describe("command-registry", () => {
   describe("COMMANDS array", () => {
@@ -96,6 +97,30 @@ describe("command-registry", () => {
         "nemoclaw help",
         "nemoclaw version",
       ]);
+    });
+  });
+
+  describe("oclif discovery coverage", () => {
+    it("requires public leaf commands to declare display metadata", () => {
+      const metadataById = getRegisteredOclifCommandsMetadata();
+      const discoveredIds = Object.keys(metadataById).sort();
+
+      for (const commandId of discoveredIds) {
+        if (commandId.startsWith("internal:")) continue;
+
+        const hasSubcommands = discoveredIds.some((id) => id.startsWith(`${commandId}:`));
+        if (hasSubcommands) continue;
+
+        expect(metadataById[commandId].display, commandId).toBeTruthy();
+        expect(metadataById[commandId].display?.length, commandId).toBeGreaterThan(0);
+      }
+    });
+
+    it("keeps every public display entry attached to a discovered oclif command", () => {
+      const discoveredIds = new Set(Object.keys(getRegisteredOclifCommandsMetadata()));
+      for (const command of COMMANDS) {
+        expect(discoveredIds.has(command.commandId), command.usage).toBe(true);
+      }
     });
   });
 
