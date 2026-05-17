@@ -20,22 +20,22 @@ const mocks = vi.hoisted(() => ({
   showStatusCommand: vi.fn(),
 }));
 
-vi.mock("../inventory", () => ({
+vi.mock("../lib/inventory", () => ({
   getSandboxInventory: mocks.getSandboxInventory,
   getStatusReport: mocks.getStatusReport,
   renderSandboxInventoryText: mocks.renderSandboxInventoryText,
   showStatusCommand: mocks.showStatusCommand,
 }));
 
-vi.mock("../list-command-deps", () => ({
+vi.mock("../lib/list-command-deps", () => ({
   buildListCommandDeps: mocks.buildListCommandDeps,
 }));
 
-vi.mock("../status-command-deps", () => ({
+vi.mock("../lib/status-command-deps", () => ({
   buildStatusCommandDeps: mocks.buildStatusCommandDeps,
 }));
 
-vi.mock("../actions/global", () => ({
+vi.mock("../lib/actions/global", () => ({
   runBackupAllAction: mocks.runBackupAllAction,
   runGarbageCollectImagesAction: mocks.runGarbageCollectImagesAction,
   runOnboardAction: mocks.runOnboardAction,
@@ -44,7 +44,7 @@ vi.mock("../actions/global", () => ({
   runUpgradeSandboxesAction: mocks.runUpgradeSandboxesAction,
 }));
 
-vi.mock("../actions/inference-set", () => ({
+vi.mock("../lib/actions/inference-set", () => ({
   InferenceSetError: class InferenceSetError extends Error {
     exitCode: number;
 
@@ -56,7 +56,7 @@ vi.mock("../actions/inference-set", () => ({
   runInferenceSet: mocks.runInferenceSet,
 }));
 
-vi.mock("../actions/inference-get", () => ({
+vi.mock("../lib/actions/inference-get", () => ({
   InferenceGetError: class InferenceGetError extends Error {
     exitCode: number;
 
@@ -68,18 +68,18 @@ vi.mock("../actions/inference-get", () => ({
   runInferenceGet: mocks.runInferenceGet,
 }));
 
-import { InferenceGetError } from "../actions/inference-get";
-import { InferenceSetError } from "../actions/inference-set";
-import InferenceGetCommand from "../../commands/inference/get";
-import InferenceSetCommand from "../../commands/inference/set";
-import ListCommand from "../../commands/list";
-import BackupAllCommand from "../../commands/backup-all";
-import GarbageCollectImagesCommand from "../../commands/gc";
-import UpgradeSandboxesCommand from "../../commands/upgrade-sandboxes";
-import OnboardCliCommand from "../../commands/onboard";
-import SetupCliCommand from "../../commands/setup";
-import SetupSparkCliCommand from "../../commands/setup-spark";
-import StatusCommand from "../../commands/status";
+import { InferenceGetError } from "../lib/actions/inference-get";
+import { InferenceSetError } from "../lib/actions/inference-set";
+import InferenceGetCommand from "./inference/get";
+import InferenceSetCommand from "./inference/set";
+import ListCommand from "./list";
+import BackupAllCommand from "./backup-all";
+import GarbageCollectImagesCommand from "./gc";
+import UpgradeSandboxesCommand from "./upgrade-sandboxes";
+import OnboardCliCommand from "./onboard";
+import SetupCliCommand from "./setup";
+import SetupSparkCliCommand from "./setup-spark";
+import StatusCommand from "./status";
 
 const rootDir = process.cwd();
 

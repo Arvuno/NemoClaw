@@ -39,43 +39,43 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("node:child_process", () => ({ spawnSync: mocks.spawnSync }));
-vi.mock("../diagnostics/debug", () => ({ runDebug: vi.fn() }));
-vi.mock("../diagnostics/debug-command", () => ({
+vi.mock("../lib/diagnostics/debug", () => ({ runDebug: vi.fn() }));
+vi.mock("../lib/diagnostics/debug-command", () => ({
   runDebugCommandWithOptions: mocks.runDebugCommandWithOptions,
 }));
-vi.mock("../gateway-token-command", () => ({
+vi.mock("../lib/gateway-token-command", () => ({
   GatewayTokenCommandError: mocks.GatewayTokenCommandError,
   runGatewayTokenCommand: mocks.runGatewayTokenCommand,
 }));
-vi.mock("../actions/global", () => ({
+vi.mock("../lib/actions/global", () => ({
   runDeployAction: mocks.runDeployAction,
   showRootHelp: mocks.showRootHelp,
   showVersion: mocks.showVersion,
 }));
-vi.mock("../adapters/openshell/client", () => ({ captureOpenshellCommand: mocks.captureOpenshellCommand }));
-vi.mock("../state/registry", () => ({ listSandboxes: mocks.listSandboxes }));
-vi.mock("../adapters/openshell/resolve", () => ({ resolveOpenshell: mocks.resolveOpenshell }));
-vi.mock("../tunnel/services", () => ({ startAll: mocks.startAll, stopAll: mocks.stopAll }));
-vi.mock("../tunnel/service-command", () => ({
+vi.mock("../lib/adapters/openshell/client", () => ({ captureOpenshellCommand: mocks.captureOpenshellCommand }));
+vi.mock("../lib/state/registry", () => ({ listSandboxes: mocks.listSandboxes }));
+vi.mock("../lib/adapters/openshell/resolve", () => ({ resolveOpenshell: mocks.resolveOpenshell }));
+vi.mock("../lib/tunnel/services", () => ({ startAll: mocks.startAll, stopAll: mocks.stopAll }));
+vi.mock("../lib/tunnel/service-command", () => ({
   runStartCommand: mocks.runStartCommand,
   runStopCommand: mocks.runStopCommand,
 }));
-vi.mock("../uninstall-command", () => ({
+vi.mock("../lib/uninstall-command", () => ({
   buildVersionedUninstallUrl: mocks.buildVersionedUninstallUrl,
   runUninstallCommand: mocks.runUninstallCommand,
 }));
-vi.mock("../core/version", () => ({ getVersion: mocks.getVersion }));
+vi.mock("../lib/core/version", () => ({ getVersion: mocks.getVersion }));
 
-import DebugCliCommand from "../../commands/debug";
-import DeployCliCommand from "../../commands/deploy";
-import GatewayTokenCliCommand, { setGatewayTokenRuntimeBridgeFactoryForTest } from "../../commands/sandbox/gateway/token";
-import DeprecatedStartCommand from "../../commands/start";
-import DeprecatedStopCommand from "../../commands/stop";
-import RootHelpCommand from "../../commands/root/help";
-import VersionCommand from "../../commands/root/version";
-import TunnelStartCommand from "../../commands/tunnel/start";
-import TunnelStopCommand from "../../commands/tunnel/stop";
-import UninstallCliCommand from "../../commands/uninstall";
+import DebugCliCommand from "./debug";
+import DeployCliCommand from "./deploy";
+import GatewayTokenCliCommand, { setGatewayTokenRuntimeBridgeFactoryForTest } from "./sandbox/gateway/token";
+import DeprecatedStartCommand from "./start";
+import DeprecatedStopCommand from "./stop";
+import RootHelpCommand from "./root/help";
+import VersionCommand from "./root/version";
+import TunnelStartCommand from "./tunnel/start";
+import TunnelStopCommand from "./tunnel/stop";
+import UninstallCliCommand from "./uninstall";
 
 const rootDir = process.cwd();
 

@@ -5,7 +5,7 @@ import { NemoClawCommand } from "../../lib/cli/nemoclaw-oclif-command";
 
 import { stopAll } from "../../lib/tunnel/services";
 import { runStopCommand } from "../../lib/tunnel/service-command";
-import { serviceDeps } from "../../lib/commands/tunnel/common";
+import { serviceDeps } from "../../lib/tunnel/command-support";
 
 export default class TunnelStopCommand extends NemoClawCommand {
   static id = "tunnel:stop";

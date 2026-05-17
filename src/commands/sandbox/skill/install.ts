@@ -4,7 +4,7 @@
 import { Args } from "@oclif/core";
 import { NemoClawCommand } from "../../../lib/cli/nemoclaw-oclif-command";
 
-import { getSkillInstallRuntimeBridge } from "../../../lib/commands/sandbox/skill/common";
+import { getSkillInstallRuntimeBridge } from "../../../lib/sandbox/skill-command-support";
 
 export default class SkillInstallCliCommand extends NemoClawCommand {
   static id = "sandbox:skill:install";

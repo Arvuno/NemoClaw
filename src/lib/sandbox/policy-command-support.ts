@@ -3,7 +3,7 @@
 
 import { Args } from "@oclif/core";
 
-import { dryRunFlag, forceFlag, yesFlag } from "../../../cli/common-flags";
+import { dryRunFlag, forceFlag, yesFlag } from "../cli/common-flags";
 
 type PolicyRuntimeBridge = {
   sandboxPolicyAdd: (sandboxName: string, args?: string[]) => Promise<void>;
@@ -11,7 +11,7 @@ type PolicyRuntimeBridge = {
 };
 
 let runtimeBridgeFactory = (): PolicyRuntimeBridge => {
-  const actions = require("../../../actions/sandbox/policy-channel") as {
+  const actions = require("../actions/sandbox/policy-channel") as {
     addSandboxPolicy: PolicyRuntimeBridge["sandboxPolicyAdd"];
     removeSandboxPolicy: PolicyRuntimeBridge["sandboxPolicyRemove"];
   };

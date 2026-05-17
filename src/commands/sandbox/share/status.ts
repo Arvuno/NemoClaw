@@ -5,7 +5,7 @@ import { Args } from "@oclif/core";
 import { NemoClawCommand } from "../../../lib/cli/nemoclaw-oclif-command";
 
 import { runShareStatus } from "../../../lib/share-command";
-import { sandboxNameArg } from "../../../lib/commands/sandbox/common";
+import { sandboxNameArg } from "../../../lib/sandbox/command-support";
 
 export default class ShareStatusCommand extends NemoClawCommand {
   static id = "sandbox:share:status";

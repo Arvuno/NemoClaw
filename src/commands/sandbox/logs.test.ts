@@ -3,7 +3,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import SandboxLogsCommand, { setSandboxLogsRuntimeBridgeFactoryForTest } from "../../../commands/sandbox/logs";
+import SandboxLogsCommand, { setSandboxLogsRuntimeBridgeFactoryForTest } from "./logs";
 
 const rootDir = process.cwd();
 

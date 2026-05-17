@@ -4,7 +4,7 @@
 import { NemoClawCommand } from "../../lib/cli/nemoclaw-oclif-command";
 
 import { showSandboxStatus } from "../../lib/actions/sandbox/status";
-import { sandboxNameArg } from "../../lib/commands/sandbox/common";
+import { sandboxNameArg } from "../../lib/sandbox/command-support";
 
 export default class SandboxStatusCommand extends NemoClawCommand {
   static id = "sandbox:status";

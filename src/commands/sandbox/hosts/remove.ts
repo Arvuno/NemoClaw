@@ -9,7 +9,7 @@ import {
   hostAliasMutationArgs,
   hostAliasMutationFlags,
   isHostAliasFailure,
-} from "../../../lib/commands/sandbox/hosts/common";
+} from "../../../lib/sandbox/hosts-command-support";
 
 export default class HostsRemoveCommand extends NemoClawCommand {
   static id = "sandbox:hosts:remove";

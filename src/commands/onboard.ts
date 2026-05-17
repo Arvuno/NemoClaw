@@ -10,7 +10,7 @@ import {
   type OnboardFlags,
   onboardUsage,
   toLegacyOnboardArgs,
-} from "../lib/commands/onboard/common";
+} from "../lib/onboard/command-support";
 
 export default class OnboardCliCommand extends NemoClawCommand {
   static id = "onboard";

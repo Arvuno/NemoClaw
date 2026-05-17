@@ -3,7 +3,7 @@
 
 import { NemoClawCommand } from "../../../lib/cli/nemoclaw-oclif-command";
 
-import { getHostsRuntimeBridge, hostAliasSandboxArgs, isHostAliasFailure } from "../../../lib/commands/sandbox/hosts/common";
+import { getHostsRuntimeBridge, hostAliasSandboxArgs, isHostAliasFailure } from "../../../lib/sandbox/hosts-command-support";
 
 export default class HostsListCommand extends NemoClawCommand {
   static id = "sandbox:hosts:list";

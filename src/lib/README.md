@@ -31,7 +31,6 @@ Some older modules are still too large or coupled to split directly into actions
 
 ```text
 src/lib/agent/**        agent definition, agent-specific onboarding, runtime helpers
-src/lib/commands/**     shared parser helpers pending feature-folder migration
 src/lib/credentials/**  credential storage and credential command support
 src/lib/dashboard/**    dashboard contract, health, and recovery helpers
 src/lib/deploy/**       deploy/build-image support that is not yet action-shaped
@@ -42,7 +41,7 @@ src/lib/messaging/**    channel/messaging policy and message filtering helpers
 src/lib/onboard/**      onboarding support modules around the large legacy flow
 src/lib/policy/**       policy preset loading, tier selection, and application support
 src/lib/runtime/**      sandbox/runtime recovery helpers
-src/lib/sandbox/**      sandbox config, build, stream, channel, and version support
+src/lib/sandbox/**      sandbox config, build, stream, channel, version, and command support
 src/lib/security/**     redaction, secret patterns, and credential filtering
 src/lib/shields/**      shields orchestration, timers, and audit helpers
 src/lib/tunnel/**       local service/tunnel command support

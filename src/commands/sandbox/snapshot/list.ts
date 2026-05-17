@@ -3,7 +3,7 @@
 
 import { NemoClawCommand } from "../../../lib/cli/nemoclaw-oclif-command";
 
-import { getSnapshotRuntimeBridge, sandboxNameArg, snapshotCommandError } from "../../../lib/commands/sandbox/snapshot/common";
+import { getSnapshotRuntimeBridge, sandboxNameArg, snapshotCommandError } from "../../../lib/sandbox/snapshot-command-support";
 
 export default class SnapshotListCommand extends NemoClawCommand {
   static id = "sandbox:snapshot:list";

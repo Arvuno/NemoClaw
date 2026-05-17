@@ -3,7 +3,7 @@
 
 import { Args } from "@oclif/core";
 
-import { dryRunFlag } from "../../../cli/common-flags";
+import { dryRunFlag } from "../cli/common-flags";
 
 type ChannelsRuntimeBridge = {
   sandboxChannelsAdd: (sandboxName: string, args?: string[]) => Promise<void>;
@@ -13,7 +13,7 @@ type ChannelsRuntimeBridge = {
 };
 
 let runtimeBridgeFactory = (): ChannelsRuntimeBridge => {
-  const actions = require("../../../actions/sandbox/policy-channel") as {
+  const actions = require("../actions/sandbox/policy-channel") as {
     addSandboxChannel: ChannelsRuntimeBridge["sandboxChannelsAdd"];
     removeSandboxChannel: ChannelsRuntimeBridge["sandboxChannelsRemove"];
     startSandboxChannel: ChannelsRuntimeBridge["sandboxChannelsStart"];

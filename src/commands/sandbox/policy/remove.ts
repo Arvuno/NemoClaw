@@ -8,7 +8,7 @@ import {
   getPolicyRuntimeBridge,
   policyMutationArgs,
   policyMutationFlags,
-} from "../../../lib/commands/sandbox/policy/common";
+} from "../../../lib/sandbox/policy-command-support";
 
 export default class PolicyRemoveCommand extends NemoClawCommand {
   static id = "sandbox:policy:remove";

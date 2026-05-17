@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { NemoClawCommand } from "../../lib/cli/nemoclaw-oclif-command";
-import { getSkillInstallRuntimeBridge } from "../../lib/commands/sandbox/skill/common";
+import { getSkillInstallRuntimeBridge } from "../../lib/sandbox/skill-command-support";
 
 export default class SkillCliCommand extends NemoClawCommand {
   static id = "sandbox:skill";

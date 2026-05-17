@@ -5,7 +5,7 @@ import { NemoClawCommand } from "../../lib/cli/nemoclaw-oclif-command";
 
 import { startAll } from "../../lib/tunnel/services";
 import { runStartCommand } from "../../lib/tunnel/service-command";
-import { serviceDeps } from "../../lib/commands/tunnel/common";
+import { serviceDeps } from "../../lib/tunnel/command-support";
 
 export default class TunnelStartCommand extends NemoClawCommand {
   static id = "tunnel:start";

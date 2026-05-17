@@ -6,7 +6,7 @@ import { NemoClawCommand } from "../../../lib/cli/nemoclaw-oclif-command";
 
 import { shieldsTimeoutDurationFlag } from "../../../lib/cli/duration-flags";
 import * as shields from "../../../lib/shields/index";
-import { sandboxNameArg } from "../../../lib/commands/sandbox/common";
+import { sandboxNameArg } from "../../../lib/sandbox/command-support";
 
 export default class ShieldsDownCommand extends NemoClawCommand {
   static id = "sandbox:shields:down";

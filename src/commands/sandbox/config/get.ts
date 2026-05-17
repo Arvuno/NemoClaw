@@ -5,7 +5,7 @@ import { Flags } from "@oclif/core";
 import { NemoClawCommand } from "../../../lib/cli/nemoclaw-oclif-command";
 
 import * as sandboxConfig from "../../../lib/sandbox/config";
-import { sandboxNameArg } from "../../../lib/commands/sandbox/common";
+import { sandboxNameArg } from "../../../lib/sandbox/command-support";
 
 export default class SandboxConfigGetCommand extends NemoClawCommand {
   static id = "sandbox:config:get";

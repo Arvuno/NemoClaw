@@ -3,7 +3,7 @@
 
 import { Args } from "@oclif/core";
 
-import { dryRunFlag } from "../../../cli/common-flags";
+import { dryRunFlag } from "../cli/common-flags";
 
 type HostsRuntimeBridge = {
   addSandboxHostAlias: (sandboxName: string, args?: string[]) => void;
@@ -18,7 +18,7 @@ type HostAliasFailure = {
 };
 
 let runtimeBridgeFactory = (): HostsRuntimeBridge => {
-  const actions = require("../../../actions/sandbox/host-aliases") as HostsRuntimeBridge;
+  const actions = require("../actions/sandbox/host-aliases") as HostsRuntimeBridge;
   return actions;
 };
 

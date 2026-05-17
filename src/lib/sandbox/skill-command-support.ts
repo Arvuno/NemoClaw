@@ -3,7 +3,7 @@
 
 let runtimeBridgeFactory = () => ({
   sandboxSkillInstall: async (sandboxName: string, args?: string[]) => {
-    const { installSandboxSkill } = require("../../../actions/sandbox/skill-install") as {
+    const { installSandboxSkill } = require("../actions/sandbox/skill-install") as {
       installSandboxSkill: (sandboxName: string, args?: string[]) => Promise<void>;
     };
     await installSandboxSkill(sandboxName, args);

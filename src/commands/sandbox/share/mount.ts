@@ -5,7 +5,7 @@ import { Args } from "@oclif/core";
 import { NemoClawCommand } from "../../../lib/cli/nemoclaw-oclif-command";
 
 import { runShareMount, ShareCommandError } from "../../../lib/share-command";
-import { sandboxNameArg } from "../../../lib/commands/sandbox/common";
+import { sandboxNameArg } from "../../../lib/sandbox/command-support";
 
 export default class ShareMountCommand extends NemoClawCommand {
   static id = "sandbox:share:mount";

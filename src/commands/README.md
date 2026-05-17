@@ -5,8 +5,9 @@
 
 This tree is the oclif discovery surface for the packaged `nemoclaw` CLI.
 Command entrypoint files define the oclif command class directly. Do not add new
-public command shims that only re-export from `src/lib/commands/**`; prefer
-`src/lib/<feature>/**` for shared parser helpers.
+public command shims that only re-export from `src/lib/**`, and do not recreate a
+parallel command layer under `src/lib`. Prefer `src/lib/<feature>/**` for shared
+parser helpers.
 
 ```text
 src/commands/<public command path>.ts

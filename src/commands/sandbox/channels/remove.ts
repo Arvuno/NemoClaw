@@ -8,7 +8,7 @@ import {
   channelMutationArgs,
   channelMutationFlags,
   getChannelsRuntimeBridge,
-} from "../../../lib/commands/sandbox/channels/common";
+} from "../../../lib/sandbox/channels-command-support";
 
 export default class ChannelsRemoveCommand extends NemoClawCommand {
   static id = "sandbox:channels:remove";

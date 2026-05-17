@@ -4,7 +4,7 @@
 import { NemoClawCommand } from "../lib/cli/nemoclaw-oclif-command";
 
 import { runSetupSparkAction } from "../lib/actions/global";
-import { buildOnboardFlags, type OnboardFlags, toLegacyOnboardArgs } from "../lib/commands/onboard/common";
+import { buildOnboardFlags, type OnboardFlags, toLegacyOnboardArgs } from "../lib/onboard/command-support";
 
 export default class SetupSparkCliCommand extends NemoClawCommand {
   static id = "setup-spark";

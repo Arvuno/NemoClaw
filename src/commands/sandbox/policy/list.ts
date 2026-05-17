@@ -4,7 +4,7 @@
 import { NemoClawCommand } from "../../../lib/cli/nemoclaw-oclif-command";
 
 import { listSandboxPolicies } from "../../../lib/actions/sandbox/policy-channel";
-import { sandboxNameArg } from "../../../lib/commands/sandbox/common";
+import { sandboxNameArg } from "../../../lib/sandbox/command-support";
 
 export default class SandboxPolicyListCommand extends NemoClawCommand {
   static id = "sandbox:policy:list";

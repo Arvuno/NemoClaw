@@ -32,53 +32,53 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../actions/sandbox/connect", () => ({
+vi.mock("../../lib/actions/sandbox/connect", () => ({
   connectSandbox: mocks.connectSandbox,
 }));
 
-vi.mock("../../actions/sandbox/destroy", () => ({
+vi.mock("../../lib/actions/sandbox/destroy", () => ({
   destroySandbox: mocks.destroySandbox,
 }));
 
-vi.mock("../../actions/sandbox/rebuild", () => ({
+vi.mock("../../lib/actions/sandbox/rebuild", () => ({
   rebuildSandbox: mocks.rebuildSandbox,
 }));
 
-vi.mock("../../actions/sandbox/status", () => ({
+vi.mock("../../lib/actions/sandbox/status", () => ({
   showSandboxStatus: mocks.showSandboxStatus,
 }));
 
-vi.mock("../../actions/sandbox/policy-channel", () => ({
+vi.mock("../../lib/actions/sandbox/policy-channel", () => ({
   listSandboxChannels: mocks.listSandboxChannels,
   listSandboxPolicies: mocks.listSandboxPolicies,
 }));
 
-vi.mock("../../sandbox/config", () => ({
+vi.mock("../../lib/sandbox/config", () => ({
   configGet: mocks.configGet,
   SandboxConfigError: mocks.SandboxConfigError,
 }));
 
-vi.mock("../../actions/sandbox/doctor", () => ({
+vi.mock("../../lib/actions/sandbox/doctor", () => ({
   runSandboxDoctor: mocks.runSandboxDoctor,
 }));
 
-vi.mock("../../shields", () => ({
+vi.mock("../../lib/shields", () => ({
   shieldsDown: mocks.shieldsDown,
   shieldsStatus: mocks.shieldsStatus,
   shieldsUp: mocks.shieldsUp,
 }));
 
-import ConnectCliCommand from "../../../commands/sandbox/connect";
-import SandboxConfigGetCommand from "../../../commands/sandbox/config/get";
-import DestroyCliCommand from "../../../commands/sandbox/destroy";
-import SandboxDoctorCliCommand from "../../../commands/sandbox/doctor";
-import SandboxChannelsListCommand from "../../../commands/sandbox/channels/list";
-import SandboxPolicyListCommand from "../../../commands/sandbox/policy/list";
-import RebuildCliCommand from "../../../commands/sandbox/rebuild";
-import SandboxStatusCommand from "../../../commands/sandbox/status";
-import ShieldsDownCommand from "../../../commands/sandbox/shields/down";
-import ShieldsStatusCommand from "../../../commands/sandbox/shields/status";
-import ShieldsUpCommand from "../../../commands/sandbox/shields/up";
+import ConnectCliCommand from "./connect";
+import SandboxConfigGetCommand from "./config/get";
+import DestroyCliCommand from "./destroy";
+import SandboxDoctorCliCommand from "./doctor";
+import SandboxChannelsListCommand from "./channels/list";
+import SandboxPolicyListCommand from "./policy/list";
+import RebuildCliCommand from "./rebuild";
+import SandboxStatusCommand from "./status";
+import ShieldsDownCommand from "./shields/down";
+import ShieldsStatusCommand from "./shields/status";
+import ShieldsUpCommand from "./shields/up";
 
 const rootDir = process.cwd();
 

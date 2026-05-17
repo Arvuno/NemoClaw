@@ -220,7 +220,10 @@ reviews:
     - path: "src/lib/actions/sandbox/rebuild.ts"
       instructions: *e2e-channel-stop-start
 
-    - path: "src/lib/commands/sandbox/channels/**"
+    - path: "src/commands/sandbox/channels/**"
+      instructions: *e2e-channel-stop-start
+
+    - path: "src/lib/sandbox/channels-command-support.ts"
       instructions: *e2e-channel-stop-start
 
     - path: "test/e2e/test-channels-stop-start.sh"

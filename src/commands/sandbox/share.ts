@@ -4,7 +4,7 @@
 import { NemoClawCommand } from "../../lib/cli/nemoclaw-oclif-command";
 
 import { printShareUsageAndExit, ShareCommandError } from "../../lib/share-command";
-import { sandboxNameArg } from "../../lib/commands/sandbox/common";
+import { sandboxNameArg } from "../../lib/sandbox/command-support";
 
 export default class ShareCommand extends NemoClawCommand {
   static id = "sandbox:share";
