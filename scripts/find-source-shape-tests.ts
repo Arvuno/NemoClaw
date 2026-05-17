@@ -98,7 +98,7 @@ function isTestFile(absPath: string): boolean {
 }
 
 function stripStringLiterals(text: string): string {
-  return text.replace(/(['"`])(?:\\.|(?!\1)[\\s\\S])*\1/g, "");
+  return text.replace(/(['"`])(?:\\.|(?!\1)[\s\S])*\1/g, "");
 }
 
 function textContainsIdentifier(text: string, identifier: string): boolean {
@@ -141,6 +141,9 @@ function hasDirectProductionPathHint(text: string): boolean {
       text,
     ) ||
     /["'`]\.\.["'`]\s*,\s*["'`](?:\.github|agents|bin|dist|nemoclaw|nemoclaw-blueprint|scripts|src|Dockerfile(?:\.base)?|install\.sh|package\.json)["'`]/.test(
+      text,
+    ) ||
+    /join\(\s*["'`]\.\.["'`]\s*,\s*["'`](?:\.github|agents|bin|dist|nemoclaw|nemoclaw-blueprint|scripts|src|Dockerfile(?:\.base)?|install\.sh|package\.json)["'`]\s*\)/.test(
       text,
     ) ||
     /(import\.meta\.dirname|import\.meta\.url)[\s\S]*["'`](?![\w.-]+\.test\.ts["'`])[\w.-]+\.ts["'`]/.test(
@@ -312,6 +315,16 @@ function sourceReadFromInitializer(
   };
 }
 
+function isNestedFunctionLike(node: ts.Node): boolean {
+  return (
+    ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isArrowFunction(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isConstructorDeclaration(node)
+  );
+}
+
 function collectSourceFunctions(
   sourceFile: ts.SourceFile,
   productionPathVars: ReadonlySet<string>,
@@ -344,6 +357,7 @@ function collectSourceFunctions(
       let sourceRead: SourceRead | null = null;
       function visitFunctionBody(child: ts.Node): void {
         if (sourceRead) return;
+        if (child !== node && isNestedFunctionLike(child)) return;
         if (ts.isReturnStatement(child) && child.expression) {
           sourceRead = sourceReadFromExpression(child.expression);
         }
