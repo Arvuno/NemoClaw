@@ -1286,7 +1286,13 @@ export function probeContainerDns(opts: ProbeContainerDnsOpts = {}): DnsProbeRes
   }
 
   // Success: busybox nslookup prints "Name:" and "Address:" lines.
-  if (/\bName:\s*registry\.npmjs\.org\b/.test(output) && /\bAddress:\s*\d/.test(output)) {
+  const outputLines = output.split(/\r?\n/).map((line) => line.trim());
+  const hasRegistryName = outputLines.some((line) => {
+    const fields = line.split(/\s+/);
+    return fields[0] === "Name:" && fields[1] === "registry.npmjs.org";
+  });
+  const hasAddress = outputLines.some((line) => line.startsWith("Address:"));
+  if (hasRegistryName && hasAddress) {
     return { ok: true };
   }
 
