@@ -69,10 +69,7 @@ const {
 }: typeof import("./onboard/selection-drift") = require("./onboard/selection-drift");
 const { isLinuxDockerDriverGatewayEnabled }: typeof import("./onboard/docker-driver-platform") = require("./onboard/docker-driver-platform");
 const {
-  canRestartCpuOnlyGatewayForGpuIntent,
-  decideGatewayGpuReuseForGpuIntent,
-  inspectLegacyGatewayGpuPassthroughResult,
-  shouldInspectLegacyGatewayGpuPassthrough,
+  reconcileGatewayGpuReuseForGpuIntent,
 }: typeof import("./onboard/gateway-gpu-passthrough") = require("./onboard/gateway-gpu-passthrough");
 const {
   syncPresetSelection,
@@ -2747,57 +2744,16 @@ async function refreshDockerDriverGatewayReuseState(
   return "stale";
 }
 
-function isConfirmedDockerDriverGatewayForGpuReuse(gatewayReuseState: GatewayReuseState): boolean {
-  if (!isLinuxDockerDriverGatewayEnabled() || gatewayReuseState !== "healthy") return false;
-  return isDockerDriverGatewayProcessAlive();
-}
-
-function readRegisteredSandboxNamesForGatewayGpuReuse(): string[] | null {
-  try {
-    return registry
-      .listSandboxes()
-      .sandboxes.map((s) => s.name)
-      .filter((name) => typeof name === "string" && name.trim().length > 0);
-  } catch {
-    return null;
-  }
-}
-
-function reportUnreadableSandboxRegistryForGpuGatewayReuse(): never {
-  console.error("  Existing gateway was started without GPU passthrough.");
-  console.error(
-    "  Could not read the local sandbox registry, so automatic gateway cleanup would be unsafe.",
-  );
-  console.error(
-    "  Fix the registry read error and rerun, or manually verify no sandboxes depend on the gateway before running:",
-  );
-  console.error(`    openshell gateway remove ${GATEWAY_NAME}`);
-  console.error("    # For OpenShell releases that still expose lifecycle commands:");
-  console.error(`    openshell gateway destroy -g ${GATEWAY_NAME}`);
-  console.error("    nemoclaw onboard --gpu");
-  process.exit(1);
-}
-
-function destroyGateway(): boolean {
+function destroyGateway(
+  clearRegistry: () => void = registry.clearAll,
+  isDockerDriverGatewayEnabledForDestroy: () => boolean = isLinuxDockerDriverGatewayEnabled,
+): boolean {
   return destroyGatewayWithVolumeCleanup({
-    clearRegistry: registry.clearAll,
+    clearRegistry,
     dockerRemoveVolumesByPrefix,
     gatewayName: GATEWAY_NAME,
     hasLifecycleCommands: () => gatewayCliSupportsLifecycleCommands(runCaptureOpenshell),
-    isDockerDriverGatewayEnabled: isLinuxDockerDriverGatewayEnabled,
-    removeDockerDriverGatewayRegistration,
-    runOpenshell,
-    stopDockerDriverGatewayProcess,
-  });
-}
-
-function destroyGatewayRuntimeForGpuReuse(): boolean {
-  return destroyGatewayWithVolumeCleanup({
-    clearRegistry: () => undefined,
-    dockerRemoveVolumesByPrefix,
-    gatewayName: GATEWAY_NAME,
-    hasLifecycleCommands: () => gatewayCliSupportsLifecycleCommands(runCaptureOpenshell),
-    isDockerDriverGatewayEnabled: () => false,
+    isDockerDriverGatewayEnabled: isDockerDriverGatewayEnabledForDestroy,
     removeDockerDriverGatewayRegistration,
     runOpenshell,
     stopDockerDriverGatewayProcess,
@@ -9730,80 +9686,18 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       }
     }
 
-    const confirmedDockerDriverGateway = isConfirmedDockerDriverGatewayForGpuReuse(gatewayReuseState);
-
-    // Verify legacy reusable gateway GPU passthrough; confirmed Docker-driver
-    // gateways use live CLI health.
-    if (shouldInspectLegacyGatewayGpuPassthrough(
+    gatewayReuseState = reconcileGatewayGpuReuseForGpuIntent({
       gatewayReuseState,
       gpuPassthrough,
-      confirmedDockerDriverGateway,
-    )) {
-      const container = `openshell-cluster-${GATEWAY_NAME}`;
-      const gpuCheck = docker.dockerInspect(
-        ["--type", "container", "--format", "{{json .HostConfig.DeviceRequests}}", container],
-        { ignoreError: true, suppressOutput: true },
-      );
-      const legacyGatewayGpuInspection = inspectLegacyGatewayGpuPassthroughResult(
-        gpuCheck.status,
-        gpuCheck.stdout,
-        gpuCheck.stderr,
-      );
-
-      if (legacyGatewayGpuInspection === "unknown") {
-        console.error("  Existing gateway GPU passthrough could not be verified.");
-        console.error(
-          "  Refusing automatic gateway cleanup without a clear Docker signal; restart Docker and rerun onboard.",
-        );
-        process.exit(1);
-      }
-
-      const registeredSandboxNames =
-        legacyGatewayGpuInspection === "cpu-only"
-          ? readRegisteredSandboxNamesForGatewayGpuReuse()
-          : [];
-      if (registeredSandboxNames === null) {
-        reportUnreadableSandboxRegistryForGpuGatewayReuse();
-      }
-      const cpuOnlyGatewayRestartSafe = canRestartCpuOnlyGatewayForGpuIntent(
-        registeredSandboxNames,
-        recordedSandboxName || requestedSandboxName,
-        isRecreateSandbox(),
-      );
-
-      const gatewayGpuReuseDecision = decideGatewayGpuReuseForGpuIntent({
-        gatewayReuseState,
-        gpuPassthrough,
-        confirmedDockerDriverGateway,
-        legacyGatewayGpuInspection,
-        cpuOnlyGatewayRestartSafe,
-      });
-
-      if (gatewayGpuReuseDecision === "restart-gateway") {
-        console.log(
-          "  Existing gateway was started without GPU passthrough; recreating it for GPU onboarding...",
-        );
-        stopAllDashboardForwards();
-        if (isLinuxDockerDriverGatewayEnabled()) {
-          retireLegacyGatewayForDockerDriverUpgrade();
-          gatewayReuseState = "missing";
-          console.log("  ✓ Previous CPU-only gateway cleaned up");
-        } else {
-          gatewayReuseState = destroyGatewayForReuse(
-            destroyGatewayRuntimeForGpuReuse,
-            "  ✓ Previous CPU-only gateway cleaned up",
-            "  ! Previous CPU-only gateway cleanup failed; leaving registry state intact.",
-          );
-        }
-        if (gatewayReuseState !== "missing") {
-          reportGpuPassthroughRecovery(console.error, () => registeredSandboxNames);
-          process.exit(1);
-        }
-      } else if (gatewayGpuReuseDecision === "abort-with-recovery") {
-        reportGpuPassthroughRecovery(console.error, () => registeredSandboxNames);
-        process.exit(1);
-      }
-    }
+      gatewayName: GATEWAY_NAME,
+      currentSandboxName: recordedSandboxName || requestedSandboxName,
+      recreateSandbox: isRecreateSandbox(),
+      confirmedDockerDriverGateway:
+        isLinuxDockerDriverGatewayEnabled() && gatewayReuseState === "healthy",
+      stopDashboardForwards: stopAllDashboardForwards,
+      retireLegacyGatewayForDockerDriverUpgrade,
+      destroyGatewayRuntimeForGpuReuse: () => destroyGateway(() => undefined, () => false),
+    });
 
     const canReuseHealthyGateway = gatewayReuseState === "healthy";
 
