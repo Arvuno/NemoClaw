@@ -501,18 +501,50 @@ function assertionFromAssertCall(
   );
 }
 
+function expressionReferencesSource(
+  expression: ts.Expression,
+  sourceVars: ReadonlySet<string>,
+  productionPathVars: ReadonlySet<string>,
+): boolean {
+  const text = expression.getText();
+  return (
+    [...sourceVars].some((name) => textContainsIdentifier(text, name)) ||
+    (ts.isCallExpression(expression) &&
+      isReadFileCall(expression) &&
+      expression.arguments.length > 0 &&
+      isProductionPathExpression(expression.arguments[0].getText(), productionPathVars))
+  );
+}
+
 function assertionFromExpectCall(
   sourceFile: ts.SourceFile,
   node: ts.CallExpression,
   sourceVars: ReadonlySet<string>,
   productionPathVars: ReadonlySet<string>,
 ): Assertion | null {
+  if (
+    sourceVars.size > 0 &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    node.expression.name.text === "unreachable" &&
+    ts.isIdentifier(node.expression.expression) &&
+    node.expression.expression.text === "expect"
+  ) {
+    const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+    return {
+      line: line + 1,
+      column: character + 1,
+      subject: "expect.unreachable",
+      matcher: "unreachable",
+      text: node.getText(sourceFile).replace(/\s+/g, " "),
+    };
+  }
+
   const expectBase = getExpectBase(node.expression);
   if (!expectBase || expectBase.arguments.length === 0) {
     return null;
   }
 
-  return assertionFromSubject(
+  const subjectAssertion = assertionFromSubject(
     sourceFile,
     node,
     expectBase.arguments[0],
@@ -520,6 +552,24 @@ function assertionFromExpectCall(
     sourceVars,
     productionPathVars,
   );
+  if (subjectAssertion) return subjectAssertion;
+
+  if (
+    node.arguments.some((argument) =>
+      expressionReferencesSource(argument, sourceVars, productionPathVars),
+    )
+  ) {
+    const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+    return {
+      line: line + 1,
+      column: character + 1,
+      subject: node.expression.getText(sourceFile),
+      matcher: matcherName(node.expression),
+      text: node.getText(sourceFile).replace(/\s+/g, " "),
+    };
+  }
+
+  return null;
 }
 
 function assertionFromCall(
