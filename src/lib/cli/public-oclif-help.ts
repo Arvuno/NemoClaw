@@ -3,7 +3,7 @@
 
 import { CommandHelp } from "@oclif/core";
 
-import { CLI_NAME } from "./branding";
+import { CLI_DISPLAY_NAME, CLI_NAME } from "./branding";
 import { getRegisteredOclifCommandMetadata, type OclifCommandMetadata } from "./oclif-metadata";
 
 type PublicHelpCommand = OclifCommandMetadata & {
@@ -38,6 +38,10 @@ class PublicUsageCommandHelp extends CommandHelp {
   }
 }
 
+function brandedHelpText(text: string): string {
+  return text.replace(/nemoclaw/g, CLI_NAME).replace(/NemoClaw/g, CLI_DISPLAY_NAME);
+}
+
 function publicRouteTokens(publicUsage: string): string[] {
   const tokens = publicUsage.split(/\s+/).filter(Boolean);
   const route = tokens[0] === "<name>" ? tokens.slice(1) : tokens;
@@ -66,19 +70,22 @@ function publicExamples(
   publicUsage: string,
 ): string[] | undefined {
   const examples = metadata.examples;
-  if (!examples || !commandId.startsWith("sandbox:")) return examples;
+  if (!examples) return undefined;
+  if (!commandId.startsWith("sandbox:")) return examples.map(brandedHelpText);
 
   const nativeRoute = commandId.split(":").slice(1);
   const publicRoute = publicRouteTokens(publicUsage);
-  if (nativeRoute.length === 0 || publicRoute.length === 0) return examples;
+  if (nativeRoute.length === 0 || publicRoute.length === 0) return examples.map(brandedHelpText);
 
   const nativePattern = nativeRoute.map(escapeRegExp).join("\\s+");
   const nativeExamplePattern = new RegExp(`^(.*?\\s)sandbox\\s+${nativePattern}\\s+(\\S+)(.*)$`);
   return examples.map((example) =>
-    example.replace(
-      nativeExamplePattern,
-      (_match, prefix: string, sandboxName: string, rest: string) =>
-        `${prefix}${sandboxName} ${publicRoute.join(" ")}${rest}`,
+    brandedHelpText(
+      example.replace(
+        nativeExamplePattern,
+        (_match, prefix: string, sandboxName: string, rest: string) =>
+          `${prefix}${sandboxName} ${publicRoute.join(" ")}${rest}`,
+      ),
     ),
   );
 }
@@ -92,6 +99,7 @@ function toPublicHelpCommand(
     ...metadata,
     aliases: [],
     args: metadata.args ?? {},
+    description: metadata.description ? brandedHelpText(metadata.description) : undefined,
     examples: publicExamples(commandId, metadata, publicUsage),
     flags: {
       ...(metadata.baseFlags ?? {}),
@@ -100,6 +108,7 @@ function toPublicHelpCommand(
     hiddenAliases: [],
     id: metadata.id ?? commandId,
     strict: metadata.strict ?? true,
+    summary: metadata.summary ? brandedHelpText(metadata.summary) : undefined,
   };
 }
 

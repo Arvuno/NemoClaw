@@ -19,7 +19,7 @@ function* walkTsFiles(dir: string): Generator<string> {
 }
 
 describe("public command display metadata", () => {
-  it("derives command display entries from oclif command-class metadata", () => {
+  it("loads public display entries from the generated oclif metadata manifest", () => {
     const metadata = getRegisteredOclifCommandsMetadata();
     const discoveredDisplay = Object.entries(metadata).flatMap(([commandId, commandMetadata]) =>
       (commandMetadata.publicDisplay ?? []).map((entry) => ({ commandId, usage: entry.usage })),

@@ -6,95 +6,52 @@ import path from "node:path";
 
 import type { PublicCommandDisplayEntry } from "./command-display";
 
+const GENERATED_METADATA_FILE = "oclif-command-metadata.generated.json";
+
 export type OclifCommandMetadata = {
   args?: Record<string, unknown>;
   baseFlags?: Record<string, unknown>;
   description?: string;
+  deprecationOptions?: unknown;
   examples?: string[];
   flags?: Record<string, unknown>;
   hidden?: boolean;
   id?: string;
-  strict?: boolean;
-  summary?: string;
-  usage?: string[];
   /** Public compatibility help/listing metadata for `nemoclaw <name> action` grammar. */
   publicDisplay?: readonly PublicCommandDisplayEntry[];
   /** @deprecated Use publicDisplay for NemoClaw public compatibility metadata. */
   display?: readonly PublicCommandDisplayEntry[];
-};
-
-type CommandExport = {
-  default?: OclifCommandMetadata;
-  [key: string]: unknown;
+  state?: string;
+  strict?: boolean;
+  summary?: string;
+  usage?: string[];
 };
 
 function packageRoot(): string {
   return path.resolve(__dirname, "..", "..", "..");
 }
 
-function commandIdFromDiscoveredFile(relativeFile: string): string {
-  const parsed = path.parse(relativeFile);
-  const topics = parsed.dir.split(path.sep).filter(Boolean);
-  const command = parsed.name === "index" ? null : parsed.name;
-  return [...topics, command].filter(Boolean).join(":");
+function generatedMetadataPath(): string {
+  return path.join(packageRoot(), "dist", "lib", "cli", GENERATED_METADATA_FILE);
 }
 
-function* walkCommandFiles(dir: string, prefix = ""): Generator<string> {
-  if (!fs.existsSync(dir)) return;
-  for (const entry of fs.readdirSync(dir).sort()) {
-    const absolute = path.join(dir, entry);
-    const relative = path.join(prefix, entry);
-    const stat = fs.statSync(absolute);
-    if (stat.isDirectory()) {
-      yield* walkCommandFiles(absolute, relative);
-    } else if (
-      stat.isFile() &&
-      /\.(js|cjs|mjs|ts|tsx|mts|cts)$/.test(entry) &&
-      !/\.(d|test|spec)\.(js|ts|tsx|mts|cts)$/.test(entry)
-    ) {
-      yield relative;
-    }
-  }
-}
+let cachedMetadata: Record<string, OclifCommandMetadata> | null = null;
 
-function commandClassFromModule(moduleExports: CommandExport): OclifCommandMetadata | null {
-  if (moduleExports.default) return moduleExports.default;
-  for (const value of Object.values(moduleExports)) {
-    if (value && typeof value === "function") return value as OclifCommandMetadata;
-  }
-  return null;
-}
+function loadGeneratedOclifMetadata(): Record<string, OclifCommandMetadata> | null {
+  if (cachedMetadata) return cachedMetadata;
 
-function loadPatternDiscoveredCommands(): Record<string, OclifCommandMetadata> | null {
-  const root = packageRoot();
-  const packageJsonPath = path.join(root, "package.json");
-  if (!fs.existsSync(packageJsonPath)) return null;
+  const metadataPath = generatedMetadataPath();
+  if (!fs.existsSync(metadataPath)) return null;
 
-  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")) as {
-    oclif?: { commands?: { strategy?: string; target?: string } };
-  };
-  const commandDiscovery = packageJson.oclif?.commands;
-  if (commandDiscovery?.strategy !== "pattern" || !commandDiscovery.target) return null;
-
-  const commandRoot = path.resolve(root, commandDiscovery.target);
-  const commands: Record<string, OclifCommandMetadata> = {};
-  for (const relativeFile of walkCommandFiles(commandRoot)) {
-    const commandId = commandIdFromDiscoveredFile(relativeFile);
-    const commandClass = commandClassFromModule(
-      require(path.join(commandRoot, relativeFile)) as CommandExport,
-    );
-    if (commandClass) commands[commandId] = commandClass;
-  }
-
-  return Object.keys(commands).length > 0 ? commands : null;
-}
-
-function loadOclifCommands(): Record<string, OclifCommandMetadata> | null {
-  return loadPatternDiscoveredCommands();
+  cachedMetadata = JSON.parse(fs.readFileSync(metadataPath, "utf-8")) as Record<
+    string,
+    OclifCommandMetadata
+  >;
+  return cachedMetadata;
 }
 
 export function getRegisteredOclifCommandsMetadata(): Record<string, OclifCommandMetadata> {
-  return loadOclifCommands() ?? {};
+  return loadGeneratedOclifMetadata() ?? {};
 }
 
 export function getRegisteredOclifCommandMetadata(

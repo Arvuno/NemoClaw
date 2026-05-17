@@ -14,15 +14,20 @@
  * (e.g. "nemohermes") for display.
  */
 
-import { CLI_NAME } from "./branding";
+import { CLI_DISPLAY_NAME, CLI_NAME } from "./branding";
 import type { CommandGroup, PublicCommandDisplayEntry } from "./command-display";
 import { getRegisteredOclifCommandsMetadata } from "./oclif-metadata";
 
 export type { CommandGroup } from "./command-display";
 
+/** Replace canonical NemoClaw public copy with active CLI/agent branding. */
+export function brandedPublicText(text: string): string {
+  return text.replace(/nemoclaw/g, CLI_NAME).replace(/NemoClaw/g, CLI_DISPLAY_NAME);
+}
+
 /** Replace the canonical "nemoclaw" prefix in a usage string with CLI_NAME. */
 export function brandedUsage(usage: string): string {
-  return usage.replace(/^nemoclaw/, CLI_NAME);
+  return brandedPublicText(usage.replace(/^nemoclaw/, CLI_NAME));
 }
 
 export interface CommandDef extends Omit<PublicCommandDisplayEntry, "order"> {
@@ -91,7 +96,7 @@ export function commandsByGroup(): Map<CommandGroup, CommandDef[]> {
       .map((c) => ({
         ...c,
         usage: brandedUsage(c.usage),
-        description: c.description.replace(/nemoclaw/g, CLI_NAME),
+        description: brandedPublicText(c.description),
       }));
     if (cmds.length > 0) {
       grouped.set(group, cmds);
