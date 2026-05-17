@@ -257,6 +257,8 @@ const {
   cleanupStaleHostFiles,
 }: typeof import("./host-artifact-cleanup") = require("./host-artifact-cleanup");
 const registry: typeof import("./state/registry") = require("./state/registry");
+const { resolveSandboxImageTagFromCreateOutput } =
+  require("./domain/sandbox/image-tag") as typeof import("./domain/sandbox/image-tag");
 const nim: typeof import("./inference/nim") = require("./inference/nim");
 const onboardSession: typeof import("./state/onboard-session") = require("./state/onboard-session");
 const policies: typeof import("./policy") = require("./policy");
@@ -5790,15 +5792,7 @@ async function createSandbox(
     }
   }
   // openshell tags images with seconds; buildId is ms. Parse actual tag from output. Fixes #2672.
-  const builtImageMatch = createResult.output.match(/Built image (openshell\/sandbox-from:\d+)/);
-  if (!builtImageMatch) {
-    console.warn(
-      "  Warning: could not parse image tag from build output; imageTag may be stale. Run 'nemoclaw gc' if destroy fails.",
-    );
-  }
-  const resolvedImageTag = builtImageMatch
-    ? builtImageMatch[1]
-    : `openshell/sandbox-from:${buildId}`;
+  const resolvedImageTag = resolveSandboxImageTagFromCreateOutput(createResult.output, buildId);
 
   const sandboxRuntimeFields = getSandboxRuntimeRegistryFields(effectiveSandboxGpuConfig);
   registry.registerSandbox({
