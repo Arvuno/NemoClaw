@@ -115,7 +115,9 @@ function validSandboxActionsText(): string {
 }
 
 function shouldExecuteViaNativeArgv(result: Extract<DispatchResult, { kind: "nativeArgv" }>): boolean {
-  return result.commandId.startsWith("sandbox:") && !hasHelpFlag(result.args);
+  if (hasHelpFlag(result.args)) return false;
+  if (result.commandId.startsWith("sandbox:")) return true;
+  return result.commandId.includes(":") && !result.commandId.startsWith("root:");
 }
 
 function printDispatchUsageError(
