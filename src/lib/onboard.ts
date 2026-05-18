@@ -186,6 +186,10 @@ const {
   getProviderSelectionConfig,
   parseGatewayInference,
 } = inferenceConfig;
+const bedrockRuntime: typeof import("./inference/bedrock-runtime") =
+  require("./inference/bedrock-runtime");
+const bedrockRuntimeAdapter: typeof import("./inference/bedrock-runtime-adapter") =
+  require("./inference/bedrock-runtime-adapter");
 
 const onboardProviders = require("./onboard/providers");
 const hermesProviderAuth = require("./hermes-provider-auth");
@@ -6509,6 +6513,10 @@ async function setupNim(
             console.log("");
             continue selectionLoop;
           }
+          const endpointClassification = bedrockRuntime.classifyCustomAnthropicEndpoint(endpointUrl);
+          if (endpointClassification.kind === "bedrock-runtime") {
+            endpointUrl = endpointClassification.endpointUrl;
+          }
         }
 
         if (selected.key === "hermesProvider") {
@@ -6658,6 +6666,45 @@ async function setupNim(
             credentialEnv,
             `Missing credential env for ${remoteConfig.label}`,
           );
+          const customAnthropicClassification =
+            selected.key === "anthropicCompatible" && endpointUrl
+              ? bedrockRuntime.classifyCustomAnthropicEndpoint(endpointUrl)
+              : null;
+          const isBedrockRuntimeCustomAnthropic =
+            customAnthropicClassification?.kind === "bedrock-runtime";
+          if (isBedrockRuntimeCustomAnthropic) {
+            if (!resolveProviderCredential(selectedCredentialEnv)) {
+              if (isNonInteractive()) {
+                if (!bedrockRuntime.hasBedrockRuntimeAwsAuthEnv()) {
+                  console.error(
+                    `  ${bedrockRuntime.BEDROCK_RUNTIME_AWS_BEARER_TOKEN_ENV}, AWS_PROFILE, IAM environment credentials, or ${selectedCredentialEnv} is required for a Bedrock Runtime endpoint in non-interactive mode.`,
+                  );
+                  process.exit(1);
+                }
+              } else if (!bedrockRuntime.hasBedrockRuntimeAwsAuthEnv()) {
+                await ensureNamedCredential(
+                  selectedCredentialEnv,
+                  remoteConfig.label + " API key",
+                  remoteConfig.helpUrl,
+                );
+              }
+            }
+            while (true) {
+              if (isNonInteractive()) {
+                model = defaultModel;
+              } else {
+                model = await promptInputModel(remoteConfig.label, defaultModel, null);
+              }
+              if (model === BACK_TO_SELECTION) {
+                console.log("  Returning to provider selection.");
+                console.log("");
+                continue selectionLoop;
+              }
+              preferredInferenceApi = "openai-completions";
+              break;
+            }
+            break;
+          }
           let modelValidator: ((candidate: string) => ModelValidationResult) | null = null;
           if (selected.key === "openai" || selected.key === "gemini") {
             const modelAuthMode = getProbeAuthMode(provider);
@@ -7450,6 +7497,68 @@ async function setupInference(
     if (!config) {
       console.error(`  Unsupported provider configuration: ${provider}`);
       process.exit(1);
+    }
+    const customAnthropicClassification =
+      provider === "compatible-anthropic-endpoint" && endpointUrl
+        ? bedrockRuntime.classifyCustomAnthropicEndpoint(endpointUrl)
+        : null;
+    if (customAnthropicClassification?.kind === "bedrock-runtime") {
+      const compatibleCredential = credentialEnv ? hydrateCredentialEnv(credentialEnv) : null;
+      let adapter: Awaited<ReturnType<typeof bedrockRuntimeAdapter.ensureBedrockRuntimeAdapter>>;
+      try {
+        adapter = await bedrockRuntimeAdapter.ensureBedrockRuntimeAdapter({
+          classification: customAnthropicClassification,
+          compatibleCredential,
+        });
+      } catch (err) {
+        console.error(
+          `  Failed to start Bedrock Runtime adapter: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+        if (isNonInteractive()) process.exit(1);
+        return { retry: "selection" };
+      }
+      const providerResult = upsertProvider(
+        provider,
+        "openai",
+        adapter.credentialEnv,
+        adapter.baseUrl,
+        { [adapter.credentialEnv]: adapter.token },
+      );
+      if (!providerResult.ok) {
+        console.error(`  ${providerResult.message}`);
+        if (isNonInteractive()) process.exit(providerResult.status || 1);
+        return { retry: "selection" };
+      }
+      const applyResult = runOpenshell(
+        [
+          "inference",
+          "set",
+          "--no-verify",
+          "--provider",
+          provider,
+          "--model",
+          model,
+          "--timeout",
+          String(LOCAL_INFERENCE_TIMEOUT_SECS),
+        ],
+        { ignoreError: true },
+      );
+      if (applyResult.status !== 0) {
+        const message =
+          compactText(redact(`${applyResult.stderr || ""} ${applyResult.stdout || ""}`)) ||
+          `Failed to configure inference provider '${provider}'.`;
+        console.error(`  ${message}`);
+        if (isNonInteractive()) process.exit(applyResult.status || 1);
+        return { retry: "selection" };
+      }
+      verifyInferenceRoute(provider, model);
+      if (sandboxName) {
+        registry.updateSandbox(sandboxName, { model, provider });
+      }
+      console.log(`  ✓ Inference route set: ${provider} / ${model}`);
+      return { ok: true };
     }
     while (true) {
       const resolvedCredentialEnv = credentialEnv || (config && config.credentialEnv);
@@ -9805,8 +9914,15 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         process.exit(1);
       }
       process.env.NEMOCLAW_OPENSHELL_BIN = getOpenshellBinary();
+      const needsBedrockRuntimeAdapter =
+        provider === "compatible-anthropic-endpoint" &&
+        endpointUrl &&
+        bedrockRuntime.isBedrockRuntimeEndpoint(endpointUrl);
       const resumeInference =
-        !forceProviderSelection && resume && isInferenceRouteReady(provider, model);
+        !needsBedrockRuntimeAdapter &&
+        !forceProviderSelection &&
+        resume &&
+        isInferenceRouteReady(provider, model);
       if (resumeInference) {
         if (provider === hermesProviderAuth.HERMES_PROVIDER_NAME) {
           startRecordedStep("inference", { provider, model });
