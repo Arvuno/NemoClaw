@@ -3,7 +3,30 @@
 
 import { describe, expect, it } from "vitest";
 
-import { resolveGlobalOclifDispatch, resolveLegacySandboxDispatch } from "./oclif-dispatch";
+import {
+  nativeArgvForOclifDispatch,
+  resolveGlobalOclifDispatch,
+  resolveLegacySandboxDispatch,
+} from "./oclif-dispatch";
+
+describe("nativeArgvForOclifDispatch", () => {
+  it("translates resolved command IDs and parser args to native oclif argv", () => {
+    expect(
+      nativeArgvForOclifDispatch({
+        kind: "oclif",
+        commandId: "sandbox:config:set",
+        args: ["alpha", "--key", "model", "--value", "nvidia/nemotron"],
+      }),
+    ).toEqual(["sandbox", "config", "set", "alpha", "--key", "model", "--value", "nvidia/nemotron"]);
+    expect(
+      nativeArgvForOclifDispatch({
+        kind: "oclif",
+        commandId: "inference:get",
+        args: ["--json"],
+      }),
+    ).toEqual(["inference", "get", "--json"]);
+  });
+});
 
 describe("resolveGlobalOclifDispatch", () => {
   it("routes simple and nested global commands through oclif", () => {

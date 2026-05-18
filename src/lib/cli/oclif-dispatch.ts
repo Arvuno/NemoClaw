@@ -119,6 +119,10 @@ function oclif(commandId: string, args: string[]): OclifDispatch {
   return { kind: "oclif", commandId, args };
 }
 
+export function nativeArgvForOclifDispatch(result: OclifDispatch): string[] {
+  return [...result.commandId.split(":"), ...result.args];
+}
+
 function globalParentHelp(topic: string, message?: string): HelpDispatch {
   return {
     kind: "help",
