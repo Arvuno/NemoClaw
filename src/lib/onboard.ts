@@ -9693,7 +9693,9 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       currentSandboxName: recordedSandboxName || requestedSandboxName,
       recreateSandbox: isRecreateSandbox(),
       confirmedDockerDriverGateway:
-        isLinuxDockerDriverGatewayEnabled() && gatewayReuseState === "healthy",
+        isLinuxDockerDriverGatewayEnabled() &&
+        gatewayReuseState === "healthy" &&
+        !gatewayCliSupportsLifecycleCommands(runCaptureOpenshell),
       stopDashboardForwards: stopAllDashboardForwards,
       retireLegacyGatewayForDockerDriverUpgrade,
       destroyGatewayRuntimeForGpuReuse: () => destroyGateway(() => undefined, () => false),
