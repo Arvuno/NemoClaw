@@ -9,6 +9,7 @@ Use existing Vitest scenario-framework tests under `test/e2e/scenario-framework-
 ## Phase 1: Layered Terminology and Schema Planning - Test Guide
 
 **Existing Tests to Modify:**
+
 - `e2e-scenario-schema.test.ts`
   - Validate `base_scenarios`, `onboarding_profiles`, `test_plans`, `alias_for_plan`, optional `runner_requirements`, and optional `expected_failure`.
 - `e2e-scenario-resolver.test.ts`
@@ -17,6 +18,7 @@ Use existing Vitest scenario-framework tests under `test/e2e/scenario-framework-
   - Enforce stable IDs and no broken script/path references for layered metadata.
 
 **New Tests to Create:**
+
 1. `test_should_resolve_legacy_scenario_alias_to_layered_plan`
    - **Input**: `ubuntu-repo-cloud-openclaw`
    - **Expected**: resolved plan includes legacy `scenario_id` plus `base`, `onboarding`, `expected_state`, `onboarding_assertions`, and `suites` sections.
@@ -43,6 +45,7 @@ Use existing Vitest scenario-framework tests under `test/e2e/scenario-framework-
    - **Covers**: no live E2E behavior changes.
 
 **Test Implementation Notes:**
+
 - Use `loadMetadataFromObjects` for negative fixtures.
 - Use real metadata only for canonical existing scenarios.
 - Snapshot only stable JSON keys; avoid brittle full-output snapshots.
@@ -50,12 +53,14 @@ Use existing Vitest scenario-framework tests under `test/e2e/scenario-framework-
 ## Phase 2: Layered Coverage and Gap Reports - Test Guide
 
 **Existing Tests to Modify:**
+
 - `e2e-coverage-report.test.ts`
   - Add sections for base scenarios, onboarding profiles, test plans, suites, and parity by layer.
 - `e2e-parity-map.test.ts`
   - Accept explicit `layer` and `gap_domain`; infer/default layer during transition.
 
 **New Tests to Create:**
+
 1. `test_should_render_layered_coverage_sections`
    - **Input**: real metadata.
    - **Expected**: report contains base, onboarding, test plan, suite, and parity-by-layer sections.
@@ -72,6 +77,7 @@ Use existing Vitest scenario-framework tests under `test/e2e/scenario-framework-
 ## Phase 3: Onboarding Assertion Stage - Test Guide
 
 **Existing Tests to Modify:**
+
 - `e2e-scenario-resolver.test.ts`
   - Validate assertion IDs referenced by plans.
 - `e2e-suite-runner.test.ts`
@@ -80,6 +86,7 @@ Use existing Vitest scenario-framework tests under `test/e2e/scenario-framework-
   - Verify stable assertion IDs are mappable.
 
 **New Tests to Create:**
+
 1. `test_should_run_onboarding_assertions_before_expected_state`
    - **Input**: stub scripts writing stage markers.
    - **Expected**: marker order is install/onboard → assertions → expected-state → suites.
@@ -96,12 +103,14 @@ Use existing Vitest scenario-framework tests under `test/e2e/scenario-framework-
 ## Phase 4: Onboarding Matrix Expansion - Test Guide
 
 **Existing Tests to Modify:**
+
 - `e2e-scenario-additional-families.test.ts`
   - Require profiles/plans for OpenAI-compatible, messaging providers, Hermes messaging, lifecycle variants, and token rotation.
 - `e2e-scenario-resolver.test.ts`
   - Add unsupported combination failures.
 
 **New Tests to Create:**
+
 1. `test_should_list_onboarding_profiles_independently_from_base_coverage`
 2. `test_should_fail_plan_time_for_unsupported_base_onboarding_combination`
 3. `test_should_reduce_deferred_counts_for_migrated_onboarding_domains`
@@ -109,12 +118,14 @@ Use existing Vitest scenario-framework tests under `test/e2e/scenario-framework-
 ## Phase 5: Post-Onboard Suite Reorganization - Test Guide
 
 **Existing Tests to Modify:**
+
 - `e2e-suite-runner.test.ts`
   - Ensure suites do not install/onboard and consume `$E2E_CONTEXT_DIR/context.env`.
 - `e2e-coverage-report.test.ts`
   - Group suite coverage by feature family.
 
 **New Tests to Create:**
+
 1. `test_should_preserve_old_suite_ids_as_aliases`
 2. `test_should_group_suite_report_by_feature_family`
 3. `test_should_reject_suite_that_declares_install_or_onboard_step`
@@ -123,10 +134,12 @@ Use existing Vitest scenario-framework tests under `test/e2e/scenario-framework-
 ## Phase 6: Workflow and Report Visibility - Test Guide
 
 **Existing Tests to Modify:**
+
 - `e2e-scenarios-workflow.test.ts`
   - Validate scenario and parity workflow summaries.
 
 **New Tests to Create:**
+
 1. `test_should_append_scenario_layer_summary_to_github_step_summary`
 2. `test_should_append_parity_gap_summary_to_github_step_summary`
 3. `test_should_record_failing_layer_in_report`
@@ -135,12 +148,14 @@ Use existing Vitest scenario-framework tests under `test/e2e/scenario-framework-
 ## Phase 7: Clean the House - Test Guide
 
 **Existing Tests to Modify:**
+
 - `e2e-metadata-final-hygiene.test.ts`
   - Fail duplicate legacy definitions without explicit compatibility reason.
 - `e2e-convention-lint.test.ts`
   - Fail new legacy `test/e2e/test-*.sh` entrypoints.
 
 **New Tests to Create:**
+
 1. `test_should_not_allow_unexplained_duplicate_scenario_definitions`
 2. `test_should_not_allow_new_legacy_e2e_entrypoints`
 3. `test_should_keep_documented_layered_model_as_source_of_truth`

@@ -21,7 +21,9 @@ Thumbs.db
 .nemoclaw-maintainer/
 draft_newsletter_*
 research/
-specs/
+specs/*
+!specs/2026-05-14_new-e2e-model/
+!specs/2026-05-14_new-e2e-model/*.md
 vdr-notes/
 
 # Security: secrets, credentials, and keys
