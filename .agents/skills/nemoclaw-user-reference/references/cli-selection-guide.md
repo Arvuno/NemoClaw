@@ -133,12 +133,10 @@ It waits for readiness, handles stale SSH host keys after gateway restarts, and 
 
 Use `openshell sandbox connect <name>` only when you intentionally want the raw OpenShell connection path.
 
-For a one-off command, use `nemoclaw <name> exec` instead of opening an interactive shell.
-It runs as the sandbox user (HOME=/sandbox) and forwards everything after `--` to the sandbox.
-Reach for `openshell sandbox exec` directly only when you intentionally want the raw OpenShell exec path.
+For a one-off command, use `openshell sandbox exec` instead of opening an interactive shell.
 
 ```console
-$ nemoclaw my-assistant exec -- cat /tmp/gateway.log
+$ openshell sandbox exec -n my-assistant -- cat /tmp/gateway.log
 ```
 
 ### Check Health or Logs

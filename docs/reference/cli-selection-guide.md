@@ -114,13 +114,14 @@ Use `openshell` when the docs explicitly call for a live OpenShell gateway opera
   $ openshell logs <sandbox-name> --tail
   ```
 
-- Run one-off commands or move files without starting a NemoClaw chat session:
+- Move files between the host and a sandbox without starting a NemoClaw chat session:
 
   ```console
-  $ openshell sandbox exec -n <sandbox-name> -- ls -la /sandbox
   $ openshell sandbox upload <sandbox-name> ./local-file /sandbox/
   $ openshell sandbox download <sandbox-name> /sandbox/output ./output
   ```
+
+  For one-off commands, use `nemoclaw <name> exec` instead — it runs as the sandbox user (HOME=/sandbox) and finds NemoClaw-provisioned config that raw `openshell sandbox exec` (or `docker exec`) can miss.
 
 - Inspect or replace raw OpenShell policy:
 
