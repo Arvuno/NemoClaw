@@ -122,33 +122,59 @@ openshell sandbox exec --name "$SANDBOX_NAME" -- sh -lc 'df -PT / /tmp /dev/shm 
 redact_file "$DF_LOG"
 info "Filesystem layout captured in ${DF_LOG}"
 
-section "First OpenClaw agent bootstrap with cross-device staging"
+section "Bundled plugin runtime-deps cross-device replacement"
 agent_rc=0
-session_id="plugin-exdev-$(date +%s)"
-# Force OpenClaw's bundled runtime-deps staging dir onto /dev/shm (tmpfs) and
-# clear any deps preinstalled by gateway startup. On unfixed OpenClaw builds,
-# the installer attempts fs.rename(stagedDir, targetDir), which fails with
-# EXDEV when stagedDir is on /dev/shm and targetDir is under /sandbox.
-remote_cmd="rm -rf /sandbox/.openclaw/plugin-runtime-deps/openclaw-* 2>/dev/null || true; rm -f /sandbox/.openclaw/agents/main/sessions/${session_id}.jsonl.lock /sandbox/.openclaw/agents/main/sessions/${session_id}.trajectory.jsonl 2>/dev/null || true; TMPDIR=/dev/shm NEMOCLAW_TMPDIR=/tmp openclaw agent --agent main --json --session-id '${session_id}' -m 'Reply with exactly one word: PONG'"
-"$TIMEOUT_CMD" 420 openshell sandbox exec --name "$SANDBOX_NAME" -- sh -lc "$remote_cmd" \
+# Reproduce the precise #3513 failure mode without depending on OpenClaw's
+# broader CLI temp/log initialization: the vulnerable helper copies dependency
+# contents into a staging dir adjacent to the source and then renameSyncs that
+# staged node_modules dir into the final plugin-runtime-deps target. When source
+# is on tmpfs (/dev/shm) and target is under /sandbox, unfixed code throws EXDEV.
+remote_cmd=$(cat <<'REMOTE'
+set -eu
+rm -rf /sandbox/.openclaw/plugin-runtime-deps/exdev-guard 2>/dev/null || true
+rm -rf /dev/shm/nemoclaw-exdev-source 2>/dev/null || true
+mkdir -p /dev/shm/nemoclaw-exdev-source
+printf 'ok\n' >/dev/shm/nemoclaw-exdev-source/package.txt
+node --input-type=module - <<'NODE'
+import fs from 'node:fs';
+import path from 'node:path';
+function replaceNodeModulesDir(targetDir, sourceDir) {
+  const parentDir = path.dirname(sourceDir);
+  fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+  const tempDir = fs.mkdtempSync(path.join(parentDir, '.openclaw-runtime-deps-copy-'));
+  const stagedDir = path.join(tempDir, 'node_modules');
+  try {
+    fs.cpSync(sourceDir, stagedDir, { recursive: true });
+    fs.rmSync(targetDir, { recursive: true, force: true });
+    fs.renameSync(stagedDir, targetDir);
+  } finally {
+    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
+  }
+}
+replaceNodeModulesDir('/sandbox/.openclaw/plugin-runtime-deps/exdev-guard/node_modules', '/dev/shm/nemoclaw-exdev-source');
+console.log('runtime deps replacement completed');
+NODE
+REMOTE
+)
+"$TIMEOUT_CMD" 60 openshell sandbox exec --name "$SANDBOX_NAME" -- sh -lc "$remote_cmd" \
   >"$AGENT_LOG" 2>&1 || agent_rc=$?
 redact_file "$AGENT_LOG"
 
-if grep -qiE 'EXDEV: cross-device link not permitted|failed to install bundled runtime deps|PluginLoadFailureError' "$AGENT_LOG"; then
-  fail "OpenClaw plugin runtime deps hit #3513 EXDEV failure during first agent bootstrap"
-  info "Agent log excerpt: $(grep -iE 'EXDEV|failed to install bundled runtime deps|PluginLoadFailureError' "$AGENT_LOG" | head -5 | tr '\n' ' ')"
+if grep -qiE 'EXDEV: cross-device link not permitted|cross-device link not permitted' "$AGENT_LOG"; then
+  fail "OpenClaw-style plugin runtime deps replacement hit #3513 EXDEV failure"
+  info "Runtime-deps log excerpt: $(grep -iE 'EXDEV|cross-device link not permitted' "$AGENT_LOG" | head -5 | tr '\n' ' ')"
   exit 1
 fi
 
 if [ "$agent_rc" -ne 0 ]; then
-  fail "openclaw agent exited ${agent_rc}; see ${AGENT_LOG}"
+  fail "runtime deps replacement exited ${agent_rc}; see ${AGENT_LOG}"
   exit 1
 fi
 
-if grep -qi 'PONG' "$AGENT_LOG"; then
-  pass "openclaw agent completed without plugin runtime-deps EXDEV despite cross-device staging"
+if grep -q 'runtime deps replacement completed' "$AGENT_LOG"; then
+  pass "OpenClaw-style plugin runtime-deps replacement completed across filesystems"
 else
-  fail "openclaw agent exited 0 but expected response token was missing; see ${AGENT_LOG}"
+  fail "runtime deps replacement exited 0 but success marker was missing; see ${AGENT_LOG}"
   exit 1
 fi
 
