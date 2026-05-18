@@ -96,6 +96,14 @@ function printConnectOrderHint(candidate: string | null): void {
 const VALID_SANDBOX_ACTIONS =
   "connect, status, doctor, logs, policy-add, policy-remove, policy-list, hosts-add, hosts-list, hosts-remove, skill, snapshot, share, rebuild, recover, shields, config, channels, gateway-token, destroy";
 
+function sandboxActionList(): string[] {
+  return sandboxActionTokens();
+}
+
+function isKnownSandboxAction(action: string): boolean {
+  return sandboxActionList().includes(action);
+}
+
 function printDispatchUsageError(
   result: Extract<DispatchResult, { kind: "usageError" }>,
   sandboxName?: string,
@@ -109,6 +117,45 @@ function printDispatchUsageError(
   console.error(`  Usage: ${CLI_NAME} ${sandboxName ? `${sandboxName} ` : ""}${usage}`);
   for (const line of details) {
     console.error(`    ${line}`);
+  }
+  process.exit(1);
+}
+
+async function recoverRequestedSandboxIfNeeded(
+  sandboxName: string,
+  action: string,
+  rawArgsAfterSandboxName: string[],
+): Promise<void> {
+  if (registry().getSandbox(sandboxName) || !isKnownSandboxAction(action)) return;
+
+  validateName(sandboxName, "sandbox name");
+  await registryRecovery().recoverRegistryEntries({ requestedSandboxName: sandboxName });
+  if (registry().getSandbox(sandboxName)) return;
+
+  if (rawArgsAfterSandboxName.length === 0) {
+    const suggestion = suggestGlobalCommand(sandboxName);
+    if (suggestion) {
+      console.error(`  Unknown command: ${sandboxName}`);
+      console.error(`  Did you mean: ${CLI_NAME} ${suggestion}?`);
+      process.exit(1);
+    }
+  }
+
+  console.error(`  Sandbox '${sandboxName}' does not exist.`);
+  const allNames = registry().listSandboxes().sandboxes.map((s: { name: string }) => s.name);
+  if (allNames.length > 0) {
+    console.error("");
+    console.error(`  Registered sandboxes: ${allNames.join(", ")}`);
+    console.error(`  Run '${CLI_NAME} list' to see all sandboxes.`);
+    const reorderedCandidate = rawArgsAfterSandboxName[0] === "connect"
+      ? findRegisteredSandboxName(rawArgsAfterSandboxName.slice(1))
+      : null;
+    if (reorderedCandidate) {
+      console.error("");
+      printConnectOrderHint(reorderedCandidate);
+    }
+  } else {
+    console.error(`  Run '${CLI_NAME} onboard' to create one.`);
   }
   process.exit(1);
 }
@@ -181,15 +228,12 @@ export async function dispatchCli(argv: string[] = process.argv.slice(2)): Promi
     return;
   }
 
-  // Derived from command registry — single source of truth.
-  const sandboxActions = sandboxActionTokens();
-
   // Help is parser metadata, not sandbox runtime behavior. Render sandbox-scoped
   // legacy help before registry recovery so `nemoclaw missing channels start --help`
   // stays side-effect free and never starts or repairs services.
   if (
     !normalized.connectHelpRequested &&
-    sandboxActions.includes(requestedSandboxAction) &&
+    isKnownSandboxAction(requestedSandboxAction) &&
     hasHelpFlag(requestedSandboxActionArgs)
   ) {
     validateName(cmd, "sandbox name");
@@ -205,37 +249,7 @@ export async function dispatchCli(argv: string[] = process.argv.slice(2)): Promi
 
   // If the registry doesn't know this name but the action is a sandbox-scoped
   // command, attempt recovery — the sandbox may still be live with a stale registry.
-  if (!registry().getSandbox(cmd) && sandboxActions.includes(requestedSandboxAction)) {
-    validateName(cmd, "sandbox name");
-    await registryRecovery().recoverRegistryEntries({ requestedSandboxName: cmd });
-    if (!registry().getSandbox(cmd)) {
-      if (rawArgsAfterCmd.length === 0) {
-        const suggestion = suggestGlobalCommand(cmd);
-        if (suggestion) {
-          console.error(`  Unknown command: ${cmd}`);
-          console.error(`  Did you mean: ${CLI_NAME} ${suggestion}?`);
-          process.exit(1);
-        }
-      }
-      console.error(`  Sandbox '${cmd}' does not exist.`);
-      const allNames = registry().listSandboxes().sandboxes.map((s: { name: string }) => s.name);
-      if (allNames.length > 0) {
-        console.error("");
-        console.error(`  Registered sandboxes: ${allNames.join(", ")}`);
-        console.error(`  Run '${CLI_NAME} list' to see all sandboxes.`);
-        const reorderedCandidate = rawArgsAfterCmd[0] === "connect"
-          ? findRegisteredSandboxName(rawArgsAfterCmd.slice(1))
-          : null;
-        if (reorderedCandidate) {
-          console.error("");
-          printConnectOrderHint(reorderedCandidate);
-        }
-      } else {
-        console.error(`  Run '${CLI_NAME} onboard' to create one.`);
-      }
-      process.exit(1);
-    }
-  }
+  await recoverRequestedSandboxIfNeeded(cmd, requestedSandboxAction, rawArgsAfterCmd);
 
   const sandbox = registry().getSandbox(cmd);
   if (!sandbox) {
