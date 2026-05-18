@@ -4,13 +4,17 @@
 
 # Channel stop/start lifecycle E2E test.
 #
-# Covers Test 1 from issue #3462 ("onboard telegram → channels stop → channels start").
+# Covers Test 1 from issue #3462 ("onboard telegram → channels stop → channels start")
+# plus the live channel removal path from issue #3671.
 # Regression coverage for:
 #   - #3453 — `channels stop <ch>` + rebuild must actually remove the channel
 #             from openclaw.json (registry `disabledChannels` was lost across
 #             the destroy/recreate window before the session-stash fix).
 #   - #3381 — `channels start <ch>` + rebuild must re-attach the bridge from
 #             cached credentials without re-prompting.
+#   - #3671 — `channels remove <ch>` on a live sandbox must detach before
+#             deleting the bridge provider, clear registry channel/hash state,
+#             un-apply the channel policy preset, and rebuild cleanly.
 #
 # Telegram-only — Discord/Slack carry the same code path; this script covers
 # the regression with the minimal channel surface.
@@ -416,6 +420,101 @@ if openshell provider get "${SANDBOX_NAME}-telegram-bridge" >/dev/null 2>&1; the
   pass "C6c: telegram-bridge provider record present in gateway (cached token reused)"
 else
   fail "C6c: telegram-bridge provider record missing in gateway after start"
+fi
+
+# ══════════════════════════════════════════════════════════════════
+# Phase 7: Remove telegram while the sandbox is live (#3671)
+# ══════════════════════════════════════════════════════════════════
+section "Phase 7: channels remove telegram on live sandbox"
+
+if nemoclaw "$SANDBOX_NAME" channels remove telegram >/tmp/nc-remove.log 2>&1; then
+  remove_rc=0
+else
+  remove_rc=$?
+fi
+cat /tmp/nc-remove.log
+if [ "$remove_rc" -eq 0 ] && grep -q "Removed telegram bridge" /tmp/nc-remove.log; then
+  pass "C7a: channels remove telegram completed on a live sandbox"
+else
+  fail "C7a: channels remove telegram failed"
+  tail -30 /tmp/nc-remove.log 2>/dev/null || true
+fi
+
+if grep -q "Change queued.*remove 'telegram'" /tmp/nc-remove.log; then
+  pass "C7b: channels remove queued rebuild"
+else
+  fail "C7b: channels remove did not queue a rebuild"
+fi
+
+# Successful provider deletion while the sandbox is live proves the command
+# detached the provider first; OpenShell rejects deleting attached providers.
+if openshell provider get "${SANDBOX_NAME}-telegram-bridge" >/dev/null 2>&1; then
+  fail "C7c: telegram-bridge provider still exists after channels remove"
+else
+  pass "C7c: telegram-bridge provider deleted from gateway"
+fi
+
+post_remove_messaging=$(registry_field messagingChannels)
+if echo "$post_remove_messaging" | grep -q '"telegram"'; then
+  fail "C7d: registry.messagingChannels still contains telegram after remove (got: ${post_remove_messaging})"
+else
+  pass "C7d: registry.messagingChannels no longer contains telegram (${post_remove_messaging})"
+fi
+
+post_remove_hashes=$(registry_field providerCredentialHashes)
+if echo "$post_remove_hashes" | grep -q '"TELEGRAM_BOT_TOKEN"'; then
+  fail "C7e: registry.providerCredentialHashes still contains TELEGRAM_BOT_TOKEN after remove (got: ${post_remove_hashes})"
+else
+  pass "C7e: registry.providerCredentialHashes no longer contains TELEGRAM_BOT_TOKEN (${post_remove_hashes})"
+fi
+
+if nemoclaw "$SANDBOX_NAME" policy-list >/tmp/nc-policy-list-after-remove.log 2>&1; then
+  if grep -q "● telegram" /tmp/nc-policy-list-after-remove.log; then
+    fail "C7f: telegram policy preset still active after channels remove"
+    grep "telegram" /tmp/nc-policy-list-after-remove.log | head -5 || true
+  elif grep -q "telegram" /tmp/nc-policy-list-after-remove.log; then
+    pass "C7f: telegram policy preset no longer active after channels remove"
+  else
+    fail "C7f: policy-list did not include telegram preset status"
+    tail -30 /tmp/nc-policy-list-after-remove.log 2>/dev/null || true
+  fi
+else
+  fail "C7f: policy-list failed after channels remove"
+  tail -30 /tmp/nc-policy-list-after-remove.log 2>/dev/null || true
+fi
+
+# ══════════════════════════════════════════════════════════════════
+# Phase 8: Rebuild after remove and verify final baked state
+# ══════════════════════════════════════════════════════════════════
+section "Phase 8: rebuild after channels remove"
+
+info "Rebuilding sandbox to apply the remove..."
+if nemoclaw "$SANDBOX_NAME" rebuild --yes >/tmp/nc-rebuild-remove.log 2>&1; then
+  pass "C8a: rebuild (post-remove) completed"
+else
+  fail "C8a: rebuild (post-remove) failed"
+  tail -30 /tmp/nc-rebuild-remove.log 2>/dev/null || true
+  print_summary
+fi
+
+if openclaw_has_telegram; then
+  fail "C8b: REGRESSION — openclaw.json still contains 'telegram' after remove+rebuild (#3671)"
+  info "openclaw.json channels after remove+rebuild:"
+  sandbox_exec "python3 -c 'import json; print(list(json.load(open(\"/sandbox/.openclaw/openclaw.json\")).get(\"channels\",{}).keys()))' 2>&1" | head -5
+else
+  rc=$?
+  if [ "$rc" = "2" ]; then
+    fail "C8b: could not read openclaw.json inside sandbox post-remove"
+  else
+    pass "C8b: openclaw.json excludes 'telegram' after remove+rebuild (#3671 fixed)"
+  fi
+fi
+
+post_rebuild_remove_messaging=$(registry_field messagingChannels)
+if echo "$post_rebuild_remove_messaging" | grep -q '"telegram"'; then
+  fail "C8c: registry.messagingChannels restored telegram after remove+rebuild (got: ${post_rebuild_remove_messaging})"
+else
+  pass "C8c: registry.messagingChannels still excludes telegram after remove+rebuild (${post_rebuild_remove_messaging})"
 fi
 
 print_summary
