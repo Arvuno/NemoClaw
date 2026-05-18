@@ -207,6 +207,62 @@ describe("oclif compatibility dispatch", () => {
     }
   });
 
+  it("keeps simple global execution on direct command IDs to avoid flexible taxonomy overmatching", async () => {
+    const cliPath = require.resolve("../dist/nemoclaw.js");
+    const runnerPath = require.resolve("../dist/lib/runner.js");
+    const publicDispatchPath = require.resolve("../dist/lib/cli/public-dispatch.js");
+    const oclifRunnerPath = require.resolve("../dist/lib/cli/oclif-runner.js");
+
+    const priorCli = require.cache[cliPath];
+    const priorRunner = require.cache[runnerPath];
+    const priorPublicDispatch = require.cache[publicDispatchPath];
+    const priorOclifRunner = require.cache[oclifRunnerPath];
+    const priorDisableAutoDispatch = process.env.NEMOCLAW_DISABLE_AUTO_DISPATCH;
+
+    const runOclifArgv = vi.fn(async () => undefined);
+    const runRegisteredOclifCommand = vi.fn(async () => undefined);
+
+    process.env.NEMOCLAW_DISABLE_AUTO_DISPATCH = "1";
+    requireCache[runnerPath] = {
+      id: runnerPath,
+      filename: runnerPath,
+      loaded: true,
+      exports: { ROOT: process.cwd(), validateName: vi.fn() },
+    } as any;
+    requireCache[oclifRunnerPath] = {
+      id: oclifRunnerPath,
+      filename: oclifRunnerPath,
+      loaded: true,
+      exports: { runOclifArgv, runRegisteredOclifCommand },
+    } as any;
+
+    try {
+      delete require.cache[cliPath];
+      delete require.cache[publicDispatchPath];
+      const { dispatchCli } = require(cliPath);
+
+      await dispatchCli(["status", "bogus"]);
+
+      expect(runRegisteredOclifCommand).toHaveBeenCalledWith(
+        "status",
+        ["bogus"],
+        expect.objectContaining({ rootDir: process.cwd() }),
+      );
+      expect(runOclifArgv).not.toHaveBeenCalled();
+    } finally {
+      if (priorDisableAutoDispatch === undefined) {
+        delete process.env.NEMOCLAW_DISABLE_AUTO_DISPATCH;
+      } else {
+        process.env.NEMOCLAW_DISABLE_AUTO_DISPATCH = priorDisableAutoDispatch;
+      }
+
+      restoreCache(cliPath, priorCli);
+      restoreCache(runnerPath, priorRunner);
+      restoreCache(publicDispatchPath, priorPublicDispatch);
+      restoreCache(oclifRunnerPath, priorOclifRunner);
+    }
+  });
+
   it("keeps oclif flexible taxonomy enabled for space-separated native commands", () => {
     const packageJson = JSON.parse(fs.readFileSync("package.json", "utf-8")) as {
       oclif?: { flexibleTaxonomy?: boolean; topicSeparator?: string };
