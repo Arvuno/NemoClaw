@@ -111,67 +111,16 @@ describe("translatePublicGlobalArgv", () => {
     expectNative(translatePublicGlobalArgv("version", []), "root:version", []);
   });
 
-  it("returns metadata-derived parent help for unsupported global forms", () => {
-    expect(translatePublicGlobalArgv("tunnel", ["restart"])).toEqual({
-      kind: "publicHelp",
-      commandId: "tunnel",
-      publicUsage: ["tunnel start", "tunnel stop"],
-      exitCode: 1,
-      message: "Unknown tunnel subcommand: restart",
-    });
-    expect(translatePublicGlobalArgv("inference", ["bogus"])).toEqual({
-      kind: "publicHelp",
-      commandId: "inference",
-      publicUsage: [
-        "inference get [--json]",
-        "inference set --provider <provider> --model <model> [--sandbox <name>] [--no-verify]",
-      ],
-      exitCode: 1,
-      message: "Unknown inference subcommand: bogus",
-    });
-    expect(translatePublicGlobalArgv("credentials", ["bogus"])).toEqual({
-      kind: "publicHelp",
-      commandId: "credentials",
-      publicUsage: ["credentials list", "credentials reset <PROVIDER> [--yes|-y]"],
-      exitCode: 1,
-      message: "Unknown credentials subcommand: bogus",
-    });
+  it("translates global parent help and errors to native oclif argv", () => {
+    expectNative(translatePublicGlobalArgv("credentials", []), "credentials", ["--help"], ["credentials", "--help"]);
+    expectNative(translatePublicGlobalArgv("tunnel", ["help"]), "tunnel", ["--help"], ["tunnel", "--help"]);
+    expectNative(
+      translatePublicGlobalArgv("inference", ["bogus"]),
+      "inference:bogus",
+      [],
+      ["inference", "bogus"],
+    );
     expect(translatePublicGlobalArgv("bogus", [])).toEqual({ kind: "publicUsageError", lines: [] });
-  });
-});
-
-describe("public help compatibility cases", () => {
-  it("keeps public-grammar help for supported compatibility islands", () => {
-    expect(translatePublicGlobalArgv("credentials", ["bogus"])).toEqual({
-      kind: "publicHelp",
-      commandId: "credentials",
-      publicUsage: ["credentials list", "credentials reset <PROVIDER> [--yes|-y]"],
-      exitCode: 1,
-      message: "Unknown credentials subcommand: bogus",
-    });
-    expect(translatePublicSandboxArgv("alpha", "status", ["--help"])).toEqual({
-      kind: "publicHelp",
-      commandId: "sandbox:status",
-      publicUsage: "<name> status",
-    });
-    expect(translatePublicSandboxArgv("alpha", "share", ["--help"])).toEqual({
-      kind: "publicHelp",
-      commandId: "sandbox:share",
-      publicUsage: "<name> share <mount|unmount|status>",
-    });
-    expect(translatePublicSandboxArgv("alpha", "channels", ["bogus"])).toEqual({
-      kind: "publicHelp",
-      commandId: "sandbox:channels",
-      exitCode: 1,
-      message: "Unknown channels subcommand: bogus",
-      publicUsage: [
-        "<name> channels list",
-        "<name> channels add <channel> [--dry-run]",
-        "<name> channels remove <channel> [--dry-run]",
-        "<name> channels stop <channel> [--dry-run]",
-        "<name> channels start <channel> [--dry-run]",
-      ],
-    });
   });
 });
 
@@ -198,26 +147,24 @@ describe("translatePublicSandboxArgv", () => {
     );
   });
 
-  it("keeps legacy public help usage for sandbox-scoped commands", () => {
-    expect(translatePublicSandboxArgv("alpha", "status", ["--help"])).toEqual({
-      kind: "publicHelp",
-      commandId: "sandbox:status",
-      publicUsage: "<name> status",
-    });
-    expect(translatePublicSandboxArgv("alpha", "logs", ["--help"])).toEqual({
-      kind: "publicHelp",
-      commandId: "sandbox:logs",
-      publicUsage: "<name> logs [--follow] [--tail <lines>|-n <lines>] [--since <duration>]",
-    });
-  });
-
-  it("translates sandbox recover through metadata-derived dispatch", () => {
-    expectNative(translatePublicSandboxArgv("alpha", "recover", []), "sandbox:recover", ["alpha"]);
-    expect(translatePublicSandboxArgv("alpha", "recover", ["--help"])).toEqual({
-      kind: "publicHelp",
-      commandId: "sandbox:recover",
-      publicUsage: "<name> recover",
-    });
+  it("translates sandbox help to native oclif argv", () => {
+    expectNative(
+      translatePublicSandboxArgv("alpha", "status", ["--help"]),
+      "sandbox:status",
+      ["alpha", "--help"],
+    );
+    expectNative(
+      translatePublicSandboxArgv("alpha", "config", ["--help"]),
+      "sandbox:config",
+      ["--help"],
+      ["sandbox", "config", "--help"],
+    );
+    expectNative(
+      translatePublicSandboxArgv("alpha", "share", ["--help"]),
+      "sandbox:share",
+      ["--help"],
+      ["sandbox", "share", "--help"],
+    );
   });
 
   it("translates config actions through command-id-derived dispatch", () => {
@@ -261,71 +208,37 @@ describe("translatePublicSandboxArgv", () => {
     );
   });
 
-  it("keeps share parent help public", () => {
-    expect(translatePublicSandboxArgv("alpha", "share", ["--help"])).toEqual({
-      kind: "publicHelp",
-      commandId: "sandbox:share",
-      publicUsage: "<name> share <mount|unmount|status>",
-    });
-  });
-
-  it("falls back to parent commands that intentionally own unknown subcommands and custom help", () => {
+  it("translates unknown parent subcommands to native oclif argv for oclif-owned errors", () => {
     expectNative(
-      translatePublicSandboxArgv("alpha", "skill", ["install", "--help"]),
-      "sandbox:skill",
-      ["alpha", "install", "--help"],
+      translatePublicSandboxArgv("alpha", "channels", ["bogus"]),
+      "sandbox:channels:bogus",
+      ["alpha"],
+      ["sandbox", "channels", "bogus", "alpha"],
     );
     expectNative(
+      translatePublicSandboxArgv("alpha", "config", ["bogus"]),
+      "sandbox:config:bogus",
+      ["alpha"],
+      ["sandbox", "config", "bogus", "alpha"],
+    );
+  });
+
+  it("falls back to parent commands that intentionally own unknown subcommands", () => {
+    expectNative(
       translatePublicSandboxArgv("alpha", "skill", ["bogus"]),
-      "sandbox:skill",
-      ["alpha", "bogus"],
+      "sandbox:skill:bogus",
+      ["alpha"],
+      ["sandbox", "skill", "bogus", "alpha"],
     );
     expectNative(
       translatePublicSandboxArgv("alpha", "snapshot", ["bogus"]),
-      "sandbox:snapshot",
-      ["alpha", "bogus"],
+      "sandbox:snapshot:bogus",
+      ["alpha"],
+      ["sandbox", "snapshot", "bogus", "alpha"],
     );
   });
 
-  it("returns metadata-derived parent help for config and shields groups", () => {
-    expect(translatePublicSandboxArgv("alpha", "config", ["bogus"])).toEqual({
-      kind: "publicHelp",
-      commandId: "sandbox:config",
-      exitCode: 1,
-      message: "Unknown config subcommand: bogus",
-      publicUsage: [
-        "<name> config get [--key <dotpath>] [--format json|yaml]",
-        "<name> config set --key <dotpath> --value <value> [--restart] [--config-accept-new-path]",
-        "<name> config rotate-token",
-      ],
-    });
-    expect(translatePublicSandboxArgv("alpha", "shields", ["bogus"])).toEqual({
-      kind: "publicHelp",
-      commandId: "sandbox:shields",
-      exitCode: 1,
-      message: "Unknown shields subcommand: bogus",
-      publicUsage: [
-        "<name> shields down [--timeout 5m] [--reason <text>] [--policy permissive]",
-        "<name> shields up",
-        "<name> shields status",
-      ],
-    });
-  });
-
-  it("reports channel subcommand errors from metadata-derived parent routes", () => {
-    expect(translatePublicSandboxArgv("alpha", "channels", ["bogus"])).toEqual({
-      kind: "publicHelp",
-      commandId: "sandbox:channels",
-      exitCode: 1,
-      message: "Unknown channels subcommand: bogus",
-      publicUsage: [
-        "<name> channels list",
-        "<name> channels add <channel> [--dry-run]",
-        "<name> channels remove <channel> [--dry-run]",
-        "<name> channels stop <channel> [--dry-run]",
-        "<name> channels start <channel> [--dry-run]",
-      ],
-    });
+  it("reports unknown public sandbox actions before oclif execution", () => {
     expect(translatePublicSandboxArgv("alpha", "bogus", [])).toEqual({
       kind: "unknownPublicAction",
       action: "bogus",

@@ -19,7 +19,6 @@ function importSpecifiersFor(repoPath: string): string[] {
 describe("public argv translation boundaries", () => {
   it("keeps public argv translation independent from runtime dispatch side effects", () => {
     expect(importSpecifiersFor("src/lib/cli/public-argv-translation.ts").sort()).toEqual([
-      "./command-display",
       "./oclif-metadata",
       "./public-route-metadata",
     ]);
@@ -31,7 +30,6 @@ describe("public argv translation boundaries", () => {
       expect.arrayContaining([
         "./argv-normalizer",
         "./public-argv-translation",
-        "./public-oclif-help",
       ]),
     );
 

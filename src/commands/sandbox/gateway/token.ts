@@ -47,10 +47,10 @@ export default class GatewayTokenCliCommand extends NemoClawCommand {
   static strict = true;
   static summary = "Print the OpenClaw gateway auth token to stdout";
   static description = "Print the OpenClaw gateway auth token for a running sandbox to stdout.";
-  static usage = ["<name> gateway-token [--quiet|-q]"];
+  static usage = ["<name> [--quiet|-q]"];
   static examples = [
-    "<%= config.bin %> alpha gateway-token",
-    "<%= config.bin %> alpha gateway-token --quiet",
+    "<%= config.bin %> sandbox gateway token alpha",
+    "<%= config.bin %> sandbox gateway token alpha --quiet",
   ];
   static publicDisplay = [
     {

@@ -19,7 +19,7 @@ describe("oclif compatibility dispatch", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders legacy sandbox help without registry recovery", async () => {
+  it("renders native sandbox help without registry recovery", async () => {
     const cliPath = require.resolve("../dist/nemoclaw.js");
     const registryPath = require.resolve("../dist/lib/state/registry.js");
     const registryRecoveryPath = require.resolve("../dist/lib/registry-recovery-action.js");
@@ -88,7 +88,7 @@ describe("oclif compatibility dispatch", () => {
       expect(validateName).toHaveBeenCalledWith("missing-sandbox", "sandbox name");
       expect(recoverRegistryEntries).not.toHaveBeenCalled();
       expect(stdout.join("\n")).toContain(
-        "$ nemoclaw <name> channels start <channel> [--dry-run]",
+        "$ nemoclaw sandbox channels start <name> <channel> [--dry-run]",
       );
       expect(stderr).toEqual([]);
     } finally {

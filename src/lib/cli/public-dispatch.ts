@@ -21,12 +21,10 @@ const {
   sandboxActionTokens,
 } = require("./command-registry");
 import { normalizeArgv, suggestCommand, type NormalizedSandboxArgv } from "./argv-normalizer";
-import { renderPublicOclifHelp } from "./public-oclif-help";
 import {
   translatePublicGlobalArgv,
   translatePublicSandboxArgv,
   type PublicTranslationResult,
-  type PublicHelpTranslation,
 } from "./public-argv-translation";
 
 // ── Global commands (derived from command registry) ──────────────
@@ -214,14 +212,6 @@ function validatePublicConnectArgs(
   }
 }
 
-function renderDispatchHelp(result: PublicHelpTranslation): void {
-  if (result.message) console.error(`  ${result.message}`);
-  renderPublicOclifHelp(result.commandId, result.publicUsage, {
-    error: typeof result.exitCode === "number" && result.exitCode !== 0,
-  });
-  if (typeof result.exitCode === "number") process.exit(result.exitCode);
-}
-
 async function runPublicTranslationResult(
   result: PublicTranslationResult,
   opts: { sandboxName?: string } = {},
@@ -233,9 +223,6 @@ async function runPublicTranslationResult(
       } else {
         await runCompatibilityOclifCommand(result.commandId, result.args);
       }
-      return;
-    case "publicHelp":
-      renderDispatchHelp(result);
       return;
     case "publicUsageError":
       printDispatchUsageError(result, opts.sandboxName);
