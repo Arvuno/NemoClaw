@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import fs from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,6 +11,17 @@ import {
   resolveGlobalOclifDispatch,
   resolveLegacySandboxDispatch,
 } from "./oclif-dispatch";
+
+describe("public route/display separation", () => {
+  it("keeps dispatch token selection independent from public display usage text", () => {
+    const dispatchSource = fs.readFileSync(path.join(process.cwd(), "src/lib/cli/oclif-dispatch.ts"), "utf-8");
+    const registrySource = fs.readFileSync(path.join(process.cwd(), "src/lib/cli/command-registry.ts"), "utf-8");
+
+    expect(dispatchSource).not.toMatch(/TokensFromUsage|literalTokensFromUsage/);
+    expect(dispatchSource).not.toMatch(/legacyTokens:\s*.*\.usage/);
+    expect(registrySource).not.toMatch(/rest\s*=\s*cmd\.usage/);
+  });
+});
 
 describe("nativeArgvForOclifDispatch", () => {
   it("translates resolved command IDs and parser args to native oclif argv", () => {
