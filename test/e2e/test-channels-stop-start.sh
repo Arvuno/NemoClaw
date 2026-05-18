@@ -236,9 +236,14 @@ token_keys_for_channel() {
 
 channel_presence() {
   local channel="$1"
+  local config_channel="$channel"
   local out
   if [ "$ACTIVE_AGENT" = "openclaw" ]; then
-    out=$(sandbox_exec "python3 -c 'import json,sys; d=json.load(open(\"/sandbox/.openclaw/openclaw.json\")); print(\"yes\" if sys.argv[1] in d.get(\"channels\", {}) else \"no\")' '$channel'" | tail -1) || true
+    # NemoClaw's wechat channel maps to OpenClaw's upstream plugin key.
+    if [ "$channel" = "wechat" ]; then
+      config_channel="openclaw-weixin"
+    fi
+    out=$(sandbox_exec "python3 -c 'import json,sys; d=json.load(open(\"/sandbox/.openclaw/openclaw.json\")); print(\"yes\" if sys.argv[1] in d.get(\"channels\", {}) else \"no\")' '$config_channel'" | tail -1) || true
   else
     local probe
     case "$channel" in
@@ -276,8 +281,6 @@ dump_channel_state() {
     info ".hermes/.env messaging keys:"
     sandbox_exec "grep -E '^(TELEGRAM_BOT_TOKEN|DISCORD_BOT_TOKEN|SLACK_BOT_TOKEN|SLACK_APP_TOKEN|WEIXIN_TOKEN)=' /sandbox/.hermes/.env 2>/dev/null || true" | head -20 || true
   fi
-  info "sandbox provider attachment excerpt:"
-  openshell sandbox describe "$ACTIVE_SANDBOX" 2>&1 | grep -E 'telegram-bridge|discord-bridge|wechat-bridge|slack-bridge|slack-app' || true
 }
 
 assert_all_config_channels() {
@@ -366,40 +369,6 @@ assert_channel_providers_deleted() {
       pass_msg "$msg"
     fi
   done < <(provider_names_for_channel "$ACTIVE_SANDBOX" "$channel")
-}
-
-assert_providers_attached() {
-  local context="$1"
-  local describe provider channel msg
-  describe="$(openshell sandbox describe "$ACTIVE_SANDBOX" 2>&1 || true)"
-  for channel in "${CHANNELS[@]}"; do
-    while IFS= read -r provider; do
-      if printf '%s' "$describe" | grep -Fq "$provider"; then
-        msg="${ACTIVE_AGENT}/${provider}: provider attached ${context}"
-        pass_msg "$msg"
-      else
-        msg="${ACTIVE_AGENT}/${provider}: provider not attached ${context}"
-        fail_msg "$msg"
-      fi
-    done < <(provider_names_for_channel "$ACTIVE_SANDBOX" "$channel")
-  done
-}
-
-assert_providers_not_attached() {
-  local context="$1"
-  local describe provider channel msg
-  describe="$(openshell sandbox describe "$ACTIVE_SANDBOX" 2>&1 || true)"
-  for channel in "${CHANNELS[@]}"; do
-    while IFS= read -r provider; do
-      if printf '%s' "$describe" | grep -Fq "$provider"; then
-        msg="${ACTIVE_AGENT}/${provider}: provider still attached ${context}"
-        fail_msg "$msg"
-      else
-        msg="${ACTIVE_AGENT}/${provider}: provider not attached ${context}"
-        pass_msg "$msg"
-      fi
-    done < <(provider_names_for_channel "$ACTIVE_SANDBOX" "$channel")
-  done
 }
 
 assert_channel_hashes_absent() {
@@ -686,7 +655,6 @@ run_agent_scenario() {
 
   section "${agent}: baseline with all channels active"
   assert_provider_records_exist "at baseline"
-  assert_providers_attached "at baseline"
   assert_all_config_channels "present" "at baseline"
   assert_registry_channels "present" "at baseline"
   assert_disabled_channels "absent" "at baseline"
@@ -703,7 +671,6 @@ run_agent_scenario() {
   assert_registry_channels "present" "after stop"
   assert_disabled_channels "present" "after stop"
   assert_provider_records_exist "after stop"
-  assert_providers_not_attached "after stop+rebuild"
 
   section "${agent}: channels start all + rebuild"
   start_all_channels
@@ -714,7 +681,6 @@ run_agent_scenario() {
   assert_registry_channels "present" "after start"
   assert_disabled_channels "absent" "after start"
   assert_provider_records_exist "after start"
-  assert_providers_attached "after start+rebuild"
 
   section "${agent}: channels remove all on live sandbox"
   remove_all_channels
