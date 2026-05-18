@@ -6950,6 +6950,11 @@ scripts:
       reason: live legacy behavior requires non-deterministic infrastructure; retained for bucket parity tracking
       owner: e2e-maintainers
       runner_requirement: sandbox runner with NemoClaw/OpenShell CLIs
+    - legacy: 'openclaw pairing list slack failed after approval: ${pairing_list_after:0:300}'
+      status: deferred
+      reason: live legacy behavior requires non-deterministic infrastructure; retained for bucket parity tracking
+      owner: e2e-maintainers
+      runner_requirement: sandbox runner with NemoClaw/OpenShell CLIs
     - legacy: 'Approved Slack pairing code is still pending'
       status: deferred
       reason: live legacy behavior requires non-deterministic infrastructure; retained for bucket parity tracking

@@ -105,7 +105,7 @@ sandbox_exec() {
   ssh_config="$(mktemp)"
   openshell sandbox ssh-config "$SANDBOX_NAME" >"$ssh_config" 2>/dev/null
 
-  local result
+  local result status
   result=$(run_with_timeout 60 ssh -F "$ssh_config" \
     -o StrictHostKeyChecking=no \
     -o UserKnownHostsFile=/dev/null \
@@ -113,10 +113,12 @@ sandbox_exec() {
     -o LogLevel=ERROR \
     "openshell-${SANDBOX_NAME}" \
     "$cmd" \
-    2>&1) || true
+    2>&1)
+  status=$?
 
   rm -f "$ssh_config"
-  echo "$result"
+  printf '%s\n' "$result"
+  return "$status"
 }
 
 quote_for_remote_sh() {
@@ -342,8 +344,10 @@ fi
 section "Phase 2: Runtime state root contract"
 
 state_env=$(sandbox_exec 'printf "OPENCLAW_HOME=%s\nOPENCLAW_STATE_DIR=%s\nOPENCLAW_CONFIG_PATH=%s\nOPENCLAW_OAUTH_DIR=%s\n" "$OPENCLAW_HOME" "$OPENCLAW_STATE_DIR" "$OPENCLAW_CONFIG_PATH" "$OPENCLAW_OAUTH_DIR"')
+state_env_status=$?
 info "OpenClaw env from connect shell: ${state_env//$'\n'/; }"
-if echo "$state_env" | grep -q '^OPENCLAW_HOME=/sandbox$' \
+if [ $state_env_status -eq 0 ] \
+  && echo "$state_env" | grep -q '^OPENCLAW_HOME=/sandbox$' \
   && echo "$state_env" | grep -q '^OPENCLAW_STATE_DIR=/sandbox/.openclaw$' \
   && echo "$state_env" | grep -q '^OPENCLAW_CONFIG_PATH=/sandbox/.openclaw/openclaw.json$' \
   && echo "$state_env" | grep -q '^OPENCLAW_OAUTH_DIR=/sandbox/.openclaw/credentials$'; then
@@ -353,8 +357,10 @@ else
 fi
 
 pairing_list_empty=$(sandbox_exec 'openclaw pairing list slack --json 2>&1')
+pairing_list_empty_status=$?
 info "Initial pairing list: ${pairing_list_empty:0:300}"
-if echo "$pairing_list_empty" | grep -q '"channel"[[:space:]]*:[[:space:]]*"slack"'; then
+if [ $pairing_list_empty_status -eq 0 ] \
+  && echo "$pairing_list_empty" | grep -q '"channel"[[:space:]]*:[[:space:]]*"slack"'; then
   pass "openclaw pairing list slack works in connect shell"
 else
   fail "openclaw pairing list slack failed before request creation: ${pairing_list_empty:0:300}"
@@ -751,7 +757,9 @@ fi
 section "Phase 4: Connect-shell approval"
 
 pending_file_check=$(sandbox_exec "test -f /sandbox/.openclaw/credentials/slack-pairing.json && grep -F '$pairing_code' /sandbox/.openclaw/credentials/slack-pairing.json && grep -F '$SLACK_PAIRING_USER' /sandbox/.openclaw/credentials/slack-pairing.json")
-if echo "$pending_file_check" | grep -qF "$pairing_code" \
+pending_file_status=$?
+if [ $pending_file_status -eq 0 ] \
+  && echo "$pending_file_check" | grep -qF "$pairing_code" \
   && echo "$pending_file_check" | grep -qF "$SLACK_PAIRING_USER"; then
   pass "Runtime-created Slack pending request is in the shared OpenClaw state root"
 else
@@ -759,8 +767,10 @@ else
 fi
 
 pairing_list=$(sandbox_exec 'openclaw pairing list slack --json 2>&1')
+pairing_list_status=$?
 info "Pairing list after fake Slack event: ${pairing_list:0:500}"
-if echo "$pairing_list" | grep -qF "$pairing_code" \
+if [ $pairing_list_status -eq 0 ] \
+  && echo "$pairing_list" | grep -qF "$pairing_code" \
   && echo "$pairing_list" | grep -qF "$SLACK_PAIRING_USER"; then
   pass "Connect-shell openclaw pairing list sees runtime-created Slack request"
 else
@@ -768,8 +778,10 @@ else
 fi
 
 approve_output=$(sandbox_exec "openclaw pairing approve slack '$pairing_code' 2>&1")
+approve_status=$?
 info "Pairing approve output: ${approve_output:0:500}"
-if echo "$approve_output" | grep -q "Approved" \
+if [ $approve_status -eq 0 ] \
+  && echo "$approve_output" | grep -q "Approved" \
   && echo "$approve_output" | grep -qF "$SLACK_PAIRING_USER"; then
   pass "Connect-shell openclaw pairing approve approved the Slack request"
 else
@@ -777,14 +789,19 @@ else
 fi
 
 pairing_list_after=$(sandbox_exec 'openclaw pairing list slack --json 2>&1')
-if echo "$pairing_list_after" | grep -qF "$pairing_code"; then
+pairing_list_after_status=$?
+if [ $pairing_list_after_status -ne 0 ]; then
+  fail "openclaw pairing list slack failed after approval: ${pairing_list_after:0:300}"
+elif echo "$pairing_list_after" | grep -qF "$pairing_code"; then
   fail "Approved Slack pairing code is still pending"
 else
   pass "Approved Slack pairing code was consumed"
 fi
 
 allow_from_check=$(sandbox_exec "test -f /sandbox/.openclaw/credentials/slack-default-allowFrom.json && grep -F '$SLACK_PAIRING_USER' /sandbox/.openclaw/credentials/slack-default-allowFrom.json")
-if echo "$allow_from_check" | grep -qF "$SLACK_PAIRING_USER"; then
+allow_from_status=$?
+if [ $allow_from_status -eq 0 ] \
+  && echo "$allow_from_check" | grep -qF "$SLACK_PAIRING_USER"; then
   pass "Slack allowFrom store contains the approved user"
 else
   fail "Slack allowFrom store missing approved user"
