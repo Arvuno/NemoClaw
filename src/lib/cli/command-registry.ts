@@ -125,8 +125,8 @@ export function canonicalUsageList(): string[] {
  */
 export function globalCommandTokens(): Set<string> {
   const tokens = new Set<string>();
-  for (const cmd of globalCommands()) {
-    for (const routeTokens of globalRouteTokenVariants(cmd.commandId)) {
+  for (const commandId of Object.keys(getRegisteredOclifCommandsMetadata())) {
+    for (const routeTokens of globalRouteTokenVariants(commandId)) {
       const [token] = routeTokens;
       if (token) tokens.add(token);
     }
@@ -144,8 +144,8 @@ export function globalCommandTokens(): Set<string> {
 export function sandboxActionTokens(): string[] {
   const seen = new Set<string>();
   const tokens: string[] = [];
-  for (const cmd of sandboxCommands()) {
-    const [token] = sandboxRouteTokens(cmd.commandId) ?? [];
+  for (const commandId of Object.keys(getRegisteredOclifCommandsMetadata())) {
+    const [token] = sandboxRouteTokens(commandId) ?? [];
     if (token && !seen.has(token)) {
       seen.add(token);
       tokens.push(token);

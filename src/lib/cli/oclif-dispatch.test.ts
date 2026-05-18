@@ -1,10 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import fs from "node:fs";
-import path from "node:path";
-
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   nativeArgvForOclifDispatch,
@@ -14,13 +11,64 @@ import {
 import { SANDBOX_ROUTE_OVERRIDES, sandboxRouteTokens } from "./public-route-metadata";
 
 describe("public route/display separation", () => {
-  it("keeps dispatch token selection independent from public display usage text", () => {
-    const dispatchSource = fs.readFileSync(path.join(process.cwd(), "src/lib/cli/oclif-dispatch.ts"), "utf-8");
-    const registrySource = fs.readFileSync(path.join(process.cwd(), "src/lib/cli/command-registry.ts"), "utf-8");
+  afterEach(() => {
+    vi.doUnmock("./oclif-metadata");
+    vi.resetModules();
+  });
 
-    expect(dispatchSource).not.toMatch(/TokensFromUsage|literalTokensFromUsage/);
-    expect(dispatchSource).not.toMatch(/legacyTokens:\s*.*\.usage/);
-    expect(registrySource).not.toMatch(/rest\s*=\s*cmd\.usage/);
+  it("keeps dispatch token selection independent from public display usage text", async () => {
+    vi.resetModules();
+    vi.doMock("./oclif-metadata", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("./oclif-metadata")>();
+      const realMetadata = actual.getRegisteredOclifCommandsMetadata();
+      const withUsage = (commandId: string, usage: string) => {
+        const metadata = realMetadata[commandId];
+        const displayEntry = metadata.publicDisplay?.[0] ?? metadata.display?.[0];
+        return {
+          ...metadata,
+          publicDisplay: displayEntry ? [{ ...displayEntry, usage }] : [],
+        };
+      };
+      const metadata: ReturnType<typeof actual.getRegisteredOclifCommandsMetadata> = {
+        ...realMetadata,
+        list: withUsage("list", "nemoclaw renamed-list"),
+        "sandbox:status": withUsage("sandbox:status", "nemoclaw <name> renamed-status"),
+      };
+      return {
+        ...actual,
+        getRegisteredOclifCommandMetadata: (commandId: string) => metadata[commandId] ?? null,
+        getRegisteredOclifCommandSummary: (commandId: string) =>
+          metadata[commandId]?.summary ?? null,
+        getRegisteredOclifCommandsMetadata: () => metadata,
+      };
+    });
+
+    const dispatch = await import("./oclif-dispatch");
+    const registry = await import("./command-registry");
+
+    expect(dispatch.resolveGlobalOclifDispatch("list", [])).toEqual({
+      kind: "oclif",
+      commandId: "list",
+      args: [],
+    });
+    expect(dispatch.resolveGlobalOclifDispatch("renamed-list", [])).toEqual({
+      kind: "usageError",
+      lines: [],
+    });
+    expect(dispatch.resolveLegacySandboxDispatch("alpha", "status", [])).toEqual({
+      kind: "oclif",
+      commandId: "sandbox:status",
+      args: ["alpha"],
+    });
+    expect(dispatch.resolveLegacySandboxDispatch("alpha", "renamed-status", [])).toEqual({
+      kind: "unknownAction",
+      action: "renamed-status",
+    });
+
+    expect(registry.globalCommandTokens()).toContain("list");
+    expect(registry.globalCommandTokens()).not.toContain("renamed-list");
+    expect(registry.sandboxActionTokens()).toContain("status");
+    expect(registry.sandboxActionTokens()).not.toContain("renamed-status");
   });
 
   it("keeps explicit compatibility route overrides limited to non-derivable public spellings", () => {

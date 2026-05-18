@@ -1,8 +1,12 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { globalCommands, sandboxCommands } from "./command-registry";
-import { getRegisteredOclifCommandMetadata } from "./oclif-metadata";
+import type { PublicCommandDisplayEntry } from "./command-display";
+import {
+  getRegisteredOclifCommandMetadata,
+  getRegisteredOclifCommandsMetadata,
+  type OclifCommandMetadata,
+} from "./oclif-metadata";
 import { globalRouteTokenVariants, sandboxRouteTokens } from "./public-route-metadata";
 
 export type OclifDispatch = {
@@ -46,24 +50,82 @@ type GlobalRoute = {
   tokens: string[];
 };
 
+type RegisteredCommand = {
+  commandId: string;
+  metadata: OclifCommandMetadata;
+};
+
 function hasHelpFlag(args: readonly string[]): boolean {
   return args.includes("--help") || args.includes("-h");
 }
 
-function publicUsageFromCommand(
-  command: ReturnType<typeof sandboxCommands>[number] | ReturnType<typeof globalCommands>[number],
+function registeredCommands(): RegisteredCommand[] {
+  return Object.entries(getRegisteredOclifCommandsMetadata()).map(([commandId, metadata]) => ({
+    commandId,
+    metadata,
+  }));
+}
+
+function registeredCommandIds(): Set<string> {
+  return new Set(Object.keys(getRegisteredOclifCommandsMetadata()));
+}
+
+function hasChildCommand(commandId: string, commandIds: ReadonlySet<string>): boolean {
+  return [...commandIds].some((id) => id.startsWith(`${commandId}:`));
+}
+
+function publicDisplayEntries(metadata: OclifCommandMetadata): readonly PublicCommandDisplayEntry[] {
+  return metadata.publicDisplay ?? metadata.display ?? [];
+}
+
+function publicUsageFromDisplayEntry(entry: PublicCommandDisplayEntry): string {
+  const usage = entry.usage.replace(/^nemoclaw\s+/, "");
+  return entry.flags ? `${usage} ${entry.flags}` : usage;
+}
+
+function fallbackPublicUsage(commandId: string, routeTokens: readonly string[]): string {
+  if (commandId.startsWith("sandbox:")) return `<name> ${routeTokens.join(" ")}`.trim();
+  return routeTokens.join(" ");
+}
+
+function publicUsageForCommand(
+  commandId: string,
+  metadata: OclifCommandMetadata,
+  routeTokens: readonly string[],
 ): string {
-  const usage = command.usage.replace(/^nemoclaw\s+/, "");
-  return command.flags ? `${usage} ${command.flags}` : usage;
+  const [entry] = publicDisplayEntries(metadata);
+  if (entry) return publicUsageFromDisplayEntry(entry);
+  return fallbackPublicUsage(commandId, routeTokens);
+}
+
+function publicUsageEntriesForCommand(
+  commandId: string,
+): { usage: string; order: number }[] {
+  const metadata = getRegisteredOclifCommandMetadata(commandId);
+  if (!metadata) return [];
+  return publicDisplayEntries(metadata).map((entry) => ({
+    usage: publicUsageFromDisplayEntry(entry),
+    order: entry.order,
+  }));
+}
+
+function publicUsagesForCommand(commandId: string): string[] {
+  return publicUsageEntriesForCommand(commandId).map((entry) => entry.usage);
 }
 
 function legacyRoutes(): LegacyRoute[] {
-  return sandboxCommands()
-    .map((command) => ({
-      commandId: command.commandId,
-      legacyTokens: sandboxRouteTokens(command.commandId) ?? [],
-      publicUsage: publicUsageFromCommand(command),
-    }))
+  const commandIds = registeredCommandIds();
+  return registeredCommands()
+    .filter(({ commandId }) => commandId.startsWith("sandbox:"))
+    .filter(({ commandId }) => !hasChildCommand(commandId, commandIds))
+    .map(({ commandId, metadata }) => {
+      const legacyTokens = sandboxRouteTokens(commandId) ?? [];
+      return {
+        commandId,
+        legacyTokens,
+        publicUsage: publicUsageForCommand(commandId, metadata, legacyTokens),
+      };
+    })
     .filter((route) => route.legacyTokens.length > 0)
     .sort((a, b) => b.legacyTokens.length - a.legacyTokens.length);
 }
@@ -71,15 +133,21 @@ function legacyRoutes(): LegacyRoute[] {
 function parentPublicUsage(action: string): string[] {
   const lines = legacyRoutes()
     .filter((route) => route.legacyTokens[0] === action)
-    .map((route) => route.publicUsage);
+    .flatMap((route) => publicUsageEntriesForCommand(route.commandId))
+    .sort((a, b) => a.order - b.order)
+    .map((entry) => entry.usage);
   return [...new Set(lines)];
 }
 
 function globalRoutes(): GlobalRoute[] {
-  return globalCommands()
-    .flatMap((command) =>
-      globalRouteTokenVariants(command.commandId).map((tokens) => ({
-        commandId: command.commandId,
+  const commandIds = registeredCommandIds();
+  return registeredCommands()
+    .filter(({ commandId }) => !commandId.startsWith("sandbox:"))
+    .filter(({ commandId }) => !commandId.startsWith("internal:"))
+    .filter(({ commandId }) => !hasChildCommand(commandId, commandIds))
+    .flatMap(({ commandId }) =>
+      globalRouteTokenVariants(commandId).map((tokens) => ({
+        commandId,
         tokens,
       })),
     )
@@ -88,15 +156,14 @@ function globalRoutes(): GlobalRoute[] {
 }
 
 function globalParentPublicUsage(topic: string): string[] {
-  const lines = globalRoutes()
-    .filter((route) => route.tokens[0] === topic)
-    .map((route) => route.commandId);
-  const commandIds = new Set(lines);
+  const commandIds = new Set(
+    globalRoutes()
+      .filter((route) => route.tokens[0] === topic)
+      .map((route) => route.commandId),
+  );
   return [
     ...new Set(
-      globalCommands()
-        .filter((command) => commandIds.has(command.commandId))
-        .map((command) => publicUsageFromCommand(command)),
+      [...commandIds].flatMap((commandId) => publicUsagesForCommand(commandId)),
     ),
   ];
 }
