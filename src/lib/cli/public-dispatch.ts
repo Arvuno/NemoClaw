@@ -23,8 +23,8 @@ const {
 import { normalizeArgv, suggestCommand } from "./argv-normalizer";
 import { renderPublicOclifHelp } from "./public-oclif-help";
 import {
-  resolveGlobalOclifDispatch,
-  resolveLegacySandboxDispatch,
+  translatePublicGlobalArgv,
+  translatePublicSandboxArgv,
   type DispatchResult,
   type HelpDispatch,
 } from "./oclif-dispatch";
@@ -234,7 +234,7 @@ export async function dispatchCli(argv: string[] = process.argv.slice(2)): Promi
   }
 
   if (normalized.kind === "global") {
-    await runDispatchResult(resolveGlobalOclifDispatch(normalized.command, normalized.args));
+    await runDispatchResult(translatePublicGlobalArgv(normalized.command, normalized.args));
     return;
   }
 
@@ -258,7 +258,7 @@ export async function dispatchCli(argv: string[] = process.argv.slice(2)): Promi
   ) {
     validateName(cmd, "sandbox name");
     await runDispatchResult(
-      resolveLegacySandboxDispatch(cmd, requestedSandboxAction, requestedSandboxActionArgs),
+      translatePublicSandboxArgv(cmd, requestedSandboxAction, requestedSandboxActionArgs),
       {
         sandboxName: cmd,
       },
@@ -287,7 +287,7 @@ export async function dispatchCli(argv: string[] = process.argv.slice(2)): Promi
     if (action === "connect") {
       sandboxConnect().parseSandboxConnectArgs(cmd, actionArgs);
     }
-    await runDispatchResult(resolveLegacySandboxDispatch(cmd, action, actionArgs), {
+    await runDispatchResult(translatePublicSandboxArgv(cmd, action, actionArgs), {
       sandboxName: cmd,
     });
     return;

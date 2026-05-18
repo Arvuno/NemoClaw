@@ -194,7 +194,7 @@ function globalParentHelp(topic: string, message?: string): HelpDispatch {
   };
 }
 
-export function resolveGlobalOclifDispatch(cmd: string, args: string[]): DispatchResult {
+export function translatePublicGlobalArgv(cmd: string, args: string[]): DispatchResult {
   const inputTokens = [cmd, ...args];
   for (const route of globalRoutes()) {
     if (!startsWithTokens(inputTokens, route.tokens)) continue;
@@ -235,7 +235,7 @@ function parentHelp(action: string, message?: string): HelpDispatch {
   };
 }
 
-export function resolveLegacySandboxDispatch(
+export function translatePublicSandboxArgv(
   sandboxName: string,
   action: string,
   actionArgs: string[],
