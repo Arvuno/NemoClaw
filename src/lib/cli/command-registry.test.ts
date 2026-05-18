@@ -101,9 +101,10 @@ describe("command-registry", () => {
   });
 
   describe("oclif discovery coverage", () => {
-    it("requires public leaf commands to declare display metadata", () => {
+    it("requires public leaf commands to have display metadata", () => {
       const metadataById = getRegisteredOclifCommandsMetadata();
       const discoveredIds = Object.keys(metadataById).sort();
+      const displayCommandIds = new Set(COMMANDS.map((command) => command.commandId));
 
       for (const commandId of discoveredIds) {
         if (commandId.startsWith("internal:")) continue;
@@ -111,8 +112,7 @@ describe("command-registry", () => {
         const hasSubcommands = discoveredIds.some((id) => id.startsWith(`${commandId}:`));
         if (hasSubcommands) continue;
 
-        expect(metadataById[commandId].publicDisplay, commandId).toBeTruthy();
-        expect(metadataById[commandId].publicDisplay?.length, commandId).toBeGreaterThan(0);
+        expect(displayCommandIds.has(commandId), commandId).toBe(true);
       }
     });
 

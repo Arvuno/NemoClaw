@@ -9,32 +9,6 @@ export default class VersionCommand extends NemoClawCommand {
   static hidden = true;
   static strict = true;
   static summary = "Show version";
-  static publicDisplay = [
-    {
-      usage: "nemoclaw version",
-      description: "Show version",
-      group: "Getting Started",
-      hidden: true,
-      scope: "global",
-      order: 46,
-    },
-    {
-      usage: "nemoclaw --version",
-      description: "Show version",
-      group: "Getting Started",
-      hidden: true,
-      scope: "global",
-      order: 47,
-    },
-    {
-      usage: "nemoclaw -v",
-      description: "Show version",
-      group: "Getting Started",
-      hidden: true,
-      scope: "global",
-      order: 48,
-    },
-  ];
 
   public async run(): Promise<void> {
     this.parsed = true;

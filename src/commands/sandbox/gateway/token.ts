@@ -52,16 +52,6 @@ export default class GatewayTokenCliCommand extends NemoClawCommand {
     "<%= config.bin %> sandbox gateway token alpha",
     "<%= config.bin %> sandbox gateway token alpha --quiet",
   ];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw <name> gateway-token",
-      description: "Print the OpenClaw gateway auth token to stdout",
-      flags: "[--quiet|-q]",
-      group: "Sandbox Management",
-      scope: "sandbox",
-      order: 14,
-    },
-  ];
   static args = {
     sandboxName: Args.string({
       name: "sandbox",

@@ -34,16 +34,6 @@ export default class InferenceSetCommand extends NemoClawCommand {
     "<%= config.bin %> inference set --provider nvidia-prod --model nvidia/nemotron-3-super-120b-a12b",
     "<%= config.bin %> inference set --provider openai-api --model gpt-5.4 --sandbox my-assistant",
   ];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw inference set",
-      description: "Switch inference and sync the running agent config",
-      flags: "--provider <provider> --model <model> [--sandbox <name>] [--no-verify]",
-      group: "Services",
-      scope: "global",
-      order: 37,
-    },
-  ];
   static flags = {
     provider: requiredNonEmptyFlag("OpenShell inference provider name"),
     model: requiredNonEmptyFlag("Model id to route through the selected provider"),

@@ -9,32 +9,6 @@ export default class RootHelpCommand extends NemoClawCommand {
   static hidden = true;
   static strict = false;
   static summary = "Show help";
-  static publicDisplay = [
-    {
-      usage: "nemoclaw help",
-      description: "Show help",
-      group: "Getting Started",
-      hidden: true,
-      scope: "global",
-      order: 44,
-    },
-    {
-      usage: "nemoclaw --help",
-      description: "Show help",
-      group: "Getting Started",
-      hidden: true,
-      scope: "global",
-      order: 45,
-    },
-    {
-      usage: "nemoclaw -h",
-      description: "Show help",
-      group: "Getting Started",
-      hidden: true,
-      scope: "global",
-      order: 46,
-    },
-  ];
 
   public async run(): Promise<void> {
     this.parsed = true;

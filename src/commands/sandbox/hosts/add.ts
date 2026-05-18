@@ -18,16 +18,6 @@ export default class HostsAddCommand extends NemoClawCommand {
   static description = "Add a host alias to the sandbox pod template.";
   static usage = ["<name> <hostname> <ip> [--dry-run]"];
   static examples = ["<%= config.bin %> sandbox hosts add alpha searxng.local 192.168.1.105"];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw <name> hosts-add",
-      description: "Add a sandbox /etc/hosts alias",
-      flags: "<hostname> <ip> [--dry-run]",
-      group: "Policy Presets",
-      scope: "sandbox",
-      order: 19.1,
-    },
-  ];
   static args = hostAliasAddArgs;
   static flags = hostAliasMutationFlags;
 

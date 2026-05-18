@@ -18,16 +18,6 @@ export default class DeprecatedStopCommand extends NemoClawCommand {
   static deprecationOptions = {
     message: "Deprecated: 'nemoclaw stop' is now 'nemoclaw tunnel stop'. See 'nemoclaw help'.",
   };
-  static publicDisplay = [
-    {
-      usage: "nemoclaw stop",
-      description: "Deprecated alias for 'tunnel stop'",
-      group: "Services",
-      deprecated: true,
-      scope: "global",
-      order: 35,
-    },
-  ];
   static flags = {
   };
 

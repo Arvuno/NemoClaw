@@ -17,6 +17,7 @@
 import { CLI_DISPLAY_NAME, CLI_NAME } from "./branding";
 import type { CommandGroup, PublicCommandDisplayEntry } from "./command-display";
 import { getRegisteredOclifCommandsMetadata } from "./oclif-metadata";
+import { PUBLIC_DISPLAY_ENTRIES } from "./public-display-defaults";
 import { globalRouteTokenVariants, sandboxRouteTokens } from "./public-route-metadata";
 
 export type { CommandGroup } from "./command-display";
@@ -57,7 +58,7 @@ type RegisteredCommandDisplayEntry = PublicCommandDisplayEntry & { commandId: st
 function displayEntriesFromOclifMetadata(): CommandDef[] {
   const entries: RegisteredCommandDisplayEntry[] = [];
   for (const [commandId, metadata] of Object.entries(getRegisteredOclifCommandsMetadata())) {
-    const publicDisplay = metadata.publicDisplay ?? [];
+    const publicDisplay = metadata.publicDisplay ?? PUBLIC_DISPLAY_ENTRIES[commandId] ?? [];
     for (const displayEntry of publicDisplay) {
       entries.push({ ...displayEntry, commandId });
     }

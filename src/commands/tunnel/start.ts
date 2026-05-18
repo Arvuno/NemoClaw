@@ -14,15 +14,6 @@ export default class TunnelStartCommand extends NemoClawCommand {
   static description = "Start the cloudflared public-URL tunnel for the default sandbox dashboard.";
   static usage = ["tunnel start"];
   static examples = ["<%= config.bin %> tunnel start"];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw tunnel start",
-      description: "Start the cloudflared public-URL tunnel",
-      group: "Services",
-      scope: "global",
-      order: 32,
-    },
-  ];
   static flags = {
   };
 

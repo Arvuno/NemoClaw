@@ -18,16 +18,6 @@ export default class HostsRemoveCommand extends NemoClawCommand {
   static description = "Remove a host alias from the sandbox pod template.";
   static usage = ["<name> <hostname> [--dry-run]"];
   static examples = ["<%= config.bin %> sandbox hosts remove alpha searxng.local"];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw <name> hosts-remove",
-      description: "Remove a sandbox /etc/hosts alias",
-      flags: "(--dry-run)",
-      group: "Policy Presets",
-      scope: "sandbox",
-      order: 19.3,
-    },
-  ];
   static args = hostAliasMutationArgs;
   static flags = hostAliasMutationFlags;
 

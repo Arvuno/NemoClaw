@@ -15,17 +15,6 @@ export default class UninstallCliCommand extends NemoClawCommand {
   static description = "Run the local uninstall.sh script; remote fallback is disabled.";
   static usage = ["uninstall [flags]"];
   static examples = ["<%= config.bin %> uninstall --yes"];
-  static publicDisplay = [
-    {
-      // Keep the usage global even under the nemohermes alias; `nemohermes uninstall`
-      // is the package uninstaller, not a sandbox-scoped action.
-      usage: "nemoclaw uninstall",
-      description: "Run uninstall.sh (local only; no remote fallback)",
-      group: "Cleanup",
-      scope: "global",
-      order: 43,
-    },
-  ];
   static flags = {
   };
 

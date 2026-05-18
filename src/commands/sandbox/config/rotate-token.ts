@@ -24,16 +24,6 @@ export default class SandboxConfigRotateTokenCommand extends NemoClawCommand {
     "<%= config.bin %> sandbox config rotate-token alpha",
     "<%= config.bin %> sandbox config rotate-token alpha --from-env NVIDIA_API_KEY",
   ];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw <name> config rotate-token",
-      description: "Rotate sandbox provider credentials",
-      group: "Sandbox Management",
-      hidden: true,
-      scope: "sandbox",
-      order: 30,
-    },
-  ];
   static args = {
     sandboxName: sandboxNameArg,
   };

@@ -11,15 +11,6 @@ export default class BackupAllCommand extends NemoClawCommand {
   static description = "Back up registered, running sandbox state before upgrading.";
   static usage = ["backup-all"];
   static examples = ["<%= config.bin %> backup-all"];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw backup-all",
-      description: "Back up all sandbox state before upgrade",
-      group: "Backup",
-      scope: "global",
-      order: 40,
-    },
-  ];
   static flags = {};
 
   public async run(): Promise<void> {

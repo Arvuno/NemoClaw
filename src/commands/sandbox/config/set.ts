@@ -23,17 +23,6 @@ export default class SandboxConfigSetCommand extends NemoClawCommand {
     "<%= config.bin %> alpha config set --key model --value nvidia/nemotron",
     '<%= config.bin %> alpha config set --key web_search --value true --restart',
   ];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw <name> config set",
-      description: "Set sandbox configuration with SSRF validation",
-      flags: "--key <dotpath> --value <value> [--restart] [--config-accept-new-path]",
-      group: "Sandbox Management",
-      hidden: true,
-      scope: "sandbox",
-      order: 29,
-    },
-  ];
   static args = {
     sandboxName: sandboxNameArg,
   };

@@ -44,16 +44,6 @@ export default class SandboxLogsCommand extends NemoClawCommand {
     "<%= config.bin %> sandbox logs alpha --since 5m",
     "<%= config.bin %> sandbox logs alpha --follow",
   ];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw <name> logs",
-      description: "Stream sandbox logs",
-      flags: "[--follow] [--tail <lines>|-n <lines>] [--since <duration>]",
-      group: "Sandbox Management",
-      scope: "sandbox",
-      order: 6,
-    },
-  ];
   static args = {
     sandboxName: Args.string({
       name: "sandbox",

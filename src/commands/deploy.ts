@@ -13,16 +13,6 @@ export default class DeployCliCommand extends NemoClawCommand {
   static description = "Deprecated compatibility command for Brev-specific deployment.";
   static usage = ["deploy [instance-name]"];
   static examples = ["<%= config.bin %> deploy my-gpu-instance"];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw deploy",
-      description: "Deprecated Brev-specific bootstrap path",
-      group: "Compatibility Commands",
-      deprecated: true,
-      scope: "global",
-      order: 31,
-    },
-  ];
   static args = {
     instanceName: Args.string({
       name: "instance-name",

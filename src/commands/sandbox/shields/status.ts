@@ -13,16 +13,6 @@ export default class ShieldsStatusCommand extends NemoClawCommand {
   static summary = "Show current shields state";
   static description = "Show current sandbox shields state.";
   static usage = ["<name>"];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw <name> shields status",
-      description: "Show current shields state",
-      group: "Sandbox Management",
-      hidden: true,
-      scope: "sandbox",
-      order: 27,
-    },
-  ];
   static args = { sandboxName: sandboxNameArg };
   static flags = {
   };

@@ -13,16 +13,6 @@ export default class ShieldsUpCommand extends NemoClawCommand {
   static summary = "Raise sandbox security shields";
   static description = "Restore sandbox shields from the saved snapshot.";
   static usage = ["<name>"];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw <name> shields up",
-      description: "Raise sandbox security shields",
-      group: "Sandbox Management",
-      hidden: true,
-      scope: "sandbox",
-      order: 26,
-    },
-  ];
   static args = { sandboxName: sandboxNameArg };
   static flags = {
   };

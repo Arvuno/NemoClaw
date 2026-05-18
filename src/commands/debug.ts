@@ -76,16 +76,6 @@ export default class DebugCliCommand extends NemoClawCommand {
     "<%= config.bin %> debug --sandbox alpha",
     "<%= config.bin %> debug --output /tmp/nemoclaw-debug.tar.gz",
   ];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw debug",
-      description: "Collect diagnostics for bug reports",
-      flags: "[--quick] [--output FILE|-o FILE] [--sandbox NAME]",
-      group: "Troubleshooting",
-      scope: "global",
-      order: 37,
-    },
-  ];
   static flags = {
     quick: Flags.boolean({ char: "q", description: "Only collect minimal diagnostics" }),
     output: Flags.string({ char: "o", description: "Write a tarball to FILE" }),

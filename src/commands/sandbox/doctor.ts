@@ -14,16 +14,6 @@ export default class SandboxDoctorCliCommand extends NemoClawCommand {
   static description = "Run host, gateway, sandbox, inference, messaging, and local service diagnostics.";
   static usage = ["<name> [--json]"];
   static examples = ["<%= config.bin %> sandbox doctor alpha", "<%= config.bin %> sandbox doctor alpha --json"];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw <name> doctor",
-      description: "Run host, gateway, sandbox, and inference health checks",
-      flags: "[--json]",
-      group: "Sandbox Management",
-      scope: "sandbox",
-      order: 5,
-    },
-  ];
   static args = {
     sandboxName: Args.string({
       name: "sandbox",

@@ -15,16 +15,6 @@ export default class InferenceGetCommand extends NemoClawCommand {
   static description = "Read the live OpenShell inference route through the NemoClaw CLI.";
   static usage = ["inference get [--json]"];
   static examples = ["<%= config.bin %> inference get", "<%= config.bin %> inference get --json"];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw inference get",
-      description: "Show the active inference provider and model",
-      flags: "[--json]",
-      group: "Services",
-      scope: "global",
-      order: 36,
-    },
-  ];
   static flags = {};
 
   public async run(): Promise<unknown> {
