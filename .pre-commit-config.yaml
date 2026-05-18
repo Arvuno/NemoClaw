@@ -282,6 +282,7 @@ repos:
         language: system
         pass_filenames: false
         files: ^(bin/|src/.*\.(ts|tsx|js|mjs|cjs)$|test/.*\.(ts|tsx|js|mjs|cjs)$)
+        require_serial: true
         priority: 20
 
       - id: test-plugin

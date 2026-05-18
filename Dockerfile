@@ -50,7 +50,7 @@ RUN set -eu; \
             apt-get install -y --no-install-recommends procps=2:4.0.4-9; \
         fi; \
         if [ "$needs_chattr" = "1" ]; then \
-            apt-get install -y --no-install-recommends e2fsprogs=1.47.2-3+b10; \
+            apt-get install -y --no-install-recommends e2fsprogs=1.47.2-3+b11; \
         fi; \
     fi; \
     rm -rf /var/lib/apt/lists/*; \
@@ -63,6 +63,7 @@ COPY --from=builder /opt/nemoclaw/dist/ /opt/nemoclaw/dist/
 COPY nemoclaw/openclaw.plugin.json /opt/nemoclaw/
 COPY nemoclaw/package.json nemoclaw/package-lock.json /opt/nemoclaw/
 COPY nemoclaw-blueprint/ /opt/nemoclaw-blueprint/
+RUN chmod -R a+rX /opt/nemoclaw-blueprint/
 
 # Install runtime dependencies only (no devDependencies, no build step)
 WORKDIR /opt/nemoclaw
