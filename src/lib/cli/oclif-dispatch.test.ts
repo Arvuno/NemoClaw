@@ -140,6 +140,41 @@ describe("translatePublicGlobalArgv", () => {
   });
 });
 
+describe("public help compatibility cases", () => {
+  it("keeps public-grammar help for supported compatibility islands", () => {
+    expect(translatePublicGlobalArgv("credentials", ["bogus"])).toEqual({
+      kind: "help",
+      commandId: "credentials",
+      publicUsage: ["credentials list", "credentials reset <PROVIDER> [--yes|-y]"],
+      exitCode: 1,
+      message: "Unknown credentials subcommand: bogus",
+    });
+    expect(translatePublicSandboxArgv("alpha", "status", ["--help"])).toEqual({
+      kind: "help",
+      commandId: "sandbox:status",
+      publicUsage: "<name> status",
+    });
+    expect(translatePublicSandboxArgv("alpha", "share", ["--help"])).toEqual({
+      kind: "help",
+      commandId: "sandbox:share",
+      publicUsage: "<name> share <mount|unmount|status>",
+    });
+    expect(translatePublicSandboxArgv("alpha", "channels", ["bogus"])).toEqual({
+      kind: "help",
+      commandId: "sandbox:channels",
+      exitCode: 1,
+      message: "Unknown channels subcommand: bogus",
+      publicUsage: [
+        "<name> channels list",
+        "<name> channels add <channel> [--dry-run]",
+        "<name> channels remove <channel> [--dry-run]",
+        "<name> channels stop <channel> [--dry-run]",
+        "<name> channels start <channel> [--dry-run]",
+      ],
+    });
+  });
+});
+
 describe("translatePublicSandboxArgv", () => {
   it("translates simple legacy sandbox actions to native oclif argv", () => {
     expectNative(translatePublicSandboxArgv("alpha", "status", []), "sandbox:status", ["alpha"]);
