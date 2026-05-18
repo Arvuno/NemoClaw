@@ -249,7 +249,7 @@ describe("resolveLegacySandboxDispatch", () => {
     });
   });
 
-  it("reports channel subcommand and action errors", () => {
+  it("reports channel subcommand errors from metadata-derived parent routes", () => {
     expect(resolveLegacySandboxDispatch("alpha", "channels", ["bogus"])).toEqual({
       kind: "help",
       commandId: "sandbox:channels",

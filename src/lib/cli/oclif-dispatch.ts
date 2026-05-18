@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { globalCommands, sandboxCommands } from "./command-registry";
+import { getRegisteredOclifCommandMetadata } from "./oclif-metadata";
 import { globalRouteTokenVariants, sandboxRouteTokens } from "./public-route-metadata";
 
 export type OclifDispatch = {
@@ -151,9 +152,18 @@ export function resolveGlobalOclifDispatch(cmd: string, args: string[]): Dispatc
   return { kind: "usageError", lines: [] };
 }
 
-const CHANNEL_SUBCOMMANDS = new Set(["add", "list", "remove", "start", "stop"]);
+function parentSubcommands(action: string): Set<string> {
+  return new Set(
+    legacyRoutes()
+      .filter((route) => route.legacyTokens[0] === action)
+      .map((route) => route.legacyTokens[1])
+      .filter((token): token is string => Boolean(token)),
+  );
+}
 
-const PARENT_ACTIONS = new Set(["share", "skill", "snapshot"]);
+function hasRegisteredOclifParentCommand(action: string): boolean {
+  return getRegisteredOclifCommandMetadata(`sandbox:${action}`) !== null;
+}
 
 function parentHelp(action: string, message?: string): HelpDispatch {
   return {
@@ -191,7 +201,7 @@ export function resolveLegacySandboxDispatch(
 
   if (action === "channels") {
     const subcommand = actionArgs[0] ?? "";
-    if (!CHANNEL_SUBCOMMANDS.has(subcommand)) {
+    if (!parentSubcommands("channels").has(subcommand)) {
       return parentHelp("channels", `Unknown channels subcommand: ${subcommand}`);
     }
   }
@@ -210,7 +220,7 @@ export function resolveLegacySandboxDispatch(
     };
   }
 
-  if (PARENT_ACTIONS.has(action)) {
+  if (hasRegisteredOclifParentCommand(action)) {
     return {
       kind: "oclif",
       commandId: `sandbox:${action}`,
