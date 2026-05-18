@@ -25,17 +25,17 @@ export function buildMessagingEnvLines(
   discordGuilds: DiscordGuilds,
   wechatConfig: WechatConfig,
   managedToolGatewayPresets: string[] = [],
-  managedToolBrokerToken = "",
 ): string[] {
   const envLines = ["API_SERVER_PORT=18642", "API_SERVER_HOST=127.0.0.1"];
 
   if (managedToolGatewayPresets.length > 0) {
     const matrix = loadManagedToolGatewayMatrix();
     envLines.push("NEMOCLAW_HERMES_TOOL_GATEWAY_BROKER=1");
-    envLines.push(`TOOL_GATEWAY_USER_TOKEN=${managedToolBrokerToken}`);
     for (const preset of managedToolGatewayPresets) {
       const entry = matrix[preset];
-      if (!entry) continue;
+      if (!entry) {
+        throw new Error(`Unknown Hermes managed-tool gateway preset: ${preset}`);
+      }
       envLines.push(`${entry.envKey}=${entry.envValue}`);
     }
   }

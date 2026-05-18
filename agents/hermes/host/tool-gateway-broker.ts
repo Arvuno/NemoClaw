@@ -2,7 +2,7 @@
 // @ts-nocheck
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-/* global fetch, URLSearchParams */
+/* global AbortSignal, fetch, URLSearchParams */
 
 /**
  * Host-side Hermes managed-tool gateway broker.
@@ -57,6 +57,13 @@ const AGENT_KEY_REFRESH_INTERVAL_MS = readPositiveIntEnv(
   600000,
   60_000,
 );
+const UPSTREAM_REQUEST_TIMEOUT_MS = readPositiveIntEnv(
+  "HERMES_TOOL_GATEWAY_UPSTREAM_TIMEOUT_MS",
+  60_000,
+  1000,
+);
+const DEFAULT_INFERENCE_BASE_URL = "https://inference-api.nousresearch.com/v1";
+const TRUSTED_INFERENCE_BASE_URLS = new Set([DEFAULT_INFERENCE_BASE_URL]);
 
 if (!STATE_DIR) {
   console.error("HERMES_TOOL_GATEWAY_STATE_DIR required");
@@ -176,8 +183,13 @@ function timingSafeEqualString(a, b) {
 function extractRefreshToken(req) {
   const auth = req.headers.authorization;
   if (typeof auth === "string") {
-    const match = auth.match(/^(?:Bearer|Key)\s+(.+)$/i);
-    if (match) return match[1].trim();
+    const trimmed = auth.trim();
+    const separator = trimmed.indexOf(" ");
+    if (separator > 0) {
+      const scheme = trimmed.slice(0, separator).toLowerCase();
+      const token = trimmed.slice(separator + 1).trim();
+      if ((scheme === "bearer" || scheme === "key") && token) return token;
+    }
   }
   for (const headerName of TOKEN_HEADERS) {
     const value = req.headers[headerName];
@@ -348,14 +360,16 @@ async function refreshAccessToken(refreshToken, loaded) {
   return payload.access_token;
 }
 
-function agentKeyExpiresAt(payload) {
-  if (typeof payload?.expires_at === "string" && payload.expires_at.trim()) {
-    return payload.expires_at.trim();
+function agentKeyExpiresAt() {
+  return new Date(Date.now() + AGENT_KEY_MIN_TTL_SECONDS * 1000).toISOString();
+}
+
+function trustedInferenceBaseUrl(value) {
+  const normalized = String(value || "").trim().replace(/\/+$/, "");
+  for (const candidate of TRUSTED_INFERENCE_BASE_URLS) {
+    if (normalized === candidate) return candidate;
   }
-  if (typeof payload?.expires_in === "number" && Number.isFinite(payload.expires_in)) {
-    return new Date(Date.now() + payload.expires_in * 1000).toISOString();
-  }
-  return null;
+  return DEFAULT_INFERENCE_BASE_URL;
 }
 
 async function mintAgentKey(accessToken) {
@@ -388,17 +402,14 @@ async function ensureInferenceAgentKey(loaded, refreshToken, options = {}) {
   }
   const accessToken = await refreshAccessToken(refreshToken, loaded);
   const agentKey = await mintAgentKey(accessToken);
-  const inferenceBaseUrl =
-    typeof agentKey.inference_base_url === "string" && agentKey.inference_base_url.trim()
-      ? agentKey.inference_base_url.trim()
-      : "https://inference-api.nousresearch.com/v1";
+  const inferenceBaseUrl = trustedInferenceBaseUrl(agentKey.inference_base_url);
   updateOpenshellInferenceProvider(agentKey.api_key, inferenceBaseUrl);
   const nextState = {
     ...loaded.state,
     inference_provider_name: HERMES_INFERENCE_PROVIDER_NAME,
     inference_credential_env: HERMES_INFERENCE_CREDENTIAL_ENV,
     inference_base_url: inferenceBaseUrl,
-    inference_agent_key_expires_at: agentKeyExpiresAt(agentKey),
+    inference_agent_key_expires_at: agentKeyExpiresAt(),
     inference_agent_key_rotated_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -484,6 +495,14 @@ function errorCode(err) {
   return err && typeof err === "object" && typeof err.code === "string" ? err.code : null;
 }
 
+function isAbortError(err) {
+  return (
+    err &&
+    typeof err === "object" &&
+    (err.name === "AbortError" || err.name === "TimeoutError" || err.code === "ABORT_ERR")
+  );
+}
+
 async function handleProxy(req, res, route) {
   const brokerToken = extractRefreshToken(req);
   if (!brokerToken) {
@@ -553,8 +572,13 @@ async function handleProxy(req, res, route) {
       headers: buildForwardHeaders(req, route, accessToken),
       body: req.method === "GET" || req.method === "HEAD" ? undefined : body,
       redirect: "manual",
+      signal: AbortSignal.timeout(UPSTREAM_REQUEST_TIMEOUT_MS),
     });
-  } catch {
+  } catch (err) {
+    if (isAbortError(err)) {
+      sendText(res, 504, "upstream gateway request timed out");
+      return;
+    }
     sendText(res, 502, "upstream gateway request failed");
     return;
   }

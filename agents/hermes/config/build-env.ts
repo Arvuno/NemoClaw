@@ -35,7 +35,6 @@ export type HermesBuildSettings = {
   inferenceApi: string;
   managedToolGateways: {
     brokerEnabled: boolean;
-    brokerToken: string;
     presets: string[];
   };
   messaging: {
@@ -58,7 +57,6 @@ export function readHermesBuildSettings(env: NodeJS.ProcessEnv): HermesBuildSett
     inferenceApi: env.NEMOCLAW_INFERENCE_API || "",
     managedToolGateways: {
       brokerEnabled: env.NEMOCLAW_HERMES_TOOL_GATEWAY_BROKER === "1",
-      brokerToken: env.NEMOCLAW_HERMES_TOOL_BROKER_TOKEN || "",
       presets: readBase64Json<string[]>(
         env,
         "NEMOCLAW_HERMES_TOOL_GATEWAY_PRESETS_B64",

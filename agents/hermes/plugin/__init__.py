@@ -107,6 +107,7 @@ def _get_env_value(key, default=None):
         if value is not None:
             return value
     except Exception:
+        # Hermes may load this plugin before hermes_cli.config is importable.
         pass
 
     env_paths = []
@@ -149,6 +150,7 @@ def _load_hermes_dotenv():
             hermes_home = "/sandbox/.hermes-data"
         load_hermes_dotenv(hermes_home=hermes_home)
     except Exception:
+        # Runtime env still works when Hermes' optional dotenv loader is absent.
         pass
 
 
@@ -263,6 +265,7 @@ def _install_broker_url_safety_patch():
             setattr(module, _URL_SAFETY_PATCH_ATTR, True)
             patched = True
     except Exception:
+        # Some Hermes builds do not ship web URL-safety helpers.
         pass
 
     web_tools = sys.modules.get("tools.web_tools")
@@ -382,6 +385,7 @@ def _install_transcription_gateway_patch():
                 if managed_config is not None:
                     return managed_config
             except Exception:
+                # Fall back to Hermes' native audio config when broker config is incomplete.
                 pass
         return original()
 
@@ -420,6 +424,7 @@ def _replace_fal_handle_urls(handle, urls):
     try:
         return dataclass_replace(handle, **urls)
     except Exception:
+        # Some handle types are not dataclasses; try constructor replacement next.
         pass
 
     try:
@@ -431,6 +436,7 @@ def _replace_fal_handle_urls(handle, urls):
             client=handle.client,
         )
     except Exception:
+        # Fall back to in-place attribute replacement for mutable handle objects.
         pass
 
     for name, value in urls.items():
@@ -595,11 +601,13 @@ def _handle(client):
         try:
             client.close()
         except Exception:
+            # Tunnel teardown is best-effort after the client disconnects.
             pass
         try:
             if upstream is not None:
                 upstream.close()
         except Exception:
+            # Tunnel teardown is best-effort after the upstream disconnects.
             pass
 
 
@@ -623,15 +631,20 @@ while True:
 
 
 def _cleanup_browser_use_cdp_tunnels():
-    for proc, _url in list(_BROWSER_USE_CDP_TUNNELS.values()):
+    for remote_url, (proc, _url) in list(_BROWSER_USE_CDP_TUNNELS.items()):
         if proc.poll() is None:
             proc.terminate()
+        _BROWSER_USE_CDP_TUNNELS.pop(remote_url, None)
 
 
 atexit.register(_cleanup_browser_use_cdp_tunnels)
 
 
 def _start_browser_use_cdp_tunnel(cdp_url):
+    for remote_url, (proc, _url) in list(_BROWSER_USE_CDP_TUNNELS.items()):
+        if proc.poll() is not None:
+            _BROWSER_USE_CDP_TUNNELS.pop(remote_url, None)
+
     parsed = urlparse(str(cdp_url or ""))
     host = (parsed.hostname or "").lower()
     if parsed.scheme != "wss" or not host.endswith(".browser-use.com"):
@@ -990,6 +1003,7 @@ def _get_sandbox_info():
         if result.returncode == 0:
             gateway_ok = True
     except Exception:
+        # Status output should still render if the local health probe fails.
         pass
 
     return {
@@ -1033,31 +1047,43 @@ def _build_nemoclaw_agent_context(platform=None):
     platform_text = str(platform or "").strip()
     platform_line = (
         f"- Current Hermes messaging platform: {platform_text}. Messaging adapters "
-        "run in the parent Hermes gateway sandbox; child tool-execution containers "
-        "will not show their host/gateway config."
+        + "run in the parent Hermes gateway sandbox; child tool-execution containers "
+        + "will not show their host/gateway config."
         if platform_text
         else "- Messaging adapters run in the parent Hermes gateway sandbox; child "
-        "tool-execution containers will not show their host/gateway config."
+        + "tool-execution containers will not show their host/gateway config."
+    )
+    agent_identity_line = (
+        "- You are Hermes Agent running in a NemoClaw-managed OpenShell sandbox, "
+        + "not a host-only assistant."
+    )
+    child_tool_line = (
+        "- Some tools, especially managed code/terminal tools, execute in child "
+        + "tool sandboxes such as Modal. Seeing /__modal, MODAL_SANDBOX_ID, a "
+        + "missing hermes binary, or missing ~/.hermes-data inside a tool shell "
+        + "means that shell is a child tool sandbox, not proof that Hermes is "
+        + "running on the host."
+    )
+    config_line = (
+        f"- Parent Hermes sandbox config lives under {hermes_home} and "
+        + "/sandbox/.hermes when available. Use nemoclaw_status or "
+        + "nemoclaw_info for NemoClaw environment questions."
+    )
+    tools_line = (
+        "- NemoClaw tools available: nemoclaw_status, nemoclaw_info, "
+        + "nemoclaw_reload_skills, transcribe_audio."
     )
 
     return "\n".join(
         [
             "NemoClaw runtime context:",
-            "- You are Hermes Agent running in a NemoClaw-managed OpenShell sandbox, "
-            "not a host-only assistant.",
-            "- Some tools, especially managed code/terminal tools, execute in child "
-            "tool sandboxes such as Modal. Seeing /__modal, MODAL_SANDBOX_ID, a "
-            "missing hermes binary, or missing ~/.hermes-data inside a tool shell "
-            "means that shell is a child tool sandbox, not proof that Hermes is "
-            "running on the host.",
-            f"- Parent Hermes sandbox config lives under {hermes_home} and "
-            "/sandbox/.hermes when available. Use nemoclaw_status or "
-            "nemoclaw_info for NemoClaw environment questions.",
+            agent_identity_line,
+            child_tool_line,
+            config_line,
             f"- NemoClaw provider state: model={info['model']}, "
             f"provider={info['provider']}, endpoint={info['base_url']}, "
             f"gateway={info['gateway']}.",
-            "- NemoClaw tools available: nemoclaw_status, nemoclaw_info, "
-            "nemoclaw_reload_skills, transcribe_audio.",
+            tools_line,
             f"- Managed Nous tool broker: {broker_state}; configured services: "
             f"{service_text}. Raw Nous OAuth tokens are host-managed by NemoClaw "
             "and should not be expected inside the sandbox.",

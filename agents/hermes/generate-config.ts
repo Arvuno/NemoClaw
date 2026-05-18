@@ -45,7 +45,6 @@ function main(): void {
     settings.managedToolGateways.brokerEnabled
       ? settings.managedToolGateways.presets
       : [],
-    settings.managedToolGateways.brokerToken,
   );
   const written = writeHermesConfigFiles(config, envLines);
 

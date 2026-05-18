@@ -45,6 +45,16 @@ function parseStdoutJson<T>(stdout: string): T {
   return JSON.parse(line);
 }
 
+function stripMessagingEnv(source: NodeJS.ProcessEnv): Record<string, string | undefined> {
+  const env = { ...source } as Record<string, string | undefined>;
+  for (const key of Object.keys(env)) {
+    if (key.startsWith("DISCORD_") || key.startsWith("TELEGRAM_")) {
+      delete env[key];
+    }
+  }
+  return env;
+}
+
 type OnboardTestInternalsCandidate = Partial<OnboardTestInternals> | null;
 
 function isOnboardTestInternals(
@@ -682,6 +692,11 @@ let inferenceSessionSnapshot = null;
 delete process.env.NEMOCLAW_NON_INTERACTIVE;
 delete process.env.NEMOCLAW_SANDBOX_NAME;
 delete process.env.NOUS_API_KEY;
+for (const key of Object.keys(process.env)) {
+  if (key.startsWith("DISCORD_") || key.startsWith("TELEGRAM_")) {
+    delete process.env[key];
+  }
+}
 process.env.NEMOCLAW_OPENSHELL_BIN = ${openshellPath};
 process.env.OPENSHELL_GATEWAY = "nemoclaw";
 
@@ -808,7 +823,7 @@ const { onboard } = require(${onboardPath});
     fs.writeFileSync(scriptPath, script);
 
     const env: Record<string, string | undefined> = {
-      ...process.env,
+      ...stripMessagingEnv(process.env),
       HOME: tmpDir,
       PATH: `${fakeBin}:${process.env.PATH || ""}`,
       NEMOCLAW_OPENSHELL_BIN: path.join(fakeBin, "openshell"),

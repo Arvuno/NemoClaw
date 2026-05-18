@@ -349,7 +349,6 @@ import { streamGatewayStart } from "./onboard/gateway";
 import { reportGpuPassthroughRecovery } from "./onboard/gpu-recovery";
 import {
   HERMES_TOOL_GATEWAY_PRESET_NAMES,
-  hermesToolGatewayLabels,
   mergeRequiredHermesToolGatewayPolicyPresets,
   setupHermesToolGateways,
   stringSetsEqual,
@@ -1355,6 +1354,17 @@ const {
 } = urlUtils;
 const { hydrateCredentialEnv }: typeof import("./onboard/credential-env") =
   require("./onboard/credential-env");
+
+function normalizeHermesToolGatewaySelections(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const selected = new Set<string>();
+  for (const preset of value) {
+    if (typeof preset === "string" && HERMES_TOOL_GATEWAY_PRESET_NAMES.has(preset)) {
+      selected.add(preset);
+    }
+  }
+  return [...selected].sort();
+}
 
 const {
   summarizeCurlFailure,
@@ -5001,7 +5011,9 @@ async function createSandbox(
     const selectionDrift = getSelectionDrift(sandboxName, provider, model, { runOpenshell });
     const confirmedSelectionDrift = selectionDrift.changed && !selectionDrift.unknown;
     const sandboxGpuDrift = hasSandboxGpuDrift(sandboxName, effectiveSandboxGpuConfig);
-    const recordedHermesToolGateways = registry.getSandbox(sandboxName)?.hermesToolGateways ?? [];
+    const recordedHermesToolGateways = normalizeHermesToolGatewaySelections(
+      registry.getSandbox(sandboxName)?.hermesToolGateways,
+    );
     const hermesToolGatewayDrift = !stringSetsEqual(recordedHermesToolGateways, hermesToolGateways);
 
     // Detect whether any messaging credential has been rotated since the
@@ -5548,7 +5560,6 @@ async function createSandbox(
     false,
     sandboxInferenceBaseUrlOverride,
     hermesToolGateways,
-    hermesToolBrokerToken,
   );
   // Only pass non-sensitive env vars to the sandbox. Credentials flow through
   // OpenShell providers — the gateway injects them as placeholders and the L7
@@ -5593,6 +5604,10 @@ async function createSandbox(
   const sandboxProxyPort = process.env.NEMOCLAW_PROXY_PORT;
   if (sandboxProxyPort && isValidProxyPort(sandboxProxyPort)) {
     envArgs.push(formatEnvAssignment("NEMOCLAW_PROXY_PORT", sandboxProxyPort));
+  }
+  if (hermesToolBrokerToken) {
+    // Runtime-only: do not bake the per-sandbox broker token into image layers.
+    envArgs.push(formatEnvAssignment("TOOL_GATEWAY_USER_TOKEN", hermesToolBrokerToken));
   }
   if (webSearchConfig?.fetchEnabled) {
     const braveKey =
@@ -6607,7 +6622,7 @@ async function setupNim(
             credentialEnv = remoteConfig.credentialEnv;
           }
           const recordedHermesToolGateways = sandboxName
-            ? registry.getSandbox(sandboxName)?.hermesToolGateways ?? null
+            ? normalizeHermesToolGatewaySelections(registry.getSandbox(sandboxName)?.hermesToolGateways)
             : null;
           hermesToolGateways = await setupHermesToolGateways(
             provider,
@@ -9689,7 +9704,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       session?.credentialEnv === HERMES_NOUS_API_KEY_CREDENTIAL_ENV
         ? HERMES_AUTH_METHOD_API_KEY
         : null);
-    let hermesToolGateways = session?.hermesToolGateways || [];
+    let hermesToolGateways = normalizeHermesToolGatewaySelections(session?.hermesToolGateways);
     let preferredInferenceApi = session?.preferredInferenceApi || null;
     let nimContainer = session?.nimContainer || null;
     let webSearchConfig = session?.webSearchConfig || null;
@@ -9898,7 +9913,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       : false;
     const wechatConfigChanged = hasWechatConfigDrift(session);
     const recordedHermesToolGateways = sandboxName
-      ? registry.getSandbox(sandboxName)?.hermesToolGateways ?? []
+      ? normalizeHermesToolGatewaySelections(registry.getSandbox(sandboxName)?.hermesToolGateways)
       : [];
     const hermesToolGatewayConfigChanged = !stringSetsEqual(
       recordedHermesToolGateways,

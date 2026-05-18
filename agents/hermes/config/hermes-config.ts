@@ -73,7 +73,9 @@ export function buildHermesConfig(settings: HermesBuildSettings): Record<string,
     const matrix = loadManagedToolGatewayMatrix();
     for (const preset of settings.managedToolGateways.presets) {
       const entry = matrix[preset];
-      if (!entry) continue;
+      if (!entry) {
+        throw new Error(`Unknown Hermes managed-tool gateway preset: ${preset}`);
+      }
       applyManagedToolConfig(config, entry.config);
     }
     if (

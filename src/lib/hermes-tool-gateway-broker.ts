@@ -1,6 +1,6 @@
-// @ts-nocheck
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+// @ts-nocheck
 //
 // Thin lifecycle glue for the Hermes managed-tool host broker.
 
@@ -17,7 +17,6 @@ const onboardProviders = require("./onboard/providers");
 
 const HERMES_TOOL_GATEWAY_REFRESH_CREDENTIAL_ENV =
   "NEMOCLAW_HERMES_TOOL_GATEWAY_REFRESH_TOKEN";
-const HERMES_TOOL_GATEWAY_BROKER_TOKEN_ENV = "NEMOCLAW_HERMES_TOOL_BROKER_TOKEN";
 const HERMES_TOOL_GATEWAY_PORT = 11436;
 const HERMES_TOOL_GATEWAY_STATE_DIR = path.join(getCredsDir(), "hermes-tool-gateway");
 const HERMES_TOOL_GATEWAY_PID_PATH = path.join(
@@ -331,7 +330,6 @@ function ensureHermesToolGatewayBrokerForSandboxEntry(entry, options = {}) {
 
 module.exports = {
   HERMES_TOOL_GATEWAY_REFRESH_CREDENTIAL_ENV,
-  HERMES_TOOL_GATEWAY_BROKER_TOKEN_ENV,
   HERMES_TOOL_GATEWAY_STATE_DIR,
   HERMES_TOOL_GATEWAY_PORT,
   hashRefreshToken,

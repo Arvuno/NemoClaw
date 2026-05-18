@@ -222,7 +222,7 @@ describe("Hermes managed-tool gateway broker", () => {
         "Content-Encoding": "gzip",
         "Content-Length": String(body.length),
         "Content-MD5": "not-a-real-digest",
-        "Set-Cookie": "secret=1",
+        "Set-Cookie": "fixture_session=1; HttpOnly; Secure; SameSite=Strict",
       });
       res.end(body);
     });

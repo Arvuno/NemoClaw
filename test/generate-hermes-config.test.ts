@@ -122,7 +122,6 @@ describe("agents/hermes/generate-config.ts", () => {
   it("generates managed-tool gateway config and env for selected Nous presets", () => {
     const { config, envFile } = runConfigScript({
       NEMOCLAW_HERMES_TOOL_GATEWAY_BROKER: "1",
-      NEMOCLAW_HERMES_TOOL_BROKER_TOKEN: "nc_broker_test",
       NEMOCLAW_HERMES_TOOL_GATEWAY_PRESETS_B64: encodeJson([
         "nous-web",
         "nous-audio",
@@ -139,7 +138,7 @@ describe("agents/hermes/generate-config.ts", () => {
     expect(config.image_gen).toEqual({ use_gateway: true });
     expect(config.terminal).toMatchObject({ backend: "modal", modal_mode: "managed" });
     expect(envFile).toContain("NEMOCLAW_HERMES_TOOL_GATEWAY_BROKER=1\n");
-    expect(envFile).toContain("TOOL_GATEWAY_USER_TOKEN=nc_broker_test\n");
+    expect(envFile).not.toContain("TOOL_GATEWAY_USER_TOKEN=");
     expect(envFile).toContain(
       "FIRECRAWL_GATEWAY_URL=http://host.openshell.internal:11436/firecrawl\n",
     );
@@ -153,6 +152,18 @@ describe("agents/hermes/generate-config.ts", () => {
       "FAL_QUEUE_GATEWAY_URL=http://host.openshell.internal:11436/fal-queue\n",
     );
     expect(envFile).toContain("MODAL_GATEWAY_URL=http://host.openshell.internal:11436/modal\n");
+  });
+
+  it("fails fast for unknown managed-tool gateway presets", () => {
+    const result = runConfigScriptRaw({
+      NEMOCLAW_HERMES_TOOL_GATEWAY_BROKER: "1",
+      NEMOCLAW_HERMES_TOOL_GATEWAY_PRESETS_B64: encodeJson(["nous-web", "nous-typo"]),
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(`${result.stderr}\n${result.stdout}`).toContain(
+      "Unknown Hermes managed-tool gateway preset: nous-typo",
+    );
   });
 
   it("writes Discord settings in Hermes' top-level schema and keeps tokens in .env", () => {

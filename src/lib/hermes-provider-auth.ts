@@ -150,12 +150,11 @@ export async function ensureHermesProviderOAuthCredentials(
   );
   if (Array.isArray(toolGatewayPresets) && toolGatewayPresets.length > 0) {
     const hermesToolGateway = getHermesToolGatewayBroker();
-    const toolGatewayState = hermesToolGateway.registerHermesToolGatewayRefreshProvider(
+    hermesToolGateway.registerHermesToolGatewayRefreshProvider(
       _sandboxName,
       tokens.refresh_token,
       runOpenshell,
     );
-    process.env.NEMOCLAW_HERMES_TOOL_BROKER_TOKEN = toolGatewayState.brokerToken;
     if (!hermesToolGateway.ensureHermesToolGatewayBroker({ refreshToken: tokens.refresh_token })) {
       throw new Error("Hermes managed-tool gateway broker did not become ready");
     }

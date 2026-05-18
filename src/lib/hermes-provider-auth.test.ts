@@ -50,7 +50,6 @@ function loadAuthWithBrokerStub(brokerStub: Record<string, any>): Record<string,
 afterEach(() => {
   clearDistModule(DIST_AUTH);
   clearDistModule(DIST_BROKER);
-  delete process.env.NEMOCLAW_HERMES_TOOL_BROKER_TOKEN;
 });
 
 describe("Hermes provider OpenShell credential handoff", () => {
@@ -238,7 +237,6 @@ describe("Hermes provider OpenShell credential handoff", () => {
       expect(state.auth_method).toBe("oauth");
       expect(providerCalls.some((call) => call.env?.OPENAI_API_KEY === "agent-key-3")).toBe(true);
       expect(brokerCalls).toEqual([{ sandboxName: "my-assistant", refreshToken: "refresh-3" }]);
-      expect(process.env.NEMOCLAW_HERMES_TOOL_BROKER_TOKEN).toBe("broker-3");
       expect(fs.existsSync(path.join(tmp, ".nemoclaw", "hermes-oauth"))).toBe(false);
     } finally {
       if (originalHome === undefined) delete process.env.HOME;
