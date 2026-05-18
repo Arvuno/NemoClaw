@@ -534,11 +534,12 @@ export function convertBedrockConverseResponse(
 
 function streamChunk(
   model: string,
+  completionId: string,
   delta: JsonObject,
   finishReasonValue: string | null = null,
 ): JsonObject {
   return {
-    id: responseId(),
+    id: completionId,
     object: "chat.completion.chunk",
     created: Math.floor(Date.now() / 1000),
     model,
@@ -557,6 +558,7 @@ export async function* convertBedrockConverseStream(
   model: string,
 ): AsyncGenerator<JsonObject> {
   if (!stream) return;
+  const completionId = responseId();
   const toolIndexes = new Map<number, number>();
   let nextToolIndex = 0;
   let emittedRole = false;
@@ -564,19 +566,19 @@ export async function* convertBedrockConverseStream(
   for await (const event of stream) {
     if (event.messageStart) {
       emittedRole = true;
-      yield streamChunk(model, { role: "assistant" });
+      yield streamChunk(model, completionId, { role: "assistant" });
       continue;
     }
     if (!emittedRole && (event.contentBlockStart || event.contentBlockDelta)) {
       emittedRole = true;
-      yield streamChunk(model, { role: "assistant" });
+      yield streamChunk(model, completionId, { role: "assistant" });
     }
     if (event.contentBlockStart?.start && "toolUse" in event.contentBlockStart.start) {
       const toolUse = event.contentBlockStart.start.toolUse;
       if (!toolUse) continue;
       const index = nextToolIndex++;
       toolIndexes.set(event.contentBlockStart.contentBlockIndex ?? index, index);
-      yield streamChunk(model, {
+      yield streamChunk(model, completionId, {
         tool_calls: [
           {
             index,
@@ -591,12 +593,12 @@ export async function* convertBedrockConverseStream(
     if (event.contentBlockDelta?.delta) {
       const delta = event.contentBlockDelta.delta;
       if ("text" in delta && typeof delta.text === "string") {
-        yield streamChunk(model, { content: delta.text });
+        yield streamChunk(model, completionId, { content: delta.text });
         continue;
       }
       if ("toolUse" in delta && delta.toolUse?.input) {
         const index = toolIndexes.get(event.contentBlockDelta.contentBlockIndex ?? -1) ?? 0;
-        yield streamChunk(model, {
+        yield streamChunk(model, completionId, {
           tool_calls: [
             {
               index,
@@ -608,7 +610,7 @@ export async function* convertBedrockConverseStream(
       continue;
     }
     if (event.messageStop) {
-      yield streamChunk(model, {}, finishReason(event.messageStop.stopReason, false));
+      yield streamChunk(model, completionId, {}, finishReason(event.messageStop.stopReason, false));
       continue;
     }
     const serviceError =

@@ -100,6 +100,7 @@ describe("Bedrock Runtime OpenAI adapter", () => {
       "hel",
       "lo",
     ]);
+    expect(new Set(chunks.map((chunk: any) => chunk.id)).size).toBe(1);
     expect(chunks.at(-1)?.choices[0].finish_reason).toBe("stop");
   });
 

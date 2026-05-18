@@ -30,7 +30,7 @@ const {
   buildCompatibleEndpointSandboxSmokeCommand,
   buildCompatibleEndpointSandboxSmokeScript,
   shouldRunCompatibleEndpointSandboxSmoke,
-  spawnOutputToString,
+  verifyCompatibleEndpointSandboxSmoke,
 }: typeof import("./onboard/compatible-endpoint-smoke") = require("./onboard/compatible-endpoint-smoke");
 const {
   buildSandboxConfigSyncScript,
@@ -82,6 +82,8 @@ const {
 const {
   setupSelectedMessagingChannels,
 } = require("./onboard/messaging-channel-setup") as typeof import("./onboard/messaging-channel-setup");
+const bedrockRuntimeOnboard: typeof import("./onboard/bedrock-runtime") =
+  require("./onboard/bedrock-runtime");
 const crypto = require("node:crypto");
 const fs = require("fs");
 const os = require("os");
@@ -186,10 +188,6 @@ const {
   getProviderSelectionConfig,
   parseGatewayInference,
 } = inferenceConfig;
-const bedrockRuntime: typeof import("./inference/bedrock-runtime") =
-  require("./inference/bedrock-runtime");
-const bedrockRuntimeAdapter: typeof import("./inference/bedrock-runtime-adapter") =
-  require("./inference/bedrock-runtime-adapter");
 
 const onboardProviders = require("./onboard/providers");
 const hermesProviderAuth = require("./hermes-provider-auth");
@@ -1880,99 +1878,6 @@ function isInferenceRouteReady(provider: string, model: string): boolean {
     runCaptureOpenshell(["inference", "get"], { ignoreError: true }),
   );
   return Boolean(live && live.provider === provider && live.model === model);
-}
-
-function verifyCompatibleEndpointSandboxSmoke(options: {
-  sandboxName: string;
-  provider: string;
-  model: string;
-  endpointUrl?: string | null;
-  credentialEnv?: string | null;
-  messagingChannels?: string[] | null;
-  agent?: AgentDefinition | null;
-}): void {
-  if (
-    !shouldRunCompatibleEndpointSandboxSmoke(
-      options.provider,
-      options.messagingChannels,
-      options.agent,
-    )
-  ) {
-    return;
-  }
-
-  console.log("  Verifying compatible endpoint through the messaging sandbox...");
-
-  const providerResult = runOpenshell(["provider", "get", options.provider], {
-    ignoreError: true,
-    suppressOutput: true,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const providerDetails = [
-    spawnOutputToString(providerResult.stdout),
-    spawnOutputToString(providerResult.stderr),
-  ]
-    .join("\n")
-    .trim();
-
-  if (providerResult.status !== 0) {
-    console.error(
-      `  Compatible endpoint provider '${options.provider}' is missing from the OpenShell gateway.`,
-    );
-    console.error(
-      "  The sandbox would start Telegram, but agent turns would fail before reaching the model.",
-    );
-    if (providerDetails) console.error(`  ${compactText(redact(providerDetails)).slice(0, 800)}`);
-    process.exit(providerResult.status || 1);
-  }
-
-  if (
-    options.endpointUrl &&
-    providerDetails &&
-    /OPENAI_BASE_URL|baseUrl|base URL|endpoint/i.test(providerDetails) &&
-    !providerDetails.includes(options.endpointUrl)
-  ) {
-    console.warn(
-      `  ⚠ Gateway provider '${options.provider}' did not report the selected endpoint URL.`,
-    );
-    console.warn("    Continuing to the sandbox-side inference.local smoke check.");
-  }
-  if (
-    options.credentialEnv &&
-    providerDetails &&
-    /credential|api key|secret/i.test(providerDetails) &&
-    !providerDetails.includes(options.credentialEnv)
-  ) {
-    console.warn(
-      `  ⚠ Gateway provider '${options.provider}' did not report the selected credential binding.`,
-    );
-  }
-
-  const script = buildCompatibleEndpointSandboxSmokeCommand(options.model);
-  const smokeResult = runOpenshell(
-    ["sandbox", "exec", "-n", options.sandboxName, "--", "sh", "-lc", script],
-    {
-      ignoreError: true,
-      suppressOutput: true,
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: 90_000,
-    },
-  );
-  const smokeOutput = [
-    spawnOutputToString(smokeResult.stdout),
-    spawnOutputToString(smokeResult.stderr),
-  ]
-    .join("\n")
-    .trim();
-
-  if (smokeResult.status !== 0 || !/INFERENCE_SMOKE_OK/.test(smokeOutput)) {
-    console.error("  Compatible endpoint sandbox smoke check failed.");
-    console.error("  Telegram provider startup is not the root cause; inference.local failed.");
-    if (smokeOutput) console.error(`  ${compactText(redact(smokeOutput)).slice(0, 1200)}`);
-    process.exit(smokeResult.status || 1);
-  }
-
-  console.log("  ✓ Compatible endpoint responds through inference.local inside the sandbox");
 }
 
 function sandboxExistsInGateway(sandboxName: string): boolean {
@@ -6513,10 +6418,7 @@ async function setupNim(
             console.log("");
             continue selectionLoop;
           }
-          const endpointClassification = bedrockRuntime.classifyCustomAnthropicEndpoint(endpointUrl);
-          if (endpointClassification.kind === "bedrock-runtime") {
-            endpointUrl = endpointClassification.endpointUrl;
-          }
+          endpointUrl = bedrockRuntimeOnboard.normalizeCustomAnthropicEndpointUrl(endpointUrl);
         }
 
         if (selected.key === "hermesProvider") {
@@ -6642,20 +6544,6 @@ async function setupNim(
             }
           }
 
-          if (isNonInteractive()) {
-            if (!resolveProviderCredential(credentialEnv)) {
-              console.error(
-                `  ${credentialEnv} (or NEMOCLAW_PROVIDER_KEY) is required for ${remoteConfig.label} in non-interactive mode.`,
-              );
-              process.exit(1);
-            }
-          } else {
-            await ensureNamedCredential(
-              credentialEnv,
-              remoteConfig.label + " API key",
-              remoteConfig.helpUrl,
-            );
-          }
           const _envModelRemote = (process.env.NEMOCLAW_MODEL || "").trim();
           const defaultModel =
             requestedModel ||
@@ -6666,44 +6554,41 @@ async function setupNim(
             credentialEnv,
             `Missing credential env for ${remoteConfig.label}`,
           );
-          const customAnthropicClassification =
-            selected.key === "anthropicCompatible" && endpointUrl
-              ? bedrockRuntime.classifyCustomAnthropicEndpoint(endpointUrl)
-              : null;
-          const isBedrockRuntimeCustomAnthropic =
-            customAnthropicClassification?.kind === "bedrock-runtime";
-          if (isBedrockRuntimeCustomAnthropic) {
-            if (!resolveProviderCredential(selectedCredentialEnv)) {
-              if (isNonInteractive()) {
-                if (!bedrockRuntime.hasBedrockRuntimeAwsAuthEnv()) {
-                  console.error(
-                    `  ${bedrockRuntime.BEDROCK_RUNTIME_AWS_BEARER_TOKEN_ENV}, AWS_PROFILE, IAM environment credentials, or ${selectedCredentialEnv} is required for a Bedrock Runtime endpoint in non-interactive mode.`,
-                  );
-                  process.exit(1);
-                }
-              } else if (!bedrockRuntime.hasBedrockRuntimeAwsAuthEnv()) {
-                await ensureNamedCredential(
-                  selectedCredentialEnv,
-                  remoteConfig.label + " API key",
-                  remoteConfig.helpUrl,
-                );
-              }
-            }
-            while (true) {
-              if (isNonInteractive()) {
-                model = defaultModel;
-              } else {
-                model = await promptInputModel(remoteConfig.label, defaultModel, null);
-              }
-              if (model === BACK_TO_SELECTION) {
-                console.log("  Returning to provider selection.");
-                console.log("");
-                continue selectionLoop;
-              }
-              preferredInferenceApi = "openai-completions";
-              break;
-            }
+          const bedrockSelection = await bedrockRuntimeOnboard.selectBedrockRuntimeCustomAnthropic({
+            selectedKey: selected.key,
+            endpointUrl,
+            credentialEnv: selectedCredentialEnv,
+            label: remoteConfig.label,
+            helpUrl: remoteConfig.helpUrl,
+            defaultModel,
+            backToSelection: BACK_TO_SELECTION,
+            isNonInteractive,
+            promptInputModel,
+            replaceNamedCredential,
+          });
+          if (bedrockSelection.action === "retry-selection") {
+            console.log("  Returning to provider selection.");
+            console.log("");
+            continue selectionLoop;
+          }
+          if (bedrockSelection.action === "selected") {
+            model = bedrockSelection.model;
+            preferredInferenceApi = bedrockSelection.preferredInferenceApi;
             break;
+          }
+          if (isNonInteractive()) {
+            if (!resolveProviderCredential(selectedCredentialEnv)) {
+              console.error(
+                `  ${selectedCredentialEnv} (or NEMOCLAW_PROVIDER_KEY) is required for ${remoteConfig.label} in non-interactive mode.`,
+              );
+              process.exit(1);
+            }
+          } else {
+            await ensureNamedCredential(
+              selectedCredentialEnv,
+              remoteConfig.label + " API key",
+              remoteConfig.helpUrl,
+            );
           }
           let modelValidator: ((candidate: string) => ModelValidationResult) | null = null;
           if (selected.key === "openai" || selected.key === "gemini") {
@@ -6835,7 +6720,7 @@ async function setupNim(
               } else {
                 const validation = await validateOpenAiLikeSelection(
                   remoteConfig.label,
-                  endpointUrl,
+                  requireValue(endpointUrl, `Missing endpoint URL for ${remoteConfig.label}`),
                   model,
                   selectedCredentialEnv,
                   retryMessage,
@@ -6867,7 +6752,7 @@ async function setupNim(
           while (true) {
             const validation = await validateOpenAiLikeSelection(
               remoteConfig.label,
-              endpointUrl,
+              requireValue(endpointUrl, `Missing endpoint URL for ${remoteConfig.label}`),
               model,
               credentialEnv,
               "Please choose a provider/model again.",
@@ -7498,68 +7383,19 @@ async function setupInference(
       console.error(`  Unsupported provider configuration: ${provider}`);
       process.exit(1);
     }
-    const customAnthropicClassification =
-      provider === "compatible-anthropic-endpoint" && endpointUrl
-        ? bedrockRuntime.classifyCustomAnthropicEndpoint(endpointUrl)
-        : null;
-    if (customAnthropicClassification?.kind === "bedrock-runtime") {
-      const compatibleCredential = credentialEnv ? hydrateCredentialEnv(credentialEnv) : null;
-      let adapter: Awaited<ReturnType<typeof bedrockRuntimeAdapter.ensureBedrockRuntimeAdapter>>;
-      try {
-        adapter = await bedrockRuntimeAdapter.ensureBedrockRuntimeAdapter({
-          classification: customAnthropicClassification,
-          compatibleCredential,
-        });
-      } catch (err) {
-        console.error(
-          `  Failed to start Bedrock Runtime adapter: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
-        if (isNonInteractive()) process.exit(1);
-        return { retry: "selection" };
-      }
-      const providerResult = upsertProvider(
-        provider,
-        "openai",
-        adapter.credentialEnv,
-        adapter.baseUrl,
-        { [adapter.credentialEnv]: adapter.token },
-      );
-      if (!providerResult.ok) {
-        console.error(`  ${providerResult.message}`);
-        if (isNonInteractive()) process.exit(providerResult.status || 1);
-        return { retry: "selection" };
-      }
-      const applyResult = runOpenshell(
-        [
-          "inference",
-          "set",
-          "--no-verify",
-          "--provider",
-          provider,
-          "--model",
-          model,
-          "--timeout",
-          String(LOCAL_INFERENCE_TIMEOUT_SECS),
-        ],
-        { ignoreError: true },
-      );
-      if (applyResult.status !== 0) {
-        const message =
-          compactText(redact(`${applyResult.stderr || ""} ${applyResult.stdout || ""}`)) ||
-          `Failed to configure inference provider '${provider}'.`;
-        console.error(`  ${message}`);
-        if (isNonInteractive()) process.exit(applyResult.status || 1);
-        return { retry: "selection" };
-      }
-      verifyInferenceRoute(provider, model);
-      if (sandboxName) {
-        registry.updateSandbox(sandboxName, { model, provider });
-      }
-      console.log(`  ✓ Inference route set: ${provider} / ${model}`);
-      return { ok: true };
-    }
+    const bedrockSetup = await bedrockRuntimeOnboard.setupBedrockRuntimeInference({
+      sandboxName,
+      provider,
+      model,
+      endpointUrl,
+      credentialEnv,
+      isNonInteractive,
+      runOpenshell,
+      upsertProvider,
+      verifyInferenceRoute,
+      verifyOnboardInferenceSmoke,
+    });
+    if (bedrockSetup.handled) return bedrockSetup.result;
     while (true) {
       const resolvedCredentialEnv = credentialEnv || (config && config.credentialEnv);
       const resolvedEndpointUrl = endpointUrl || (config && config.endpointUrl);
@@ -9916,8 +9752,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       process.env.NEMOCLAW_OPENSHELL_BIN = getOpenshellBinary();
       const needsBedrockRuntimeAdapter =
         provider === "compatible-anthropic-endpoint" &&
-        endpointUrl &&
-        bedrockRuntime.isBedrockRuntimeEndpoint(endpointUrl);
+        bedrockRuntimeOnboard.needsBedrockRuntimeAdapter(endpointUrl);
       const resumeInference =
         !needsBedrockRuntimeAdapter &&
         !forceProviderSelection &&
@@ -10252,6 +10087,8 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       sandboxName,
       provider,
       model,
+      runOpenshell,
+      redact,
       endpointUrl,
       credentialEnv,
       messagingChannels: Array.isArray(activeMessagingChannels) ? activeMessagingChannels : [],

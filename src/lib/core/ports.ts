@@ -35,6 +35,7 @@ export interface GatewayPortValidationOptions {
   vllmPort: number;
   ollamaPort: number;
   ollamaProxyPort: number;
+  bedrockRuntimeAdapterPort: number;
 }
 
 /**
@@ -78,6 +79,7 @@ export function validateGatewayPort(
     { label: "vLLM / NIM inference", port: 8000 },
     { label: "Ollama inference", port: 11434 },
     { label: "Ollama auth proxy", port: 11435 },
+    { label: "Bedrock Runtime adapter", port: 11436 },
   ];
   const reservedDefault = reservedDefaults.find((entry) => entry.port === port);
   if (reservedDefault) {
@@ -91,6 +93,10 @@ export function validateGatewayPort(
     { envVar: "NEMOCLAW_VLLM_PORT", port: options.vllmPort },
     { envVar: "NEMOCLAW_OLLAMA_PORT", port: options.ollamaPort },
     { envVar: "NEMOCLAW_OLLAMA_PROXY_PORT", port: options.ollamaProxyPort },
+    {
+      envVar: "NEMOCLAW_BEDROCK_RUNTIME_ADAPTER_PORT",
+      port: options.bedrockRuntimeAdapterPort,
+    },
   ];
   const conflict = conflicts.find((entry) => entry.port === port);
   if (conflict) {
@@ -118,4 +124,5 @@ export const GATEWAY_PORT = parseGatewayPort("NEMOCLAW_GATEWAY_PORT", 8080, {
   vllmPort: VLLM_PORT,
   ollamaPort: OLLAMA_PORT,
   ollamaProxyPort: OLLAMA_PROXY_PORT,
+  bedrockRuntimeAdapterPort: BEDROCK_RUNTIME_ADAPTER_PORT,
 });
