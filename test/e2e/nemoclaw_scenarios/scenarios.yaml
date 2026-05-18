@@ -47,6 +47,10 @@ runtimes:
   docker-missing:
     container_engine: docker
     container_daemon: missing
+  macos-docker-optional:
+    container_engine: docker
+    container_daemon: optional
+    note: docker-unavailable-on-github-hosted-macos
 onboarding:
   cloud-openclaw: &id001
     path: cloud
@@ -113,14 +117,20 @@ setup_scenarios:
     dimensions:
       platform: macos-local
       install: repo-current
-      runtime: docker-running
+      runtime: macos-docker-optional
       onboarding: cloud-openclaw
-    expected_state: cloud-openclaw-ready
+    expected_state: macos-cli-ready-docker-optional
     suites:
-    - smoke
     - platform-macos
     runner_requirements:
     - macos-latest
+    skipped_capabilities:
+    - id: macos-docker-dependent-suites
+      reason: GitHub-hosted macOS runners do not provide a reachable Docker daemon; gateway/sandbox/inference suites are reported as skipped instead of failing this scenario.
+      suites:
+      - smoke
+      - inference
+      - credentials
   wsl-repo-cloud-openclaw:
     alias_for_plan: wsl-repo-docker__cloud-nvidia-openclaw
     dimensions:
@@ -178,9 +188,16 @@ base_scenarios:
   macos-repo-docker:
     platform: macos-local
     install: repo-current
-    runtime: docker-running
+    runtime: macos-docker-optional
     runner_requirements:
     - macos-latest
+    skipped_capabilities:
+    - id: macos-docker-dependent-suites
+      reason: GitHub-hosted macOS runners do not provide a reachable Docker daemon; gateway/sandbox/inference suites are reported as skipped instead of failing this scenario.
+      suites:
+      - smoke
+      - inference
+      - credentials
   wsl-repo-docker:
     platform: wsl-local
     install: repo-current
@@ -317,13 +334,18 @@ test_plans:
   macos-repo-docker__cloud-nvidia-openclaw:
     base: macos-repo-docker
     onboarding: cloud-nvidia-openclaw
-    expected_state: cloud-openclaw-ready
+    expected_state: macos-cli-ready-docker-optional
     onboarding_assertions:
     - base-installed
-    - preflight-passed
     suites:
-    - smoke
     - platform-macos
+    skipped_capabilities:
+    - id: macos-docker-dependent-suites
+      reason: GitHub-hosted macOS runners do not provide a reachable Docker daemon; gateway/sandbox/inference suites are reported as skipped instead of failing this scenario.
+      suites:
+      - smoke
+      - inference
+      - credentials
   wsl-repo-docker__cloud-nvidia-openclaw:
     base: wsl-repo-docker
     onboarding: cloud-nvidia-openclaw

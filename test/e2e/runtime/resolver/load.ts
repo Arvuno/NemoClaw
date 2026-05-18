@@ -87,6 +87,22 @@ function validateScenarios(doc: Record<string, unknown>, file: string): Scenario
         throw new Error(`scenario ${id}.runner_requirements must be a list of strings`);
       }
     }
+    if ("skipped_capabilities" in e) {
+      if (
+        !Array.isArray(e.skipped_capabilities) ||
+        e.skipped_capabilities.some((skip) => {
+          if (!skip || typeof skip !== "object" || Array.isArray(skip)) return true;
+          const s = skip as Record<string, unknown>;
+          return (
+            typeof s.id !== "string" ||
+            typeof s.reason !== "string" ||
+            ("suites" in s && (!Array.isArray(s.suites) || s.suites.some((suite) => typeof suite !== "string")))
+          );
+        })
+      ) {
+        throw new Error(`scenario ${id}.skipped_capabilities must list {id, reason, suites?}`);
+      }
+    }
     const dims = e.dimensions as Record<string, unknown> | undefined;
     if (!dims) {
       throw new Error(`scenario ${id} must declare 'dimensions'`);

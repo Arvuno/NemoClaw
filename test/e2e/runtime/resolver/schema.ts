@@ -24,12 +24,19 @@ export interface OnboardingProfile extends AnyRecord {
   inference_route?: string;
 }
 
+export interface SkippedCapability extends AnyRecord {
+  id: string;
+  reason: string;
+  suites?: string[];
+}
+
 export interface BaseScenario extends AnyRecord {
   platform: string;
   install: string;
   runtime: string;
   runner_requirements?: string[];
   expected_failure?: AnyRecord;
+  skipped_capabilities?: SkippedCapability[];
 }
 
 export interface TestPlan extends AnyRecord {
@@ -42,6 +49,7 @@ export interface TestPlan extends AnyRecord {
   runner_requirements?: string[];
   required_secrets?: string[];
   expected_failure?: AnyRecord;
+  skipped_capabilities?: SkippedCapability[];
 }
 
 export interface SetupScenario {
@@ -58,6 +66,7 @@ export interface SetupScenario {
   /** Explicit CI/hardware requirements for non-default platforms. */
   runner_requirements?: string[];
   expected_failure?: AnyRecord;
+  skipped_capabilities?: SkippedCapability[];
   /**
    * Guard: the legacy array form `expected_states: [...]` must not reappear.
    * If present, the loader fails.

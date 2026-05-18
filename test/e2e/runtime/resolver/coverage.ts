@@ -167,6 +167,9 @@ export function renderCoverageReport(
   const scenariosWithoutSuites = scenarioIds.filter(
     (id) => scenarios.setup_scenarios[id].suites.length === 0,
   );
+  const skippedScenarios = scenarioIds
+    .map((id) => ({ id, skips: scenarios.setup_scenarios[id].skipped_capabilities ?? [] }))
+    .filter(({ skips }) => skips.length > 0);
   const referencedStates = new Set<string>(
     scenarioIds.map((id) => scenarios.setup_scenarios[id].expected_state),
   );
@@ -176,7 +179,7 @@ export function renderCoverageReport(
 
   lines.push("## Gaps");
   lines.push("");
-  if (scenariosWithoutSuites.length === 0 && unusedStates.length === 0) {
+  if (scenariosWithoutSuites.length === 0 && unusedStates.length === 0 && skippedScenarios.length === 0) {
     lines.push("_No gaps detected._");
   } else {
     if (scenariosWithoutSuites.length > 0) {
@@ -184,6 +187,17 @@ export function renderCoverageReport(
       lines.push("");
       for (const id of scenariosWithoutSuites.sort()) {
         lines.push(`- \`${id}\`: no suites configured`);
+      }
+      lines.push("");
+    }
+    if (skippedScenarios.length > 0) {
+      lines.push("### Explicitly skipped capabilities");
+      lines.push("");
+      for (const { id, skips } of skippedScenarios) {
+        for (const skip of skips) {
+          const suites = Array.isArray(skip.suites) && skip.suites.length > 0 ? ` Suites: ${skip.suites.map((suite) => `\`${suite}\``).join(", ")}.` : "";
+          lines.push(`- \`${id}\` / \`${skip.id}\`: ${skip.reason}${suites}`);
+        }
       }
       lines.push("");
     }
