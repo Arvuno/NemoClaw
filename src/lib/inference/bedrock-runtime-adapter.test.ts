@@ -105,6 +105,47 @@ describe("Bedrock Runtime OpenAI adapter", () => {
     expect(chunks.at(-1)?.choices[0].finish_reason).toBe("stop");
   });
 
+  it("marks streamed tool calls with the tool_calls finish reason", async () => {
+    async function* stream() {
+      yield {
+        contentBlockStart: {
+          contentBlockIndex: 0,
+          start: { toolUse: { toolUseId: "toolu_stream", name: "get_weather" } },
+        },
+      };
+      yield {
+        contentBlockDelta: {
+          contentBlockIndex: 0,
+          delta: { toolUse: { input: "{\"city\":\"Seattle\"}" } },
+        },
+      };
+      yield { messageStop: { stopReason: "end_turn" } };
+    }
+    const send = vi.fn(async () => ({ stream: stream() }));
+
+    const chunks: any[] = [];
+    for await (const chunk of await streamOpenAiChatCompletion(
+      {
+        model: "anthropic.claude-3-haiku-20240307-v1:0",
+        stream: true,
+        messages: [{ role: "user", content: "weather" }],
+      },
+      { send },
+    )) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks.find((chunk) => chunk.choices[0].delta.tool_calls)?.choices[0].delta.tool_calls).toEqual([
+      {
+        index: 0,
+        id: "toolu_stream",
+        type: "function",
+        function: { name: "get_weather", arguments: "" },
+      },
+    ]);
+    expect(chunks.at(-1)?.choices[0].finish_reason).toBe("tool_calls");
+  });
+
   it("round-trips tool calls and tool results", async () => {
     const input = buildBedrockConverseRequest({
       model: "anthropic.claude-3-5-sonnet-20240620-v1:0",

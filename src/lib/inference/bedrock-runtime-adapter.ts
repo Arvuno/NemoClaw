@@ -1,20 +1,20 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
 
 import {
   BedrockRuntimeClient,
-  ConverseCommand,
-  ConverseStreamCommand,
   type ContentBlock,
+  ConverseCommand,
   type ConverseCommandInput,
   type ConverseCommandOutput,
+  ConverseStreamCommand,
   type ConverseStreamCommandInput,
   type ConverseStreamOutput,
   type Message,
@@ -610,7 +610,12 @@ export async function* convertBedrockConverseStream(
       continue;
     }
     if (event.messageStop) {
-      yield streamChunk(model, completionId, {}, finishReason(event.messageStop.stopReason, false));
+      yield streamChunk(
+        model,
+        completionId,
+        {},
+        finishReason(event.messageStop.stopReason, toolIndexes.size > 0),
+      );
       continue;
     }
     const serviceError =
