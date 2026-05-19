@@ -19,7 +19,7 @@ openclaw_diag_redact() {
     -e 's/(nvapi-)[A-Za-z0-9._-]+/\1[REDACTED]/g' \
     -e 's/(Bearer )[A-Za-z0-9._~+\/=-]+/\1[REDACTED]/g' \
     -e 's/(([aA][pP][iI][kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD])"?[[:space:]]*:[[:space:]]*"?)[^",}[:space:]]+/\1[REDACTED]/g' \
-    -e 's/^([A-Za-z0-9_]*([Tt][Oo][Kk][Ee][Nn]|[Kk][Ee][Yy]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd])[A-Za-z0-9_]*=).*/\1[REDACTED]/'
+    -e 's/^((export[[:space:]]+)?[A-Za-z0-9_]*([Tt][Oo][Kk][Ee][Nn]|[Kk][Ee][Yy]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd])[A-Za-z0-9_]*=).*/\1[REDACTED]/'
 }
 
 openclaw_diag_init() {
