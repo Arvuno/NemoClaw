@@ -289,6 +289,67 @@ describe("Bedrock Runtime OpenAI adapter", () => {
     expect(chat.status).toBe(401);
   });
 
+  it("emits safe request breadcrumbs without tokens or upstream hostnames", async () => {
+    const events: Array<{ event: string; fields?: Record<string, unknown> }> = [];
+    const server = createBedrockRuntimeAdapterServer({
+      token: "local-token",
+      endpointUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+      region: "us-east-1",
+      logger: (event, fields) => events.push({ event, fields }),
+      client: {
+        send: vi.fn(async () => ({
+          output: { message: { content: [{ text: "OK" }] } },
+          stopReason: "end_turn",
+        })),
+      },
+    });
+    const baseUrl = await listen(server);
+
+    const unauthorized = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "anthropic.claude",
+        messages: [{ role: "user", content: "hello" }],
+      }),
+    });
+    expect(unauthorized.status).toBe(401);
+
+    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer local-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "anthropic.claude",
+        messages: [{ role: "user", content: "hello" }],
+      }),
+    });
+    expect(response.status).toBe(200);
+
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: "request_rejected",
+          fields: expect.objectContaining({ status: 401, reason: "unauthorized" }),
+        }),
+        expect.objectContaining({
+          event: "request_completed",
+          fields: expect.objectContaining({
+            operation: "converse",
+            model: "anthropic.claude",
+            status: 200,
+          }),
+        }),
+      ]),
+    );
+    const serialized = JSON.stringify(events);
+    expect(serialized).not.toContain("local-token");
+    expect(serialized).not.toContain("bedrock-runtime.us-east-1.amazonaws.com");
+    expect(serialized).not.toContain("AWS_BEARER_TOKEN_BEDROCK");
+  });
+
   it("maps Bedrock auth and region failures to adapter errors", async () => {
     const server = createBedrockRuntimeAdapterServer({
       token: "local-token",

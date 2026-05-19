@@ -42,12 +42,16 @@ const STATE_DIR = path.join(os.homedir(), ".nemoclaw");
 const TOKEN_PATH = path.join(STATE_DIR, "bedrock-runtime-adapter-token");
 const PID_PATH = path.join(STATE_DIR, "bedrock-runtime-adapter.pid");
 const STATE_PATH = path.join(STATE_DIR, "bedrock-runtime-adapter.json");
+export const LOG_PATH = path.join(STATE_DIR, "bedrock-runtime-adapter.log");
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
 type JsonObject = Record<string, unknown>;
 type BedrockRuntimeClientLike = {
   send(command: ConverseCommand | ConverseStreamCommand): Promise<unknown>;
 };
+
+type AdapterLogFields = Record<string, string | number | boolean | null | undefined>;
+type AdapterLogger = (event: string, fields?: AdapterLogFields) => void;
 
 type OpenAiToolCall = {
   id?: string;
@@ -142,6 +146,37 @@ function writeJsonFile(filePath: string, value: unknown): void {
   ensureStateDir();
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
   fs.chmodSync(filePath, 0o600);
+}
+
+function normalizeLogField(value: string | number | boolean | null | undefined): string | number | boolean | null {
+  if (value === undefined) return null;
+  if (typeof value === "string") return compactText(value).slice(0, 180);
+  return value;
+}
+
+function defaultAdapterLogger(event: string, fields: AdapterLogFields = {}): void {
+  try {
+    ensureStateDir();
+    const payload: Record<string, string | number | boolean | null> = {
+      ts: new Date().toISOString(),
+      event: normalizeLogField(event) as string,
+    };
+    for (const [key, value] of Object.entries(fields)) {
+      payload[key] = normalizeLogField(value);
+    }
+    fs.appendFileSync(LOG_PATH, `${JSON.stringify(payload)}\n`, { mode: 0o600 });
+    fs.chmodSync(LOG_PATH, 0o600);
+  } catch {
+    /* best-effort diagnostics only */
+  }
+}
+
+function logAdapterEvent(logger: AdapterLogger, event: string, fields: AdapterLogFields = {}): void {
+  try {
+    logger(event, fields);
+  } catch {
+    /* best-effort diagnostics only */
+  }
 }
 
 function readJsonFile(filePath: string): JsonObject | null {
@@ -716,8 +751,13 @@ export function createBedrockRuntimeAdapterServer(options: {
   client: BedrockRuntimeClientLike;
   endpointUrl: string;
   region: string;
+  logger?: AdapterLogger;
 }): http.Server {
+  const logger = options.logger || defaultAdapterLogger;
   return http.createServer(async (req, res) => {
+    const started = Date.now();
+    let model = "unknown";
+    let operation = "unknown";
     try {
       const url = new URL(req.url || "/", "http://127.0.0.1");
       if (req.method === "GET" && url.pathname === "/health") {
@@ -733,17 +773,33 @@ export function createBedrockRuntimeAdapterServer(options: {
         sendJson(res, 401, {
           error: { message: "Unauthorized", type: "unauthorized", code: "unauthorized" },
         });
+        logAdapterEvent(logger, "request_rejected", {
+          method: req.method || "unknown",
+          path: url.pathname,
+          status: 401,
+          reason: "unauthorized",
+          durationMs: Date.now() - started,
+        });
         return;
       }
       if (req.method !== "POST" || url.pathname !== "/v1/chat/completions") {
         sendJson(res, 404, {
           error: { message: "Not found", type: "not_found", code: "not_found" },
         });
+        logAdapterEvent(logger, "request_rejected", {
+          method: req.method || "unknown",
+          path: url.pathname,
+          status: 404,
+          reason: "not_found",
+          durationMs: Date.now() - started,
+        });
         return;
       }
 
       const body = (await readRequestJson(req)) as OpenAiChatRequest;
+      model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : "unknown";
       if (body.stream === true) {
+        operation = "converse_stream";
         res.writeHead(200, {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
@@ -755,12 +811,36 @@ export function createBedrockRuntimeAdapterServer(options: {
         }
         res.write("data: [DONE]\n\n");
         res.end();
+        logAdapterEvent(logger, "request_completed", {
+          operation,
+          model,
+          status: 200,
+          stream: true,
+          durationMs: Date.now() - started,
+        });
         return;
       }
 
+      operation = "converse";
       const response = await createOpenAiChatCompletion(body, options.client);
       sendJson(res, 200, response);
+      logAdapterEvent(logger, "request_completed", {
+        operation,
+        model,
+        status: 200,
+        stream: false,
+        durationMs: Date.now() - started,
+      });
     } catch (err) {
+      const status = err instanceof AdapterHttpError ? err.status : 502;
+      const code = err instanceof AdapterHttpError ? err.code : "bedrock_runtime_error";
+      logAdapterEvent(logger, "request_failed", {
+        operation,
+        model,
+        status,
+        code,
+        durationMs: Date.now() - started,
+      });
       if (!res.headersSent) {
         sendError(res, err);
       } else {
@@ -789,8 +869,15 @@ export function startBedrockRuntimeAdapterFromEnv(): http.Server {
   const client = new BedrockRuntimeClient({ region, endpoint: endpointUrl });
   const server = createBedrockRuntimeAdapterServer({ token, client, endpointUrl, region });
   server.listen(port, BEDROCK_RUNTIME_ADAPTER_BIND_HOST, () => {
+    defaultAdapterLogger("adapter_ready", {
+      region,
+      bindHost: BEDROCK_RUNTIME_ADAPTER_BIND_HOST,
+      port,
+      sandboxRoute: BEDROCK_RUNTIME_ADAPTER_OPENAI_BASE_URL,
+      logPath: LOG_PATH,
+    });
     console.log(
-      `Bedrock Runtime adapter listening on ${BEDROCK_RUNTIME_ADAPTER_BIND_HOST}:${port} -> ${endpointUrl}`,
+      `Bedrock Runtime adapter listening on ${BEDROCK_RUNTIME_ADAPTER_BIND_HOST}:${port}; region ${region}; sandbox route ${BEDROCK_RUNTIME_ADAPTER_OPENAI_BASE_URL}; log ${LOG_PATH}`,
     );
   });
   return server;
@@ -918,6 +1005,7 @@ export async function ensureBedrockRuntimeAdapter(options: {
 }): Promise<{
   baseUrl: string;
   localBaseUrl: string;
+  logPath: string;
   credentialEnv: string;
   token: string;
   region: string;
@@ -941,6 +1029,7 @@ export async function ensureBedrockRuntimeAdapter(options: {
     return {
       baseUrl: BEDROCK_RUNTIME_ADAPTER_OPENAI_BASE_URL,
       localBaseUrl: BEDROCK_RUNTIME_ADAPTER_LOOPBACK_OPENAI_BASE_URL,
+      logPath: LOG_PATH,
       credentialEnv: BEDROCK_RUNTIME_ADAPTER_PROVIDER_CREDENTIAL_ENV,
       token: priorToken,
       region,
@@ -989,6 +1078,7 @@ export async function ensureBedrockRuntimeAdapter(options: {
   return {
     baseUrl: BEDROCK_RUNTIME_ADAPTER_OPENAI_BASE_URL,
     localBaseUrl: BEDROCK_RUNTIME_ADAPTER_LOOPBACK_OPENAI_BASE_URL,
+    logPath: LOG_PATH,
     credentialEnv: BEDROCK_RUNTIME_ADAPTER_PROVIDER_CREDENTIAL_ENV,
     token,
     region,

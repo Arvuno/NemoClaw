@@ -580,6 +580,14 @@ jobs:
           path: /tmp/nemoclaw-e2e-bedrock-runtime-${{ matrix.agent }}-mock.log
           if-no-files-found: ignore
 
+      - name: Upload Bedrock Runtime adapter log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adapter-log-bedrock-runtime-compatible-anthropic-${{ matrix.agent }}
+          path: ~/.nemoclaw/bedrock-runtime-adapter.log
+          if-no-files-found: ignore
+
   # ── Token rotation (credential propagation to L7 proxy) ─────
   # Validates that rotating a messaging token and re-running onboard
   # propagates the new credential to the sandbox. Uses two fake tokens

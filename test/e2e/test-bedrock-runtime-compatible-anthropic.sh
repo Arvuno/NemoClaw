@@ -764,6 +764,28 @@ check_mock_observed_traffic() {
   fi
 }
 
+check_adapter_log_breadcrumbs() {
+  if [ ! -f "$ADAPTER_LOG" ]; then
+    fail "B11: Bedrock Runtime adapter host log was not written"
+    return
+  fi
+  if grep -Fq '"event":"request_completed"' "$ADAPTER_LOG" \
+    && grep -Fq '"operation":"converse"' "$ADAPTER_LOG" \
+    && grep -Fq "$BEDROCK_MODEL" "$ADAPTER_LOG"; then
+    if [ "$AGENT" = "openclaw" ]; then
+      if grep -Fq '"operation":"converse_stream"' "$ADAPTER_LOG"; then
+        pass "B11: Bedrock Runtime adapter host log records safe Converse and ConverseStream breadcrumbs"
+      else
+        fail "B11: Bedrock Runtime adapter host log did not record a ConverseStream breadcrumb"
+      fi
+    else
+      pass "B11: Bedrock Runtime adapter host log records safe Converse breadcrumbs"
+    fi
+  else
+    fail "B11: Bedrock Runtime adapter host log did not record expected request breadcrumbs"
+  fi
+}
+
 collect_sandbox_snapshot() {
   local script
   script=$(
@@ -854,6 +876,8 @@ scan_for_leaks() {
   {
     printf '\n@@NEMOCLAW_E2E_FILE@@ %s\n' "$ONBOARD_LOG"
     [ -f "$ONBOARD_LOG" ] && cat "$ONBOARD_LOG"
+    printf '\n@@NEMOCLAW_E2E_FILE@@ %s\n' "$ADAPTER_LOG"
+    [ -f "$ADAPTER_LOG" ] && cat "$ADAPTER_LOG"
     printf '\n@@NEMOCLAW_E2E_FILE@@ %s\n' "$BEDROCK_MOCK_LOG"
     [ -f "$BEDROCK_MOCK_LOG" ] && cat "$BEDROCK_MOCK_LOG"
   } >"$host_log_file"
@@ -865,9 +889,9 @@ scan_for_leaks() {
   rm -f "$snapshot_file" "$host_log_file" 2>/dev/null || true
 
   if [ "$rc" -eq 0 ]; then
-    pass "B11: sandbox configs, env, proc, and logs contain no Bedrock token or hostname leaks"
+    pass "B12: sandbox configs, env, proc, and logs contain no Bedrock token or hostname leaks"
   else
-    fail "B11: leak scan found forbidden Bedrock token or hostname locations"
+    fail "B12: leak scan found forbidden Bedrock token or hostname locations"
     printf '%s\n' "$scan_output" | sed 's/^/    /'
   fi
 }
@@ -904,11 +928,14 @@ SANDBOX_NAME="${NEMOCLAW_SANDBOX_NAME:-e2e-bedrock-${AGENT}}"
 ONBOARD_LOG="/tmp/nemoclaw-e2e-bedrock-runtime-${AGENT}-onboard.log"
 BUILD_LOG="/tmp/nemoclaw-e2e-bedrock-runtime-${AGENT}-build.log"
 BEDROCK_MOCK_LOG="/tmp/nemoclaw-e2e-bedrock-runtime-${AGENT}-mock.log"
+ADAPTER_LOG="$HOME/.nemoclaw/bedrock-runtime-adapter.log"
 BEDROCK_MOCK_PID=""
 HOSTS_BACKUP=""
 ADAPTER_TOKEN=""
 
 trap cleanup EXIT
+
+rm -f "$ADAPTER_LOG" 2>/dev/null || true
 
 echo ""
 echo "============================================================"
@@ -994,6 +1021,7 @@ else
   check_openclaw_agent_turn
 fi
 check_mock_observed_traffic
+check_adapter_log_breadcrumbs
 
 section "Phase 6: Leak scan"
 scan_for_leaks

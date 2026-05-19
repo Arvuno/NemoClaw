@@ -269,7 +269,47 @@
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 847,
+          "line": 769,
+          "text": "B11: Bedrock Runtime adapter host log was not written",
+          "polarity": "fail",
+          "normalized_id": "b11.bedrock.runtime.adapter.host.log.was.not.written",
+          "mapping_status": "unmapped"
+        },
+        {
+          "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
+          "line": 777,
+          "text": "B11: Bedrock Runtime adapter host log records safe Converse and ConverseStream breadcrumbs",
+          "polarity": "pass",
+          "normalized_id": "b11.bedrock.runtime.adapter.host.log.records.safe.converse.and.conversestream.breadcrumbs",
+          "mapping_status": "unmapped"
+        },
+        {
+          "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
+          "line": 779,
+          "text": "B11: Bedrock Runtime adapter host log did not record a ConverseStream breadcrumb",
+          "polarity": "fail",
+          "normalized_id": "b11.bedrock.runtime.adapter.host.log.did.not.record.a.conversestream.breadcrumb",
+          "mapping_status": "unmapped"
+        },
+        {
+          "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
+          "line": 782,
+          "text": "B11: Bedrock Runtime adapter host log records safe Converse breadcrumbs",
+          "polarity": "pass",
+          "normalized_id": "b11.bedrock.runtime.adapter.host.log.records.safe.converse.breadcrumbs",
+          "mapping_status": "unmapped"
+        },
+        {
+          "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
+          "line": 785,
+          "text": "B11: Bedrock Runtime adapter host log did not record expected request breadcrumbs",
+          "polarity": "fail",
+          "normalized_id": "b11.bedrock.runtime.adapter.host.log.did.not.record.expected.request.breadcrumbs",
+          "mapping_status": "unmapped"
+        },
+        {
+          "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
+          "line": 869,
           "text": "B11: adapter token file was not created on the host",
           "polarity": "fail",
           "normalized_id": "b11.adapter.token.file.was.not.created.on.the.host",
@@ -277,23 +317,23 @@
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 868,
-          "text": "B11: sandbox configs, env, proc, and logs contain no Bedrock token or hostname leaks",
+          "line": 892,
+          "text": "B12: sandbox configs, env, proc, and logs contain no Bedrock token or hostname leaks",
           "polarity": "pass",
-          "normalized_id": "b11.sandbox.configs.env.proc.and.logs.contain.no.bedrock.token.or.hostname.leaks",
-          "mapping_status": "deferred"
+          "normalized_id": "b12.sandbox.configs.env.proc.and.logs.contain.no.bedrock.token.or.hostname.leaks",
+          "mapping_status": "unmapped"
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 870,
-          "text": "B11: leak scan found forbidden Bedrock token or hostname locations",
+          "line": 894,
+          "text": "B12: leak scan found forbidden Bedrock token or hostname locations",
           "polarity": "fail",
-          "normalized_id": "b11.leak.scan.found.forbidden.bedrock.token.or.hostname.locations",
-          "mapping_status": "deferred"
+          "normalized_id": "b12.leak.scan.found.forbidden.bedrock.token.or.hostname.locations",
+          "mapping_status": "unmapped"
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 922,
+          "line": 949,
           "text": "Docker is running",
           "polarity": "pass",
           "normalized_id": "docker.is.running",
@@ -301,7 +341,7 @@
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 924,
+          "line": 951,
           "text": "Docker is not running",
           "polarity": "fail",
           "normalized_id": "docker.is.not.running",
@@ -309,7 +349,7 @@
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 929,
+          "line": 956,
           "text": "python3 is available",
           "polarity": "pass",
           "normalized_id": "python3.is.available",
@@ -317,7 +357,7 @@
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 931,
+          "line": 958,
           "text": "python3 not found",
           "polarity": "fail",
           "normalized_id": "python3.not.found",
@@ -325,7 +365,7 @@
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 936,
+          "line": 963,
           "text": "NEMOCLAW_NON_INTERACTIVE=1",
           "polarity": "pass",
           "normalized_id": "nemoclaw.non.interactive.1",
@@ -333,7 +373,7 @@
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 938,
+          "line": 965,
           "text": "NEMOCLAW_NON_INTERACTIVE=1 is required",
           "polarity": "fail",
           "normalized_id": "nemoclaw.non.interactive.1.is.required",
@@ -341,7 +381,7 @@
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 943,
+          "line": 970,
           "text": "third-party software acceptance is set",
           "polarity": "pass",
           "normalized_id": "third.party.software.acceptance.is.set",
@@ -349,7 +389,7 @@
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 945,
+          "line": 972,
           "text": "NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 is required",
           "polarity": "fail",
           "normalized_id": "nemoclaw.accept.third.party.software.1.is.required",
@@ -357,7 +397,7 @@
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 957,
+          "line": 984,
           "text": "B0: source CLI and OpenShell are ready",
           "polarity": "pass",
           "normalized_id": "b0.source.cli.and.openshell.are.ready",
@@ -365,7 +405,7 @@
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 959,
+          "line": 986,
           "text": "B0: source CLI/OpenShell preparation failed",
           "polarity": "fail",
           "normalized_id": "b0.source.cli.openshell.preparation.failed",
@@ -373,7 +413,7 @@
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 968,
+          "line": 995,
           "text": "B0: fake Bedrock Runtime endpoint started",
           "polarity": "pass",
           "normalized_id": "b0.fake.bedrock.runtime.endpoint.started",
@@ -381,7 +421,7 @@
         },
         {
           "script": "test/e2e/test-bedrock-runtime-compatible-anthropic.sh",
-          "line": 970,
+          "line": 997,
           "text": "B0: fake Bedrock Runtime endpoint failed to start",
           "polarity": "fail",
           "normalized_id": "b0.fake.bedrock.runtime.endpoint.failed.to.start",
@@ -16729,7 +16769,7 @@
   ],
   "totals": {
     "scripts": 53,
-    "assertions": 2057,
+    "assertions": 2062,
     "zero_assertion_scripts": 2
   }
 }

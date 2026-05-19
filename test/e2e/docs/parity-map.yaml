@@ -200,12 +200,37 @@ scripts:
       reason: live legacy behavior requires Docker, sudo hosts edit, and OpenShell; retained for bucket parity tracking
       owner: e2e-maintainers
       runner_requirement: Docker + sudo hosts edit + OpenShell
-    - legacy: 'B11: sandbox configs, env, proc, and logs contain no Bedrock token or hostname leaks'
+    - legacy: 'B11: Bedrock Runtime adapter host log was not written'
       status: deferred
       reason: live legacy behavior requires Docker, sudo hosts edit, and OpenShell; retained for bucket parity tracking
       owner: e2e-maintainers
       runner_requirement: Docker + sudo hosts edit + OpenShell
-    - legacy: 'B11: leak scan found forbidden Bedrock token or hostname locations'
+    - legacy: 'B11: Bedrock Runtime adapter host log records safe Converse and ConverseStream breadcrumbs'
+      status: deferred
+      reason: live legacy behavior requires Docker, sudo hosts edit, and OpenShell; retained for bucket parity tracking
+      owner: e2e-maintainers
+      runner_requirement: Docker + sudo hosts edit + OpenShell
+    - legacy: 'B11: Bedrock Runtime adapter host log did not record a ConverseStream breadcrumb'
+      status: deferred
+      reason: live legacy behavior requires Docker, sudo hosts edit, and OpenShell; retained for bucket parity tracking
+      owner: e2e-maintainers
+      runner_requirement: Docker + sudo hosts edit + OpenShell
+    - legacy: 'B11: Bedrock Runtime adapter host log records safe Converse breadcrumbs'
+      status: deferred
+      reason: live legacy behavior requires Docker, sudo hosts edit, and OpenShell; retained for bucket parity tracking
+      owner: e2e-maintainers
+      runner_requirement: Docker + sudo hosts edit + OpenShell
+    - legacy: 'B11: Bedrock Runtime adapter host log did not record expected request breadcrumbs'
+      status: deferred
+      reason: live legacy behavior requires Docker, sudo hosts edit, and OpenShell; retained for bucket parity tracking
+      owner: e2e-maintainers
+      runner_requirement: Docker + sudo hosts edit + OpenShell
+    - legacy: 'B12: sandbox configs, env, proc, and logs contain no Bedrock token or hostname leaks'
+      status: deferred
+      reason: live legacy behavior requires Docker, sudo hosts edit, and OpenShell; retained for bucket parity tracking
+      owner: e2e-maintainers
+      runner_requirement: Docker + sudo hosts edit + OpenShell
+    - legacy: 'B12: leak scan found forbidden Bedrock token or hostname locations'
       status: deferred
       reason: live legacy behavior requires Docker, sudo hosts edit, and OpenShell; retained for bucket parity tracking
       owner: e2e-maintainers

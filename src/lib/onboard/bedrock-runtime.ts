@@ -150,7 +150,7 @@ export async function setupBedrockRuntimeInference(options: {
     return { handled: true, result: { retry: "selection" } };
   }
   console.log(
-    `  Bedrock Runtime adapter ready: region ${adapter.region}, sandbox route ${adapter.baseUrl}`,
+    `  Bedrock Runtime adapter ready: region ${adapter.region}, sandbox route ${adapter.baseUrl}, host log ${adapter.logPath}`,
   );
 
   const applyResult = options.runOpenshell(
