@@ -850,7 +850,7 @@ def rewrite_doc_paths(
     # Rewrite markdown links: [text](path). Keep matches on one line so
     # ordinary bracketed prose, such as version ranges, cannot consume a later
     # link and corrupt the generated skill text.
-    text = re.sub(r"\[((?:\\.|[^\[\]\n])+)\]\(([^)\n]+)\)", _resolve_link, text)
+    text = re.sub(r"\[([^\[\]\n]+)\]\(([^)\n]+)\)", _resolve_link, text)
 
     # Rewrite include placeholders: "Content included from <path>"
     def _resolve_include(match: re.Match) -> str:
