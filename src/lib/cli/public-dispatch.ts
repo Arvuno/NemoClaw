@@ -86,6 +86,16 @@ function hasHelpFlag(args: readonly string[]): boolean {
   return args.includes("--help") || args.includes("-h");
 }
 
+function argsBeforeSeparator(args: readonly string[]): readonly string[] {
+  const separatorIndex = args.indexOf("--");
+  return separatorIndex === -1 ? args : args.slice(0, separatorIndex);
+}
+
+function hasPublicSandboxHelpFlag(action: string, args: readonly string[]): boolean {
+  if (action !== "exec") return hasHelpFlag(args);
+  return hasHelpFlag(argsBeforeSeparator(args));
+}
+
 function findRegisteredSandboxName(tokens: string[]): string | null {
   const registered = new Set(
     registry().listSandboxes().sandboxes.map((s: { name: string }) => s.name),
@@ -134,7 +144,8 @@ const DIRECT_COMMAND_ID_COMPATIBILITY_COMMANDS = new Set([
 ]);
 
 function shouldExecuteViaNativeArgv(result: Extract<PublicTranslationResult, { kind: "nativeArgv" }>): boolean {
-  if (hasHelpFlag(result.args)) return false;
+  const helpArgs = result.commandId === "sandbox:exec" ? argsBeforeSeparator(result.args) : result.args;
+  if (hasHelpFlag(helpArgs)) return false;
   if (DIRECT_COMMAND_ID_COMPATIBILITY_COMMANDS.has(result.commandId)) return false;
   if (result.commandId.startsWith("root:")) return false;
   return true;
@@ -275,7 +286,7 @@ export async function dispatchCli(argv: string[] = process.argv.slice(2)): Promi
   if (
     !normalized.connectHelpRequested &&
     isKnownSandboxAction(requestedSandboxAction) &&
-    hasHelpFlag(requestedSandboxActionArgs)
+    hasPublicSandboxHelpFlag(requestedSandboxAction, requestedSandboxActionArgs)
   ) {
     validateName(cmd, "sandbox name");
     await runPublicTranslationResult(

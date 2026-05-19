@@ -212,6 +212,13 @@ const PUBLIC_DISPLAY_LAYOUT: Record<string, readonly PublicDisplayLayout[]> = {
       "flags": "[--json]"
     }
   ],
+  "sandbox:exec": [
+    {
+      "group": "Sandbox Management",
+      "order": 4.5,
+      "flags": "[--workdir <dir>] [--tty|--no-tty] [--timeout <s>] -- <cmd> [args...]"
+    }
+  ],
   "sandbox:gateway:token": [
     {
       "group": "Sandbox Management",

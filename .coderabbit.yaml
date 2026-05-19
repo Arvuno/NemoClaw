@@ -552,13 +552,8 @@ reviews:
         This is the nightly E2E workflow definition. Changes here affect
         which tests run and how they are triggered.
 
-        If a new E2E job is added, verify a corresponding
-        `path_instructions` entry exists in `.coderabbit.yaml` for the
-        source files it covers. The cross-validation test in
-        `test/validate-e2e-coverage.test.ts` checks this automatically.
-
-        If a job is renamed or removed, update the corresponding
-        `.coderabbit.yaml` path_instructions entries and the
-        `notify-on-failure` needs list.
+        If a job is renamed or removed, update the corresponding aggregate
+        job `needs` lists (`notify-on-failure`, `report-to-pr`, and
+        `scorecard`).
 chat:
   auto_reply: true
