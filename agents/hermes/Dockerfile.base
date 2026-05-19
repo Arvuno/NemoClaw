@@ -23,9 +23,9 @@ FROM node:22-trixie-slim@sha256:2d9f5c76c8f4dd36e8f253bee5d828a83a6c09f36188f0b0
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Hermes version pinned for reproducibility.
-# Calver tag v2026.4.23 = semver 0.11.0.
-ARG HERMES_VERSION=v2026.4.23
-ARG HERMES_TARBALL_SHA256=1ee1be80a2112b7edc581770cee8858e725ba110cc423979cd7102492504bc6b
+# Calver tag v2026.5.16 = semver 0.14.0.
+ARG HERMES_VERSION=v2026.5.16
+ARG HERMES_TARBALL_SHA256=c0a554050a50ee9a62f3fa5cd288a167ba5640c42d647d100cdea084b7294143
 ARG HERMES_UV_EXTRAS="messaging web"
 ARG UV_VERSION=0.11.8
 
@@ -83,12 +83,16 @@ RUN mkdir -p /sandbox/.hermes/memories \
         /sandbox/.hermes/plugins \
         /sandbox/.hermes/cron \
         /sandbox/.hermes/logs \
+        /sandbox/.hermes/logs/curator \
         /sandbox/.hermes/skins \
         /sandbox/.hermes/plans \
         /sandbox/.hermes/workspace \
         /sandbox/.hermes/profiles \
         /sandbox/.hermes/cache \
         /sandbox/.hermes/pairing \
+        /sandbox/.hermes/hooks \
+        /sandbox/.hermes/image_cache \
+        /sandbox/.hermes/audio_cache \
         /sandbox/.hermes/platforms \
         /sandbox/.hermes/platforms/whatsapp \
         /sandbox/.hermes/platforms/whatsapp/session \
@@ -103,12 +107,16 @@ RUN mkdir -p /sandbox/.hermes/memories \
         /sandbox/.hermes/plugins \
         /sandbox/.hermes/cron \
         /sandbox/.hermes/logs \
+        /sandbox/.hermes/logs/curator \
         /sandbox/.hermes/skins \
         /sandbox/.hermes/plans \
         /sandbox/.hermes/workspace \
         /sandbox/.hermes/profiles \
         /sandbox/.hermes/cache \
         /sandbox/.hermes/pairing \
+        /sandbox/.hermes/hooks \
+        /sandbox/.hermes/image_cache \
+        /sandbox/.hermes/audio_cache \
         /sandbox/.hermes/platforms \
         /sandbox/.hermes/platforms/whatsapp \
         /sandbox/.hermes/platforms/whatsapp/session \

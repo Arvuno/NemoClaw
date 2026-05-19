@@ -29,7 +29,7 @@ const API_SERVER_TOOLSETS = [
 export function buildHermesConfig(settings: HermesBuildSettings): Record<string, unknown> {
   const apiServerToolsets = [...API_SERVER_TOOLSETS];
   const config: Record<string, unknown> = {
-    _config_version: 12,
+    _config_version: 23,
     model: {
       default: settings.model,
       provider: "custom",
@@ -62,7 +62,7 @@ export function buildHermesConfig(settings: HermesBuildSettings): Record<string,
     },
   };
 
-  // Hermes v2026.4.23 reads Discord behavior from top-level `discord:`.
+  // Hermes v2026.5.16 reads Discord behavior from top-level `discord:`.
   // Bot tokens and user allowlists stay in .env so config.yaml never carries
   // real secrets or credential placeholders under platforms.discord.
   if (settings.messaging.enabledChannels.has("discord")) {

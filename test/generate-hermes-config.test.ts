@@ -101,6 +101,7 @@ describe("agents/hermes/generate-config.ts", () => {
   it("generates API server config without messaging platform token blocks", () => {
     const { config, envFile } = runConfigScript();
 
+    expect(config._config_version).toBe(23);
     expect(config.model).toMatchObject({
       default: "test-model",
       provider: "custom",

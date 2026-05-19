@@ -213,12 +213,16 @@ RUN set -eu; \
         "$config_dir/plugins" \
         "$config_dir/cron" \
         "$config_dir/logs" \
+        "$config_dir/logs/curator" \
         "$config_dir/skins" \
         "$config_dir/plans" \
         "$config_dir/workspace" \
         "$config_dir/profiles" \
         "$config_dir/cache" \
         "$config_dir/pairing" \
+        "$config_dir/hooks" \
+        "$config_dir/image_cache" \
+        "$config_dir/audio_cache" \
         "$config_dir/platforms" \
         "$config_dir/platforms/whatsapp" \
         "$config_dir/platforms/whatsapp/session" \
@@ -257,12 +261,16 @@ RUN set -eu; \
         /sandbox/.hermes/plugins \
         /sandbox/.hermes/cron \
         /sandbox/.hermes/logs \
+        /sandbox/.hermes/logs/curator \
         /sandbox/.hermes/skins \
         /sandbox/.hermes/plans \
         /sandbox/.hermes/workspace \
         /sandbox/.hermes/profiles \
         /sandbox/.hermes/cache \
         /sandbox/.hermes/pairing \
+        /sandbox/.hermes/hooks \
+        /sandbox/.hermes/image_cache \
+        /sandbox/.hermes/audio_cache \
         /sandbox/.hermes/platforms \
         /sandbox/.hermes/platforms/whatsapp \
         /sandbox/.hermes/platforms/whatsapp/session \
