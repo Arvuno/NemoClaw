@@ -28,12 +28,26 @@ const {
 // so host-side validation cannot prove reachability for that URL. For ordinary
 // verification we still skip these endpoints, but strict tool-call validation
 // must fail closed unless the host is probeable from the onboard process.
-const SANDBOX_INTERNAL_HOSTS = ["host.openshell.internal", "host.docker.internal"];
+const SANDBOX_INTERNAL_HOSTS = ["host.openshell.internal"];
+
+// host.docker.internal is not a stable host-service route from OpenShell k3s
+// sandboxes. Depending on the platform it may fail DNS resolution or resolve to
+// a gateway/bridge address where the user's host service is not forwarded. See
+// issue #3136. Always steer users to a NemoClaw-managed proxy URL instead.
+const HOST_DOCKER_INTERNAL = "host.docker.internal";
 
 function isSandboxInternalUrl(url) {
   try {
     const { hostname } = new URL(String(url));
     return SANDBOX_INTERNAL_HOSTS.includes(hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isHijackedDockerInternalUrl(url) {
+  try {
+    return new URL(String(url)).hostname === HOST_DOCKER_INTERNAL;
   } catch {
     return false;
   }
@@ -484,6 +498,30 @@ function runChatCompletionsProbe({ authHeader, model, url, isWsl: isWslOverride 
 }
 
 function probeOpenAiLikeEndpoint(endpointUrl, model, apiKey, options = {}) {
+  if (isHijackedDockerInternalUrl(endpointUrl) && options.allowHostDockerInternal !== true) {
+    return {
+      ok: false,
+      message:
+        `${HOST_DOCKER_INTERNAL} does not reach the host machine from inside the sandbox: ` +
+        `OpenShell k3s sandboxes do not provide it as a reliable host-service route. ` +
+        `It may fail DNS resolution or resolve to a gateway/bridge address where port ` +
+        `11434 is not forwarded. For local Ollama, use the auth-proxy URL ` +
+        `http://host.openshell.internal:11435/v1 (the URL NemoClaw onboard configures ` +
+        `automatically when you pick "Local Ollama"). See issue #3136.`,
+      failures: [
+        {
+          name: "host.docker.internal reachability",
+          httpStatus: 0,
+          curlStatus: 0,
+          message:
+            `${HOST_DOCKER_INTERNAL} is not a reliable host-service route from ` +
+            `OpenShell k3s sandboxes and cannot be used as an inference base URL.`,
+          body: "",
+        },
+      ],
+    };
+  }
+
   if (isSandboxInternalUrl(endpointUrl)) {
     const { hostname } = new URL(String(endpointUrl));
     if (options.requireChatCompletionsToolCalling !== true) {
@@ -494,21 +532,19 @@ function probeOpenAiLikeEndpoint(endpointUrl, model, apiKey, options = {}) {
         note: `${hostname} only resolves inside the sandbox — validation skipped. If the endpoint is unreachable at runtime, re-run onboard with a routable URL.`,
       };
     }
-    if (hostname !== "host.docker.internal") {
-      return {
-        ok: false,
-        message: `${hostname} only resolves inside the sandbox and cannot be validated for required structured Chat Completions tool calls from the host. Use a routable endpoint URL and retry onboard.`,
-        failures: [
-          {
-            name: "Chat Completions API with tool calling",
-            httpStatus: 0,
-            curlStatus: 0,
-            message: "sandbox-internal endpoint cannot be strictly validated from host",
-            body: "",
-          },
-        ],
-      };
-    }
+    return {
+      ok: false,
+      message: `${hostname} only resolves inside the sandbox and cannot be validated for required structured Chat Completions tool calls from the host. Use a routable endpoint URL and retry onboard.`,
+      failures: [
+        {
+          name: "Chat Completions API with tool calling",
+          httpStatus: 0,
+          curlStatus: 0,
+          message: "sandbox-internal endpoint cannot be strictly validated from host",
+          body: "",
+        },
+      ],
+    };
   }
 
   const useQueryParam = options.authMode === "query-param";
@@ -787,6 +823,7 @@ function probeAnthropicEndpoint(endpointUrl, model, apiKey) {
 
 module.exports = {
   isSandboxInternalUrl,
+  isHijackedDockerInternalUrl,
   parseJsonObject,
   hasResponsesToolCall,
   hasChatCompletionsToolCall,
