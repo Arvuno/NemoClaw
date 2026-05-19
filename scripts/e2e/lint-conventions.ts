@@ -21,10 +21,10 @@
  *     is rejected in suite step scripts; use
  *     `SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"` and
  *     walk up.
- *   - Every `test/e2e/test-*.sh` script MUST have an entry in
- *     `test/e2e/docs/parity-map.yaml` (Risk #1: guards against new
- *     legacy scripts landing unmapped).
- *   - The generated parity inventory MUST match current legacy assertions.
+ *
+ * Normal PR lint intentionally excludes legacy parity bookkeeping. Generate and
+ * validate legacy assertion parity from `.github/workflows/e2e-parity-compare.yaml`
+ * when producing a parity report.
  *
  * Invocation:
  *   tsx scripts/e2e/lint-conventions.ts [--root <repo-root>]
@@ -35,9 +35,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
-
-import { buildLegacyAssertionInventory } from "./extract-legacy-assertions";
-import { validateParityMap } from "./check-parity-map";
 
 interface Rule {
   id: string;
@@ -150,7 +147,9 @@ function parseArgs(argv: string[]): { root: string } {
     const a = args.shift()!;
     if (a === "--root") root = args.shift();
     else if (a === "-h" || a === "--help") {
-      process.stdout.write("tsx scripts/e2e/lint-conventions.ts [--root <repo-root>]\n");
+      process.stdout.write(
+        "tsx scripts/e2e/lint-conventions.ts [--root <repo-root>]\n",
+      );
       process.exit(0);
     } else {
       process.stderr.write(`lint-conventions: unexpected arg: ${a}\n`);
@@ -173,49 +172,13 @@ function lintSuiteSteps(root: string): LintFinding[] {
     for (const rule of STEP_RULES) {
       const msg = rule.test(body);
       if (msg) {
-        findings.push({ file: path.relative(root, file), rule: rule.id, message: msg });
+        findings.push({
+          file: path.relative(root, file),
+          rule: rule.id,
+          message: msg,
+        });
       }
     }
-  }
-  return findings;
-}
-
-/**
- * Read `test/e2e/docs/parity-map.yaml` and return the set of legacy-script
- * names that have an entry. Uses a narrow parser to avoid a runtime
- * dependency when js-yaml is not available.
- */
-function readParityMapScripts(mapFile: string): Set<string> {
-  const set = new Set<string>();
-  if (!fs.existsSync(mapFile)) return set;
-  const text = fs.readFileSync(mapFile, "utf8");
-  for (const raw of text.split("\n")) {
-    const m = raw.match(/^\s{2}([\w.\-]+):\s*$/);
-    if (m) set.add(m[1]);
-  }
-  return set;
-}
-
-function lintLegacyFrontier(root: string): LintFinding[] {
-  const findings: LintFinding[] = [];
-  const e2eDir = path.join(root, "test/e2e");
-  const mapFile = path.join(e2eDir, "docs", "parity-map.yaml");
-  const mapped = readParityMapScripts(mapFile);
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(e2eDir, { withFileTypes: true });
-  } catch {
-    return findings;
-  }
-  for (const ent of entries) {
-    if (!ent.isFile()) continue;
-    if (!/^test-.*\.sh$/.test(ent.name)) continue;
-    if (mapped.has(ent.name)) continue;
-    findings.push({
-      file: `test/e2e/${ent.name}`,
-      rule: "legacy-script-needs-parity-map-entry",
-      message: `new legacy test/e2e/${ent.name} has no entry in test/e2e/docs/parity-map.yaml (Risk #1)`,
-    });
   }
   return findings;
 }
@@ -232,11 +195,16 @@ function lintRetiredLegacyWrappers(root: string): LintFinding[] {
     const file = path.join(root, "test/e2e", script);
     if (!fs.existsSync(file) || !script.endsWith(".sh")) continue;
     const body = fs.readFileSync(file, "utf8");
-    if (!/test\/e2e\/runtime\/run-scenario\.sh|runtime\/run-scenario\.sh/.test(body)) {
+    if (
+      !/test\/e2e\/runtime\/run-scenario\.sh|runtime\/run-scenario\.sh/.test(
+        body,
+      )
+    ) {
       findings.push({
         file: `test/e2e/${script}`,
         rule: "retired-wrapper-delegates-to-scenario-runner",
-        message: "retired legacy wrapper must delegate to test/e2e/runtime/run-scenario.sh",
+        message:
+          "retired legacy wrapper must delegate to test/e2e/runtime/run-scenario.sh",
       });
     }
     if (
@@ -255,47 +223,11 @@ function lintRetiredLegacyWrappers(root: string): LintFinding[] {
   return findings;
 }
 
-function lintParityInventory(root: string): LintFinding[] {
-  const findings: LintFinding[] = [];
-  const inventoryPath = path.join(root, "test/e2e/docs/parity-inventory.generated.json");
-  if (!fs.existsSync(inventoryPath)) {
-    findings.push({
-      file: "test/e2e/docs/parity-inventory.generated.json",
-      rule: "legacy-assertion-inventory-current",
-      message:
-        "generated parity inventory is missing; run scripts/e2e/extract-legacy-assertions.ts",
-    });
-    return findings;
-  }
-
-  const expected = `${JSON.stringify(buildLegacyAssertionInventory(root), null, 2)}\n`;
-  const actual = fs.readFileSync(inventoryPath, "utf8");
-  if (actual !== expected) {
-    findings.push({
-      file: "test/e2e/docs/parity-inventory.generated.json",
-      rule: "legacy-assertion-inventory-current",
-      message: "generated parity inventory is stale; run scripts/e2e/extract-legacy-assertions.ts",
-    });
-  }
-  return findings;
-}
-
 function main(): number {
   const { root } = parseArgs(process.argv);
-  const inventoryPath = path.join(root, "test/e2e/docs/parity-inventory.generated.json");
-  const parityErrors = fs.existsSync(inventoryPath)
-    ? validateParityMap({ root, strict: false }).map((message) => ({
-        file: "test/e2e/docs/parity-map.yaml",
-        rule: "parity-map-schema",
-        message,
-      }))
-    : [];
   const findings = [
     ...lintSuiteSteps(root),
-    ...lintLegacyFrontier(root),
-    ...lintParityInventory(root),
     ...lintRetiredLegacyWrappers(root),
-    ...parityErrors,
   ];
   if (findings.length === 0) {
     return 0;
@@ -303,7 +235,9 @@ function main(): number {
   for (const f of findings) {
     process.stderr.write(`${f.file}: [${f.rule}] ${f.message}\n`);
   }
-  process.stderr.write(`\ne2e-convention-lint: ${findings.length} violation(s)\n`);
+  process.stderr.write(
+    `\ne2e-convention-lint: ${findings.length} violation(s)\n`,
+  );
   return 1;
 }
 
