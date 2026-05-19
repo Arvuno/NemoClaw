@@ -1550,8 +1550,7 @@ def generate_skill(
             lines.append(item)
         lines.append("")
 
-    # Procedural steps from how_to and get_started pages
-    step_num = 0
+    # Procedural sections from how_to and get_started pages
     skip_sections = {"prerequisites", "before you begin", "troubleshooting"}
     related_sections = {"related topics", "next steps"}
     collected_related: list[str] = []  # raw content from related sections
@@ -1575,9 +1574,8 @@ def generate_skill(
                     lines.append("")
                 continue
 
-            step_num += 1
             cleaned_content = _clean(content, pp)
-            lines.append(f"## Step {step_num}: {heading}")
+            lines.append(f"## {heading}")
             lines.append("")
             lines.append(cleaned_content)
             lines.append("")
