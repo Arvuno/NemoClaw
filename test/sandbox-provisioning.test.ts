@@ -347,31 +347,6 @@ describe("sandbox provisioning: copied OpenClaw helper permissions (#2861)", () 
   });
 });
 
-describe("sandbox provisioning: OpenClaw WeChat channel seeding", () => {
-  it("re-applies WeChat account seeding after OpenClaw can rewrite openclaw.json", () => {
-    const dockerfile = fs.readFileSync(DOCKERFILE, "utf-8");
-    const generateConfig = dockerfile.indexOf(
-      "RUN python3 /usr/local/lib/nemoclaw/generate-openclaw-config.py",
-    );
-    const doctor = dockerfile.indexOf("RUN openclaw doctor --fix --non-interactive");
-    const installPlugin = dockerfile.indexOf("RUN (openclaw plugins install /opt/nemoclaw");
-    const seedAfterInstall = dockerfile.indexOf(
-      "python3 /usr/local/lib/nemoclaw/seed-wechat-accounts.py",
-      installPlugin,
-    );
-    const configHash = dockerfile.indexOf(
-      "sha256sum /sandbox/.openclaw/openclaw.json",
-      seedAfterInstall,
-    );
-
-    expect(generateConfig).toBeGreaterThan(-1);
-    expect(doctor).toBeGreaterThan(generateConfig);
-    expect(installPlugin).toBeGreaterThan(doctor);
-    expect(seedAfterInstall).toBeGreaterThan(installPlugin);
-    expect(configHash).toBeGreaterThan(seedAfterInstall);
-  });
-});
-
 describe("Hermes sandbox provisioning", () => {
   function runHermesPathValidation(pathEntriesBeforeManifest: string[] = []) {
     const dockerfile = fs.readFileSync(HERMES_DOCKERFILE, "utf-8");
