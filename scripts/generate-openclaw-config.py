@@ -674,7 +674,7 @@ def build_config(env: dict | None = None) -> dict:
                 ),
                 # NemoClaw sandboxes are provisioned non-interactively and the
                 # E2E CLI contract expects the first agent turn to answer the
-                # caller's prompt. OpenClaw 2026.4.24 seeds BOOTSTRAP.md by
+                # caller's prompt. OpenClaw 2026.4.24+ seeds BOOTSTRAP.md by
                 # default, which redirects a fresh workspace into an identity
                 # setup conversation before normal replies.
                 "skipBootstrap": True,
@@ -701,7 +701,7 @@ def build_config(env: dict | None = None) -> dict:
         #     load. The sandbox L7 proxy denies the registry URL, the
         #     install retries for ~6 minutes, and while it's stuck the
         #     gateway can't service openclaw-agent requests — that's the
-        #     TC-SBX-02 hang in 2026.4.24.
+        #     TC-SBX-02 hang observed in 2026.4.24.
         #
         # acpx is disabled by default because its runtime dependency staging
         # also reaches npm during gateway startup. NemoClaw's primary CLI path

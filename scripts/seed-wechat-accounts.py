@@ -10,7 +10,7 @@
 # would otherwise drive an in-sandbox QR scan that has no terminal and no
 # paired phone access.
 #
-# Files written (matching auth/accounts.ts in @tencent-weixin/openclaw-weixin@2.4.2):
+# Files written (matching auth/accounts.ts in @tencent-weixin/openclaw-weixin@2.4.3):
 #   <stateDir>/openclaw-weixin/accounts.json                  — JSON array of accountIds
 #   <stateDir>/openclaw-weixin/accounts/<accountId>.json      — { token, savedAt, baseUrl, userId }
 #   <stateDir>/openclaw.json (channels.openclaw-weixin)       — registered channel + accounts.<id>.enabled

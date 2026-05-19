@@ -52,7 +52,7 @@ STATE_DIR="${NEMOCLAW_OPENSHELL_GATEWAY_STATE_DIR:-$HOME/.local/state/nemoclaw/o
 PID_FILE="${STATE_DIR}/openshell-gateway.pid"
 OLD_NEMOCLAW_REF="${NEMOCLAW_OLD_NEMOCLAW_REF:-v0.0.36}"
 OLD_OPENSHELL_VERSION="${NEMOCLAW_OLD_OPENSHELL_VERSION:-0.0.36}"
-CURRENT_OPENSHELL_VERSION="${NEMOCLAW_CURRENT_OPENSHELL_VERSION:-0.0.39}"
+CURRENT_OPENSHELL_VERSION="${NEMOCLAW_CURRENT_OPENSHELL_VERSION:-0.0.44}"
 SURVIVOR_SANDBOX="${NEMOCLAW_GATEWAY_UPGRADE_SURVIVOR_NAME:-e2e-gateway-upgrade-survivor}"
 SURVIVOR_MARKER="gateway-upgrade-survivor-$(date +%s)"
 SURVIVOR_MARKER_PATH="/sandbox/.openclaw/workspace/nemoclaw-gateway-upgrade-marker"
@@ -145,7 +145,7 @@ EOF
 # request-body-credential-rewrite
 # websocket-credential-rewrite
 if [ "${1:-}" = "--version" ]; then
-  printf 'openshell 0.0.39\n'
+  printf 'openshell 0.0.44\n'
   exit 0
 fi
 exit 99
@@ -235,7 +235,7 @@ EOF
 # request-body-credential-rewrite
 # websocket-credential-rewrite
 if [ "${1:-}" = "--version" ]; then
-  printf 'openshell 0.0.39\n'
+  printf 'openshell 0.0.44\n'
   exit 0
 fi
 exit 99

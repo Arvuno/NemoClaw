@@ -267,8 +267,8 @@ describe("generate-openclaw-config.py: config generation", () => {
     const configPath = path.join(tmpDir, ".openclaw", "openclaw.json");
     const installEntry = {
       type: "npm",
-      spec: "@tencent-weixin/openclaw-weixin@2.4.2",
-      resolved: "@tencent-weixin/openclaw-weixin@2.4.2",
+      spec: "@tencent-weixin/openclaw-weixin@2.4.3",
+      resolved: "@tencent-weixin/openclaw-weixin@2.4.3",
     };
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(
@@ -328,8 +328,8 @@ describe("generate-openclaw-config.py: config generation", () => {
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     const installEntry = {
       type: "npm",
-      spec: "@tencent-weixin/openclaw-weixin@2.4.2",
-      resolved: "@tencent-weixin/openclaw-weixin@2.4.2",
+      spec: "@tencent-weixin/openclaw-weixin@2.4.3",
+      resolved: "@tencent-weixin/openclaw-weixin@2.4.3",
     };
     fs.writeFileSync(
       configPath,
