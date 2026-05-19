@@ -160,6 +160,8 @@ jobs:
         run: |
           mkdir -p .e2e/parity
           bash test/e2e/runtime/coverage-report.sh > .e2e/parity/coverage-report.md
+          echo '## E2E parity and layered gap summary' >> "$GITHUB_STEP_SUMMARY"
+          cat .e2e/parity/coverage-report.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload parity artifacts
         if: always()

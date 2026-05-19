@@ -25,6 +25,20 @@ first, they are short and deliberately not redundant with prose:
 - [`../validation_suites/suites.yaml`](../validation_suites/suites.yaml)
   — ordered validation steps, each with a `requires_state` predicate.
 
+## Layered scenario model
+
+The E2E source of truth is layered as base environment, onboarding profile,
+test plan, expected state, and post-onboard suites. Test plans can also declare
+onboarding assertions that run after install/onboard and before expected-state
+validation.
+
+Plan-only resolution accepts either an alias or a test plan ID:
+
+```bash
+bash test/e2e/runtime/run-scenario.sh ubuntu-repo-cloud-openclaw --plan-only
+bash test/e2e/runtime/run-scenario.sh ubuntu-repo-docker__cloud-nvidia-openclaw --plan-only
+```
+
 ## How to run
 
 ```bash
