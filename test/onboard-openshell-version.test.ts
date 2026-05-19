@@ -339,32 +339,32 @@ describe("computeOpenshellInstallEnv", () => {
     const result = pinModule.computeOpenshellInstallEnv(
       { EXISTING: "preserved" },
       {
-        getBlueprintMinOpenshellVersion: () => "0.0.39",
-        getBlueprintMaxOpenshellVersion: () => "0.0.39",
+        getBlueprintMinOpenshellVersion: () => "0.0.44",
+        getBlueprintMaxOpenshellVersion: () => "0.0.44",
         versionGte,
-        listReleases: () => ["v0.0.38", "v0.0.39", "v0.0.42"],
+        listReleases: () => ["v0.0.43", "v0.0.44", "v0.0.45"],
       },
     );
     expect(result.env).not.toBe(null);
     expect(result.env?.EXISTING).toBe("preserved");
-    expect(result.env?.NEMOCLAW_OPENSHELL_MIN_VERSION).toBe("0.0.39");
-    expect(result.env?.NEMOCLAW_OPENSHELL_MAX_VERSION).toBe("0.0.39");
-    expect(result.env?.NEMOCLAW_OPENSHELL_PIN_VERSION).toBe("0.0.39");
+    expect(result.env?.NEMOCLAW_OPENSHELL_MIN_VERSION).toBe("0.0.44");
+    expect(result.env?.NEMOCLAW_OPENSHELL_MAX_VERSION).toBe("0.0.44");
+    expect(result.env?.NEMOCLAW_OPENSHELL_PIN_VERSION).toBe("0.0.44");
   });
 
   it("overlays MIN/MAX but no PIN when release discovery fails", () => {
     const result = pinModule.computeOpenshellInstallEnv(
       {},
       {
-        getBlueprintMinOpenshellVersion: () => "0.0.39",
-        getBlueprintMaxOpenshellVersion: () => "0.0.39",
+        getBlueprintMinOpenshellVersion: () => "0.0.44",
+        getBlueprintMaxOpenshellVersion: () => "0.0.44",
         versionGte,
         listReleases: () => null,
       },
     );
     expect(result.env).not.toBe(null);
-    expect(result.env?.NEMOCLAW_OPENSHELL_MIN_VERSION).toBe("0.0.39");
-    expect(result.env?.NEMOCLAW_OPENSHELL_MAX_VERSION).toBe("0.0.39");
+    expect(result.env?.NEMOCLAW_OPENSHELL_MIN_VERSION).toBe("0.0.44");
+    expect(result.env?.NEMOCLAW_OPENSHELL_MAX_VERSION).toBe("0.0.44");
     expect(result.env?.NEMOCLAW_OPENSHELL_PIN_VERSION).toBeUndefined();
   });
 
