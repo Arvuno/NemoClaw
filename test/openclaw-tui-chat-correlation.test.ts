@@ -8,8 +8,10 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const LIVE_REPRO_ENV = "NEMOCLAW_ISSUE_2603_LIVE";
-const LIVE_SANDBOX_ENV = "NEMOCLAW_ISSUE_2603_SANDBOX";
+const LIVE_REPRO_ENV = "NEMOCLAW_TUI_CHAT_CORRELATION_LIVE";
+const LIVE_REPRO_ENV_ALIASES = ["NEMOCLAW_ISSUE_3145_LIVE", "NEMOCLAW_ISSUE_2603_LIVE"];
+const LIVE_SANDBOX_ENV = "NEMOCLAW_TUI_CHAT_CORRELATION_SANDBOX";
+const LIVE_SANDBOX_ENV_ALIASES = ["NEMOCLAW_ISSUE_3145_SANDBOX", "NEMOCLAW_ISSUE_2603_SANDBOX"];
 const LIVE_SCRIPT_NAME = "openclaw-issue2603-chat-correlation.cjs";
 
 const ISSUE_2603_FIX_EXPECTATIONS = [
@@ -179,6 +181,18 @@ function buildFailureSummary(analysis: Issue2603Analysis): string {
     null,
     2,
   );
+}
+
+function isLiveReproEnabled(): boolean {
+  return [LIVE_REPRO_ENV, ...LIVE_REPRO_ENV_ALIASES].some((name) => process.env[name] === "1");
+}
+
+function resolveLiveSandboxName(): string {
+  for (const name of [LIVE_SANDBOX_ENV, ...LIVE_SANDBOX_ENV_ALIASES]) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  return "hclaw";
 }
 
 const capturedIssue2603Trace: Issue2603Trace = {
@@ -457,7 +471,7 @@ function runLiveIssue2603Repro(sandboxName: string): LiveIssue2603Trace {
   return JSON.parse(resultLine.slice("ISSUE2603_RESULT ".length)) as LiveIssue2603Trace;
 }
 
-describe("OpenClaw TUI chat correlation regression (#2603)", () => {
+describe("OpenClaw TUI chat correlation regression (#2603/#3145)", () => {
   it("classifies the observed #2603 gateway trace as broken", () => {
     const analysis = analyzeIssue2603Trace(capturedIssue2603Trace);
 
@@ -496,10 +510,10 @@ describe("OpenClaw TUI chat correlation regression (#2603)", () => {
     ]);
   });
 
-  it.runIf(process.env[LIVE_REPRO_ENV] === "1")(
+  it.runIf(isLiveReproEnabled())(
     "keeps rapid live TUI/webchat sends correlated on a real OpenClaw sandbox",
     () => {
-      const sandboxName = process.env[LIVE_SANDBOX_ENV] || "hclaw";
+      const sandboxName = resolveLiveSandboxName();
       const repro = runLiveIssue2603Repro(sandboxName);
       if (repro.error) throw new Error(`live repro failed before assertions: ${repro.error}`);
 
