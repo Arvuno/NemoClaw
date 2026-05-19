@@ -86,7 +86,7 @@ $ NEMOCLAW_PROVIDER=routed NVIDIA_API_KEY=<your-key> nemoclaw onboard --non-inte
 The Model Router runs in a host-side virtual environment that NemoClaw creates during onboarding.
 NemoClaw probes `python3.13`, `python3.12`, `python3.11`, `python3.10`, and bare `python3`, and adopts the first interpreter that satisfies both of:
 
-- Version inside `3.10, 3.14)`.
+- Version inside `[3.10, 3.14)`.
 - `ensurepip`, `pyexpat`, `ssl`, and `venv` all import without error.
 
 If no candidate qualifies, onboarding aborts and prints the real failure for each candidate.
@@ -113,7 +113,7 @@ Local NIM and managed vLLM install/start require `NEMOCLAW_EXPERIMENTAL=1`; an a
 | Local NVIDIA NIM | NIM-capable GPU detected | Pulls and manages a NIM container. |
 | Local vLLM | vLLM running on `localhost:8000`, or a supported DGX Spark, DGX Station, or Linux NVIDIA GPU profile | Auto-detects the loaded model when vLLM is already running. Can install or start a managed vLLM container for supported profiles after experimental opt-in. |
 
-For setup instructions, refer to [Use a Local Inference Server (use the `nemoclaw-user-configure-inference` skill).
+For setup instructions, refer to Use a Local Inference Server (use the `nemoclaw-user-configure-inference` skill).
 
 ## Validation
 
