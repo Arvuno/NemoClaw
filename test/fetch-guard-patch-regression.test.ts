@@ -32,6 +32,23 @@ function dockerRunCommandBetween(startMarker: string, endMarker: string): string
   return command;
 }
 
+function dockerShellSegmentBetween(startMarker: string, endMarker: string): string {
+  const dockerfile = fs.readFileSync(DOCKERFILE, "utf-8");
+  const start = dockerfile.indexOf(startMarker);
+  const end = dockerfile.indexOf(endMarker, start);
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error(`Expected Dockerfile segment between ${startMarker} and ${endMarker}`);
+  }
+  return dockerfile
+    .slice(start, end)
+    .trim()
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("#"))
+    .join("\n")
+    .replace(/\\\n/g, " ")
+    .replace(/\\\s*$/, "");
+}
+
 function runOpenClawUpgradeBlock(currentVersion: string) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-openclaw-upgrade-"));
   const blueprint = path.join(tmp, "blueprint.yaml");
@@ -137,6 +154,67 @@ if (globalThis.proxyChecks.length !== 0) throw new Error('sandbox proxy validati
       );
       expect(verify.status).toBe(0);
       expect(verify.stderr).toBe("");
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("patches the OpenClaw 2026.5.x handshake timeout constant shape", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-handshake-timeout-"));
+    const dist = path.join(tmp, "dist");
+    fs.mkdirSync(dist, { recursive: true });
+    const modulePath = path.join(dist, "handshake-timeouts-test.js");
+    fs.writeFileSync(
+      modulePath,
+      [
+        "const DEFAULT_PREAUTH_HANDSHAKE_TIMEOUT_MS = 15e3;",
+        "const MAX_CONNECT_CHALLENGE_TIMEOUT_MS = DEFAULT_PREAUTH_HANDSHAKE_TIMEOUT_MS;",
+        "export { DEFAULT_PREAUTH_HANDSHAKE_TIMEOUT_MS };",
+        "",
+      ].join("\n"),
+    );
+
+    const command = dockerShellSegmentBetween(
+      "# --- Patch 5: bump default WS handshake timeout",
+      "# Set up blueprint for local resolution.",
+    );
+    const fakeBin = path.join(tmp, "bin");
+    fs.mkdirSync(fakeBin);
+    const sedWrapper = path.join(fakeBin, "sed");
+    fs.writeFileSync(
+      sedWrapper,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        'if [ "${1:-}" = "-i" ] && [ "${2:-}" = "-E" ]; then',
+        "  expr=$3",
+        "  shift 3",
+        '  for file in "$@"; do perl -0pi -e "$expr" "$file"; done',
+        "  exit 0",
+        "fi",
+        'exec /usr/bin/sed "$@"',
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+    const scriptPath = path.join(tmp, "patch.sh");
+    fs.writeFileSync(
+      scriptPath,
+      ["#!/usr/bin/env bash", "set -euo pipefail", `OC_DIST=${JSON.stringify(dist)}`, command].join(
+        "\n",
+      ),
+      { mode: 0o700 },
+    );
+
+    try {
+      const patch = spawnSync("bash", [scriptPath], {
+        encoding: "utf-8",
+        env: { ...process.env, PATH: `${fakeBin}:${process.env.PATH || ""}` },
+        timeout: 5000,
+      });
+      expect(patch.status, `${patch.stdout}${patch.stderr}`).toBe(0);
+      const patched = fs.readFileSync(modulePath, "utf-8");
+      expect(patched).toContain("DEFAULT_PREAUTH_HANDSHAKE_TIMEOUT_MS = 6e4");
+      expect(patched).not.toContain("DEFAULT_PREAUTH_HANDSHAKE_TIMEOUT_MS = 15e3");
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
