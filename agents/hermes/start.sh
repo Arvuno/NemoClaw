@@ -230,6 +230,117 @@ start_gateway_log_stream() {
   GATEWAY_LOG_TAIL_PID=$!
 }
 
+bootstrap_tirith_after_download_failure() {
+  local marker="${HERMES_DIR}/.tirith-install-failed"
+  local reason python_bin tirith_bin
+
+  [ -e "$marker" ] || return 0
+  if [ -L "$marker" ] || [ ! -f "$marker" ]; then
+    echo "[tirith-bootstrap] WARNING: unsafe Tirith install marker at ${marker}; not reading it" >&2
+    return 0
+  fi
+
+  reason="$(head -n 1 "$marker" 2>/dev/null | tr -d '\r\n' || true)"
+  if [ "$reason" != "download_failed" ]; then
+    echo "[tirith-bootstrap] WARNING: Tirith install marker reason '${reason:-unknown}' is not retryable; gateway startup will continue" >&2
+    return 0
+  fi
+
+  if [ -x /opt/hermes/.venv/bin/python ]; then
+    python_bin="/opt/hermes/.venv/bin/python"
+  else
+    python_bin="$(command -v python3 2>/dev/null || command -v python 2>/dev/null || true)"
+  fi
+  if [ -z "$python_bin" ]; then
+    echo "[tirith-bootstrap] WARNING: no Python interpreter available for Tirith retry; gateway startup will continue" >&2
+    return 0
+  fi
+
+  echo "[tirith-bootstrap] Retrying Tirith install after download_failed marker" >&2
+  rm -f "$marker" 2>/dev/null || true
+  if HERMES_HOME="${HERMES_DIR}" PYTHONPATH="/opt/hermes:${PYTHONPATH:-}" "$python_bin" - <<'PYTIRITH_BOOTSTRAP'; then
+import os
+import stat
+import sys
+
+marker = os.path.join(os.environ["HERMES_HOME"], ".tirith-install-failed")
+
+try:
+    from tools import tirith_security
+except Exception as exc:
+    print(f"[tirith-bootstrap] WARNING: could not import tools.tirith_security: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    try:
+        os.unlink(marker)
+    except FileNotFoundError:
+        pass
+
+    if hasattr(tirith_security, "_resolved_path"):
+        tirith_security._resolved_path = None
+    if hasattr(tirith_security, "_install_failure_reason"):
+        tirith_security._install_failure_reason = ""
+
+    installed = None
+    reason = ""
+    installer = getattr(tirith_security, "_install_tirith", None)
+    if callable(installer):
+        installed, reason = installer(log_failures=True)
+    else:
+        resolver = getattr(tirith_security, "_resolve_tirith_path", None)
+        if callable(resolver):
+            installed = resolver("tirith")
+        else:
+            ensure_installed = getattr(tirith_security, "ensure_installed", None)
+            if not callable(ensure_installed):
+                raise RuntimeError("Hermes Tirith installer API is unavailable")
+            installed = ensure_installed(log_failures=True)
+
+    if installed and os.path.isfile(installed):
+        os.chmod(installed, os.stat(installed).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        clear_failed = getattr(tirith_security, "_clear_install_failed", None)
+        if callable(clear_failed):
+            clear_failed()
+        else:
+            try:
+                os.unlink(marker)
+            except FileNotFoundError:
+                pass
+        print(f"[tirith-bootstrap] installed={installed}", file=sys.stderr)
+        sys.exit(0)
+
+    reason = reason or "unknown"
+    mark_failed = getattr(tirith_security, "_mark_install_failed", None)
+    if callable(mark_failed):
+        mark_failed(reason)
+    else:
+        os.makedirs(os.path.dirname(marker), exist_ok=True)
+        with open(marker, "w", encoding="utf-8") as fh:
+            fh.write(reason)
+    print(f"[tirith-bootstrap] WARNING: Tirith install retry failed: {reason}", file=sys.stderr)
+    sys.exit(1)
+except Exception as exc:
+    try:
+        os.makedirs(os.path.dirname(marker), exist_ok=True)
+        with open(marker, "w", encoding="utf-8") as fh:
+            fh.write("bootstrap_failed")
+    except OSError:
+        pass
+    print(f"[tirith-bootstrap] WARNING: Tirith bootstrap failed: {exc}", file=sys.stderr)
+    sys.exit(1)
+PYTIRITH_BOOTSTRAP
+    tirith_bin="${HERMES_DIR}/bin/tirith"
+    if [ -f "$tirith_bin" ] && [ ! -L "$tirith_bin" ]; then
+      chmod a+rx "$tirith_bin" 2>/dev/null || true
+    fi
+    rm -f "$marker" 2>/dev/null || true
+    echo "[tirith-bootstrap] Tirith ready at ${tirith_bin}" >&2
+  else
+    echo "[tirith-bootstrap] WARNING: Tirith retry failed; gateway startup will continue" >&2
+  fi
+}
+
 # ── socat forwarder ──────────────────────────────────────────────
 # Hermes API server binds to 127.0.0.1 regardless of config (upstream bug).
 # OpenShell needs the port accessible on 0.0.0.0 for port forwarding.
@@ -602,6 +713,8 @@ if [ "$(id -u)" -ne 0 ]; then
     exec "${NEMOCLAW_CMD[@]}"
   fi
 
+  bootstrap_tirith_after_download_failure
+
   prepare_restricted_log /tmp/gateway.log "" 600
 
   # Defence-in-depth: verify /tmp file permissions before launching services.
@@ -633,6 +746,7 @@ fi
 
 # ── Root path (full privilege separation via setpriv) ──────────
 
+export HERMES_HOME="${HERMES_DIR}"
 verify_config_integrity "${HERMES_DIR}" "${HERMES_HASH_FILE}"
 refresh_hermes_provider_placeholders
 install_configure_guard
@@ -641,6 +755,8 @@ configure_messaging_channels
 if [ ${#NEMOCLAW_CMD[@]} -gt 0 ]; then
   exec "${STEP_DOWN_PREFIX_SANDBOX[@]}" "${NEMOCLAW_CMD[@]}"
 fi
+
+bootstrap_tirith_after_download_failure
 
 # SECURITY: Protect gateway log from sandbox user tampering
 prepare_restricted_log /tmp/gateway.log gateway:gateway 600
