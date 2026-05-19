@@ -147,9 +147,7 @@ function parseArgs(argv: string[]): { root: string } {
     const a = args.shift()!;
     if (a === "--root") root = args.shift();
     else if (a === "-h" || a === "--help") {
-      process.stdout.write(
-        "tsx scripts/e2e/lint-conventions.ts [--root <repo-root>]\n",
-      );
+      process.stdout.write("tsx scripts/e2e/lint-conventions.ts [--root <repo-root>]\n");
       process.exit(0);
     } else {
       process.stderr.write(`lint-conventions: unexpected arg: ${a}\n`);
@@ -195,16 +193,11 @@ function lintRetiredLegacyWrappers(root: string): LintFinding[] {
     const file = path.join(root, "test/e2e", script);
     if (!fs.existsSync(file) || !script.endsWith(".sh")) continue;
     const body = fs.readFileSync(file, "utf8");
-    if (
-      !/test\/e2e\/runtime\/run-scenario\.sh|runtime\/run-scenario\.sh/.test(
-        body,
-      )
-    ) {
+    if (!/test\/e2e\/runtime\/run-scenario\.sh|runtime\/run-scenario\.sh/.test(body)) {
       findings.push({
         file: `test/e2e/${script}`,
         rule: "retired-wrapper-delegates-to-scenario-runner",
-        message:
-          "retired legacy wrapper must delegate to test/e2e/runtime/run-scenario.sh",
+        message: "retired legacy wrapper must delegate to test/e2e/runtime/run-scenario.sh",
       });
     }
     if (
@@ -225,19 +218,14 @@ function lintRetiredLegacyWrappers(root: string): LintFinding[] {
 
 function main(): number {
   const { root } = parseArgs(process.argv);
-  const findings = [
-    ...lintSuiteSteps(root),
-    ...lintRetiredLegacyWrappers(root),
-  ];
+  const findings = [...lintSuiteSteps(root), ...lintRetiredLegacyWrappers(root)];
   if (findings.length === 0) {
     return 0;
   }
   for (const f of findings) {
     process.stderr.write(`${f.file}: [${f.rule}] ${f.message}\n`);
   }
-  process.stderr.write(
-    `\ne2e-convention-lint: ${findings.length} violation(s)\n`,
-  );
+  process.stderr.write(`\ne2e-convention-lint: ${findings.length} violation(s)\n`);
   return 1;
 }
 
