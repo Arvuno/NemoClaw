@@ -56,12 +56,12 @@ open(path, "w").write(text)
 PY
 }
 
-cleanup_logs() {
+redact_logs() {
   redact_file "$ONBOARD_LOG"
   redact_file "$AGENT_LOG"
   redact_file "$DF_LOG"
 }
-trap cleanup_logs EXIT
+trap redact_logs EXIT
 
 section "Prerequisites"
 if docker info >/dev/null 2>&1; then
@@ -97,7 +97,6 @@ section "Fresh sandbox onboard"
 rm -f "$HOME/.nemoclaw/onboard.lock" 2>/dev/null || true
 nemoclaw "$SANDBOX_NAME" destroy --yes >/dev/null 2>&1 || true
 
-
 python3 - "${REPO}" <<'PY'
 import sys
 from pathlib import Path
@@ -130,7 +129,7 @@ env \
   "$TIMEOUT_CMD" 1500 nemoclaw onboard --fresh --non-interactive --yes-i-accept-third-party-software --agent openclaw --from "$REPO/Dockerfile" \
   >"$ONBOARD_LOG" 2>&1
 onboard_rc=$?
-redact_file "$ONBOARD_LOG"
+redact_logs
 if [ "$onboard_rc" -eq 0 ]; then
   pass "fresh sandbox onboard completed"
 else
@@ -141,7 +140,7 @@ fi
 section "Filesystem layout evidence"
 openshell sandbox exec --name "$SANDBOX_NAME" -- sh -lc 'df -PT / /tmp /dev/shm /sandbox /sandbox/.openclaw/plugin-runtime-deps 2>&1' \
   >"$DF_LOG" 2>&1 || true
-redact_file "$DF_LOG"
+redact_logs
 info "Filesystem layout captured in ${DF_LOG}"
 
 section "Bundled plugin runtime-deps cross-device replacement"
@@ -151,7 +150,8 @@ agent_rc=0
 # contents into a staging dir adjacent to the source and then renameSyncs that
 # staged node_modules dir into the final plugin-runtime-deps target. When source
 # is on tmpfs (/dev/shm) and target is under /sandbox, unfixed code throws EXDEV.
-remote_script_b64=$(cat <<'REMOTE' | base64 | tr -d '\n'
+remote_script_b64=$(
+  cat <<'REMOTE' | base64 | tr -d '\n'
 set -eu
 rm -rf /sandbox/.openclaw/plugin-runtime-deps/exdev-guard 2>/dev/null || true
 rm -rf /dev/shm/nemoclaw-exdev-source 2>/dev/null || true
@@ -181,7 +181,7 @@ REMOTE
 remote_cmd="printf '%s' '${remote_script_b64}' | base64 -d > /tmp/nemoclaw-exdev-guard.sh && sh /tmp/nemoclaw-exdev-guard.sh"
 "$TIMEOUT_CMD" 60 openshell sandbox exec --name "$SANDBOX_NAME" -- sh -lc "$remote_cmd" \
   >"$AGENT_LOG" 2>&1 || agent_rc=$?
-redact_file "$AGENT_LOG"
+redact_logs
 
 if grep -qiE 'EXDEV: cross-device link not permitted|cross-device link not permitted' "$AGENT_LOG"; then
   fail "OpenClaw-style plugin runtime deps replacement hit #3513 EXDEV failure"
