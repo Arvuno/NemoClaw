@@ -17,7 +17,7 @@ import * as policies from "../../policy";
 import * as registry from "../../state/registry";
 import type { SandboxEntry } from "../../state/registry";
 import * as sandboxState from "../../state/sandbox";
-import { removeSandboxRegistryEntry } from "./destroy";
+import { cleanupShieldsDestroyArtifacts, removeSandboxRegistryEntry } from "./destroy";
 
 const useColor = !process.env.NO_COLOR && !!process.stdout.isTTY;
 const trueColor =
@@ -219,16 +219,18 @@ async function autoCreateSandboxFromSource(
 }
 
 // Delete an existing destination sandbox so `snapshot restore --to <dst> --force`
-// can recreate it from the source's image. Mirrors the rebuild.ts delete
-// sequence: stop the destination's NIM container (if any), run
-// `openshell sandbox delete`, then drop the NemoClaw registry entry. Throws
+// can recreate it from the source's image. Stops the destination's NIM
+// container, runs `openshell sandbox delete`, performs the destination-only
+// cleanups that `sandboxDestroy` does (PID dir, per-sandbox messaging
+// providers, shields state), then drops the NemoClaw registry entry. Throws
 // SnapshotCommandError on failure so the caller does not proceed into a
 // partially-deleted target.
 //
 // Host-shared cleanups that destroy.ts performs \u2014 Ollama auth proxy
-// (`killStaleProxy`), host services (`cleanupSandboxServices`), gateway
-// teardown \u2014 are deliberately skipped here because they can also affect the
-// source sandbox we are about to clone from.
+// (`killStaleProxy`), host services (`cleanupSandboxServices` with
+// `stopHostServices`), Ollama model unload, gateway teardown \u2014 are
+// deliberately skipped here because they can also affect the source sandbox
+// we are about to clone from.
 function deleteSandboxForRestore(name: string): void {
   const nim = require("../../inference/nim") as {
     stopNimContainer: (sandboxName: string, opts?: { silent?: boolean }) => void;
@@ -250,6 +252,30 @@ function deleteSandboxForRestore(name: string): void {
     console.error(`  Failed to delete '${name}' (exit ${deleteResult.status}). Aborting restore.`);
     snapshotExit(1);
   }
+  // Destination-only cleanup so the recreated sandbox does not inherit stale
+  // host-side state or hit provider-name conflicts (Codex #3796 P2):
+  // - /tmp/nemoclaw-services-<name>: PID dir for this sandbox's services
+  // - OpenShell providers named <name>-{telegram,discord,slack,wechat}-bridge
+  //   and <name>-slack-app: per-sandbox messaging bridges
+  // - shields-<name>.json + shields timer: per-sandbox shields artifacts
+  try {
+    fs.rmSync(`/tmp/nemoclaw-services-${name}`, { recursive: true, force: true });
+  } catch {
+    // PID dir may not exist \u2014 ignore.
+  }
+  for (const suffix of [
+    "telegram-bridge",
+    "discord-bridge",
+    "slack-bridge",
+    "slack-app",
+    "wechat-bridge",
+  ]) {
+    runOpenshell(["provider", "delete", `${name}-${suffix}`], {
+      ignoreError: true,
+      stdio: ["ignore", "ignore", "ignore"],
+    });
+  }
+  cleanupShieldsDestroyArtifacts(name);
   removeSandboxRegistryEntry(name);
   console.log(`  ${G}\u2713${R} '${name}' deleted`);
 }
@@ -395,6 +421,22 @@ export async function runSandboxSnapshot(
           snapshotExit(1);
         }
       } else {
+        // #3756: cross-sandbox restore into a destination that already exists
+        // used to overlay onto the live filesystem silently. Refuse by default
+        // *before* doing any source-side preflight, so the user sees the
+        // precise "destination exists" error instead of a misleading
+        // "source not found" or "cannot resolve image" message when both are
+        // also broken.
+        if (targetExists && !request.force) {
+          console.error(`  Destination sandbox '${targetSandbox}' already exists.`);
+          console.error(
+            "  Restoring into an existing sandbox is unsupported because it would silently mutate its filesystem.",
+          );
+          console.error(
+            `  Re-run with --force to delete '${targetSandbox}' and recreate it from the snapshot, or pick a different name.`,
+          );
+          snapshotExit(1);
+        }
         // Cross-sandbox restore — whether dst exists (with --force) or not,
         // we must be able to clone the source's running pod image. Resolve it
         // upfront so a missing source / unresolvable image cannot delete the
@@ -422,21 +464,8 @@ export async function runSandboxSnapshot(
           snapshotExit(1);
         }
         if (targetExists) {
-          // #3756: cross-sandbox restore into a destination that already
-          // exists used to overlay onto the live filesystem silently. Refuse
-          // by default; with --force, delete the destination and let the
-          // existing auto-create path recreate it cleanly. Confirm before
-          // deleting unless --yes (or NEMOCLAW_NON_INTERACTIVE=1) is set.
-          if (!request.force) {
-            console.error(`  Destination sandbox '${targetSandbox}' already exists.`);
-            console.error(
-              "  Restoring into an existing sandbox is unsupported because it would silently mutate its filesystem.",
-            );
-            console.error(
-              `  Re-run with --force to delete '${targetSandbox}' and recreate it from the snapshot, or pick a different name.`,
-            );
-            snapshotExit(1);
-          }
+          // --force confirmed above. Prompt for the destination name (unless
+          // --yes or NEMOCLAW_NON_INTERACTIVE=1), then delete and recreate.
           const nonInteractive = process.env.NEMOCLAW_NON_INTERACTIVE === "1";
           if (!request.yes && !nonInteractive) {
             const answer = (
@@ -534,7 +563,9 @@ export async function runSandboxSnapshot(
       console.log(
         `    ${CLI_NAME} ${sandboxName} snapshot list            List available snapshots`,
       );
-      console.log(`    ${CLI_NAME} ${sandboxName} snapshot restore [selector] [--to <dst>]`);
+      console.log(
+        `    ${CLI_NAME} ${sandboxName} snapshot restore [selector] [--to <dst>] [--force] [--yes|-y]`,
+      );
       console.log(
         `                                             Restore by version (v1), name, or timestamp.`,
       );
@@ -543,6 +574,9 @@ export async function runSandboxSnapshot(
       );
       console.log(
         `                                             Use --to to restore into another sandbox; <dst> is auto-created if missing.`,
+      );
+      console.log(
+        `                                             When <dst> already exists, pass --force to delete it and recreate from the snapshot (prompts unless --yes).`,
       );
       break;
   }

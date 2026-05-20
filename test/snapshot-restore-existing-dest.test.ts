@@ -194,6 +194,19 @@ describe("snapshot restore --to existing destination (#3756)", () => {
     expect(log).not.toMatch(/sandbox delete dst/);
   });
 
+  it("refuses by default before running source-image preflight (Codex #3796 P2)", () => {
+    // Existing destination + unresolvable source image. The user must see the
+    // precise "destination exists" error, not the "cannot resolve image"
+    // misdirection that would land if the refusal came after preflight.
+    const { env } = makeExistingDestEnv("nemoclaw-snap-restore-refuse-before-preflight-", {
+      withSourceImage: false,
+    });
+    const r = runCli("src snapshot restore --to dst", env);
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/Destination sandbox 'dst' already exists/);
+    expect(r.out).not.toMatch(/Cannot resolve image/);
+  });
+
   it("deletes the destination when --force --yes is set, then proceeds (#3756)", () => {
     const { env, osLog } = makeExistingDestEnv("nemoclaw-snap-restore-force-");
     const r = runCli("src snapshot restore --to dst --force --yes", env);

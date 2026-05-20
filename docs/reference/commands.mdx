@@ -831,7 +831,7 @@ The selector accepts any of:
 
 - A version (`v1`, `v2`, ..., `vN`) from `snapshot list`.
 - An exact name passed to `snapshot create --name`.
-- An exact or prefix timestamp (partial prefixes are accepted when they match exactly one snapshot).
+- An exact timestamp.
 
 Pass `--to <dst>` to restore the snapshot into a different sandbox instead of the source.
 When `dst` does not exist, it is auto-created by reusing the source sandbox's container image — no re-onboarding needed.
