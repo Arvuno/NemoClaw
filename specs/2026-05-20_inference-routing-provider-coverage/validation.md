@@ -19,7 +19,7 @@ Test Spec: `specs/2026-05-20_inference-routing-provider-coverage/tests.md`
 
 ## Phase 1: Coverage Inventory and Parity Baseline - Validation Scenarios
 
-### Scenario 1.1: Target legacy scripts are fully inventoried [STATUS: pending]
+### Scenario 1.1: Target legacy scripts are fully inventoried [STATUS: passed] [VALIDATED: a6d4d39f2]
 **Type**: Happy Path
 
 **Given**: The five issue #3812 legacy scripts exist in `test/e2e/`  
@@ -33,7 +33,7 @@ Test Spec: `specs/2026-05-20_inference-routing-provider-coverage/tests.md`
 
 **Tools Required**: Bash, npm/Vitest
 
-### Scenario 1.2: Unknown parity status is rejected [STATUS: pending]
+### Scenario 1.2: Unknown parity status is rejected [STATUS: passed] [VALIDATED: a6d4d39f2]
 **Type**: Sad Path
 
 **Given**: A target legacy assertion lacks mapped/covered/deferred/retired classification  
@@ -49,7 +49,7 @@ Test Spec: `specs/2026-05-20_inference-routing-provider-coverage/tests.md`
 
 ## Phase 2: Inference Routing Primitive Library - Validation Scenarios
 
-### Scenario 2.1: Helper library is sourceable and plan-only safe [STATUS: pending]
+### Scenario 2.1: Helper library is sourceable and plan-only safe [STATUS: passed] [VALIDATED: a6d4d39f2]
 **Type**: Happy Path
 
 **Given**: `test/e2e/validation_suites/lib/inference_routing.sh` exists  
@@ -63,7 +63,7 @@ Test Spec: `specs/2026-05-20_inference-routing-provider-coverage/tests.md`
 
 **Tools Required**: Bash, npm/Vitest
 
-### Scenario 2.2: Missing required context fails clearly [STATUS: pending]
+### Scenario 2.2: Missing required context fails clearly [STATUS: passed] [VALIDATED: a6d4d39f2]
 **Type**: Sad Path
 
 **Given**: Required context keys are absent from `$E2E_CONTEXT_DIR/context.env`  
@@ -77,7 +77,7 @@ Test Spec: `specs/2026-05-20_inference-routing-provider-coverage/tests.md`
 
 **Tools Required**: Bash, npm/Vitest
 
-### Scenario 2.3: Secrets are not printed by inference helpers [STATUS: pending]
+### Scenario 2.3: Secrets are not printed by inference helpers [STATUS: passed] [VALIDATED: a6d4d39f2]
 **Type**: Sad Path
 
 **Given**: Fake provider token/API key values exist in context  
@@ -93,7 +93,7 @@ Test Spec: `specs/2026-05-20_inference-routing-provider-coverage/tests.md`
 
 ## Phase 3: Domain Suite Migration - Validation Scenarios
 
-### Scenario 3.1: Domain suite families resolve to inference-specific steps [STATUS: pending]
+### Scenario 3.1: Domain suite families resolve to inference-specific steps [STATUS: passed] [VALIDATED: a6d4d39f2]
 **Type**: Happy Path
 
 **Given**: `suites.yaml` contains affected inference/provider suite families  
@@ -107,7 +107,7 @@ Test Spec: `specs/2026-05-20_inference-routing-provider-coverage/tests.md`
 
 **Tools Required**: Bash, npm/Vitest
 
-### Scenario 3.2: Affected scenarios support plan-only execution [STATUS: pending]
+### Scenario 3.2: Affected scenarios support plan-only execution [STATUS: passed] [VALIDATED: a6d4d39f2]
 **Type**: Happy Path
 
 **Given**: Final affected scenario IDs are known  
@@ -121,7 +121,7 @@ Test Spec: `specs/2026-05-20_inference-routing-provider-coverage/tests.md`
 
 **Tools Required**: Bash, scenario framework runner
 
-### Scenario 3.3: Unsupported live runner requirements do not break static validation [STATUS: pending]
+### Scenario 3.3: Unsupported live runner requirements do not break static validation [STATUS: passed] [VALIDATED: a6d4d39f2]
 **Type**: Sad Path
 
 **Given**: Provider credentials, Docker/OpenShell, or local Ollama runner are unavailable  
@@ -137,7 +137,7 @@ Test Spec: `specs/2026-05-20_inference-routing-provider-coverage/tests.md`
 
 ## Phase 4: Parity Map and Coverage Report Completion - Validation Scenarios
 
-### Scenario 4.1: Coverage report exposes issue #3812 domains [STATUS: pending]
+### Scenario 4.1: Coverage report exposes issue #3812 domains [STATUS: passed] [VALIDATED: a6d4d39f2]
 **Type**: Happy Path
 
 **Given**: All target assertions are classified in `parity-map.yaml`  
@@ -151,7 +151,7 @@ Test Spec: `specs/2026-05-20_inference-routing-provider-coverage/tests.md`
 
 **Tools Required**: Bash, npm/Vitest
 
-### Scenario 4.2: Incomplete deferred/retired metadata is rejected [STATUS: pending]
+### Scenario 4.2: Incomplete deferred/retired metadata is rejected [STATUS: passed] [VALIDATED: a6d4d39f2]
 **Type**: Sad Path
 
 **Given**: A deferred or retired target assertion lacks owner, runner/secret requirements, reason, or reviewer metadata as applicable  
@@ -167,7 +167,7 @@ Test Spec: `specs/2026-05-20_inference-routing-provider-coverage/tests.md`
 
 ## Phase 5: PR Validation and Live-Capable Verification - Validation Scenarios
 
-### Scenario 5.1: PR evidence includes static, plan-only, and parity results [STATUS: pending]
+### Scenario 5.1: PR evidence includes static, plan-only, and parity results [STATUS: blocked]
 **Type**: Happy Path
 
 **Given**: Implementation is complete and a PR is opened for issue #3812  
@@ -183,11 +183,11 @@ Test Spec: `specs/2026-05-20_inference-routing-provider-coverage/tests.md`
 
 ## Summary
 
-| Phase | Happy | Sad | Total | Passed | Failed | Pending |
-|-------|-------|-----|-------|--------|--------|---------|
-| Phase 1 | 1 | 1 | 2 | 0 | 0 | 2 |
-| Phase 2 | 1 | 2 | 3 | 0 | 0 | 3 |
-| Phase 3 | 2 | 1 | 3 | 0 | 0 | 3 |
-| Phase 4 | 1 | 1 | 2 | 0 | 0 | 2 |
-| Phase 5 | 1 | 0 | 1 | 0 | 0 | 1 |
-| **Total** | **6** | **5** | **11** | **0** | **0** | **11** |
+| Phase | Happy | Sad | Total | Passed | Failed | Pending | Blocked |
+|-------|-------|-----|-------|--------|--------|---------|---------|
+| Phase 1 | 1 | 1 | 2 | 2 | 0 | 0 | 0 |
+| Phase 2 | 1 | 2 | 3 | 3 | 0 | 0 | 0 |
+| Phase 3 | 2 | 1 | 3 | 3 | 0 | 0 | 0 |
+| Phase 4 | 1 | 1 | 2 | 2 | 0 | 0 | 0 |
+| Phase 5 | 1 | 0 | 1 | 0 | 0 | 0 | 1 |
+| **Total** | **6** | **5** | **11** | **10** | **0** | **0** | **1** |
