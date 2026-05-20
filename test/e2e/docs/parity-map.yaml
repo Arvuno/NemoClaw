@@ -10650,14 +10650,14 @@ scripts:
       owner: e2e-maintainers
       layer: validation
       gap_domain: sandbox-lifecycle
-      runner_requirement: dedicated snapshot credential leak assertion
+      runner_requirement: sandbox runner with NemoClaw/OpenShell CLIs
     - legacy: 'Credentials found: $CRED_LEAKS'
       status: deferred
       reason: snapshot credential-leak coverage is not asserted by validation.sandbox_snapshot.create_succeeds
       owner: e2e-maintainers
       layer: validation
       gap_domain: sandbox-lifecycle
-      runner_requirement: dedicated snapshot credential leak assertion
+      runner_requirement: sandbox runner with NemoClaw/OpenShell CLIs
     - legacy: 'Backup directory missing: $BACKUP_DIR'
       status: deferred
       reason: live legacy behavior requires non-deterministic infrastructure; retained for bucket parity tracking
