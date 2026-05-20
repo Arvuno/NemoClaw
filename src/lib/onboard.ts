@@ -276,6 +276,19 @@ const { resolveSandboxImageTagFromCreateOutput } =
 const nim: typeof import("./inference/nim") = require("./inference/nim");
 const onboardSession: typeof import("./state/onboard-session") = require("./state/onboard-session");
 const { toSessionUpdates }: typeof import("./onboard/session-updates") = require("./onboard/session-updates");
+const sandboxAgent: typeof import("./onboard/sandbox-agent") = require("./onboard/sandbox-agent");
+const {
+  RESERVED_SANDBOX_NAMES,
+  formatSandboxAgentName,
+  getAgentInferenceProviderOptions,
+  getDefaultSandboxNameForAgent,
+  getEffectiveSandboxAgent,
+  getRequestedSandboxAgentName,
+  getSandboxAgentDrift,
+  getSandboxAgentRegistryFields,
+  getSandboxPromptDefault,
+  normalizeSandboxAgentName,
+} = sandboxAgent;
 const modelRouter: typeof import("./onboard/model-router") = require("./onboard/model-router");
 const {
   DEFAULT_MODEL_ROUTER_CREDENTIAL_ENV,
@@ -3955,107 +3968,6 @@ async function recoverGatewayRuntime() {
 }
 
 // ── Step 3: Sandbox ──────────────────────────────────────────────
-
-// Names that collide with CLI command namespaces. A sandbox named 'status'
-// makes 'nemoclaw status connect' route to the global status command
-// instead of the sandbox, and a sandbox named 'sandbox' collides with the
-// oclif-native `nemoclaw sandbox ...` command namespace. Reject these wherever
-// a sandbox name enters the system (interactive prompt, --name flag,
-// NEMOCLAW_SANDBOX_NAME).
-const RESERVED_SANDBOX_NAMES = new Set([
-  "onboard",
-  "list",
-  "deploy",
-  "setup",
-  "setup-spark",
-  "start",
-  "stop",
-  "status",
-  "debug",
-  "uninstall",
-  "update",
-  "credentials",
-  "help",
-  "sandbox",
-]);
-
-function normalizeSandboxAgentName(agentName: string | null | undefined): string {
-  const trimmed = typeof agentName === "string" ? agentName.trim() : "";
-  return trimmed && trimmed !== "openclaw" ? trimmed : "openclaw";
-}
-
-const UNKNOWN_SANDBOX_AGENT_NAME = "unknown";
-
-function getRequestedSandboxAgentName(agent: AgentDefinition | null | undefined): string {
-  return normalizeSandboxAgentName(agent?.name);
-}
-
-function formatSandboxAgentName(agentName: string | null | undefined): string {
-  const normalized = normalizeSandboxAgentName(agentName);
-  if (normalized === "openclaw") return "OpenClaw";
-  if (normalized === "hermes") return "Hermes";
-  return normalized;
-}
-
-function getDefaultSandboxNameForAgent(agent: AgentDefinition | null | undefined): string {
-  return getRequestedSandboxAgentName(agent) === "hermes" ? "hermes" : "my-assistant";
-}
-
-function getSandboxPromptDefault(agent: AgentDefinition | null | undefined): string {
-  const envName = (process.env.NEMOCLAW_SANDBOX_NAME || "").trim().toLowerCase();
-  const agentDefault = getDefaultSandboxNameForAgent(agent);
-  if (!envName) return agentDefault;
-  try {
-    return validateName(envName, "sandbox name");
-  } catch {
-    return agentDefault;
-  }
-}
-
-function getEffectiveSandboxAgent(agent: AgentDefinition | null | undefined): AgentDefinition {
-  return agent || agentDefs.loadAgent("openclaw");
-}
-
-function getAgentInferenceProviderOptions(agent: AgentDefinition | null | undefined): string[] {
-  const effectiveAgent = agent?.name
-    ? agentDefs.loadAgent(agent.name)
-    : getEffectiveSandboxAgent(agent);
-  return Array.isArray(effectiveAgent.inferenceProviderOptions)
-    ? effectiveAgent.inferenceProviderOptions
-    : [];
-}
-
-function getSandboxAgentRegistryFields(
-  agent: AgentDefinition | null | undefined,
-  agentVersionKnown = true,
-): Pick<SandboxEntry, "agent" | "agentVersion"> {
-  const effectiveAgent = getEffectiveSandboxAgent(agent);
-  const agentName = normalizeSandboxAgentName(effectiveAgent.name);
-  return {
-    agent: agentName === "openclaw" ? null : agentName,
-    agentVersion: agentVersionKnown ? effectiveAgent.expectedVersion || null : null,
-  };
-}
-
-function getSandboxAgentDrift(
-  sandboxName: string,
-  requestedAgentName: string,
-): { changed: boolean; existingAgentName: string; requestedAgentName: string } {
-  const existingEntry: SandboxEntry | null = registry.getSandbox(sandboxName);
-  if (!existingEntry) {
-    return {
-      changed: true,
-      existingAgentName: UNKNOWN_SANDBOX_AGENT_NAME,
-      requestedAgentName,
-    };
-  }
-  const existingAgentName = normalizeSandboxAgentName(existingEntry?.agent);
-  return {
-    changed: existingAgentName !== requestedAgentName,
-    existingAgentName,
-    requestedAgentName,
-  };
-}
 
 function getSandboxRuntimeRegistryFields(
   config: SandboxGpuConfig,
