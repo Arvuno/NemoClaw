@@ -211,7 +211,7 @@ Build the smallest reviewable foundation: a precise inventory of legacy assertio
 - Helper tests pass locally.
 - No helper performs install, onboard, sandbox creation, or state rediscovery.
 
-## Phase 2: Credential and Sanitization Suite Migration
+## Phase 2: Credential and Sanitization Suite Migration [COMPLETED: a6e06b329]
 
 Migrate the highest-value credential storage, listing, migration, and sanitization assertions.
 
