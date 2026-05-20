@@ -435,3 +435,42 @@ describe("Phase 1.E install dispatcher splits", () => {
     expect(r.stdout + r.stderr).not.toMatch(/install-repo|install-curl|install-ollama/);
   });
 });
+
+
+describe("sandbox lifecycle validation helper", () => {
+  it("test_should_load_context_from_e2e_context_dir", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "e2e-life-"));
+    try {
+      fs.writeFileSync(path.join(tmp, "context.env"), "E2E_SANDBOX_NAME=sb1\nE2E_GATEWAY_URL=http://127.0.0.1:1\n");
+      const r = runBash(`set -euo pipefail; . "${VALIDATION_SUITES}/lib/sandbox_lifecycle.sh"; sandbox_lifecycle_load_context; echo "$E2E_SANDBOX_NAME $E2E_GATEWAY_URL"`, { E2E_CONTEXT_DIR: tmp });
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.stdout).toContain("sb1 http://127.0.0.1:1");
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+  });
+
+  it("test_should_emit_stable_pass_and_fail_ids", () => {
+    const r = runBash(`. "${VALIDATION_SUITES}/lib/sandbox_lifecycle.sh"; sandbox_lifecycle_pass validation.sandbox_lifecycle.gateway_health ok; sandbox_lifecycle_fail validation.sandbox_operations.logs_available nope`);
+    expect(r.status).not.toBe(0);
+    expect(r.stdout).toMatch(/PASS: validation\.sandbox_lifecycle\.gateway_health/);
+    expect(r.stderr).toMatch(/FAIL: validation\.sandbox_operations\.logs_available/);
+  });
+
+  it("test_should_apply_timeout_to_command_execution", () => {
+    const r = runBash(`. "${VALIDATION_SUITES}/lib/sandbox_lifecycle.sh"; sandbox_lifecycle_run_with_timeout 1 bash -c 'sleep 5'`);
+    expect(r.status).not.toBe(0);
+  });
+
+  it("test_should_validate_list_status_logs_exec_with_mocked_commands", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "e2e-life-mock-"));
+    try {
+      const bin = path.join(tmp, "bin"); fs.mkdirSync(bin);
+      fs.writeFileSync(path.join(bin, "nemoclaw"), `#!/usr/bin/env bash\ncase "$1" in list) echo sb1;; status) echo 'status running gateway healthy sandbox running';; logs) echo logline;; esac\n`, { mode: 0o755 });
+      fs.writeFileSync(path.join(bin, "openshell"), `#!/usr/bin/env bash\necho lifecycle-ok\n`, { mode: 0o755 });
+      fs.writeFileSync(path.join(tmp, "context.env"), "E2E_SANDBOX_NAME=sb1\nE2E_GATEWAY_URL=http://127.0.0.1:1\n");
+      const r = runBash(`set -euo pipefail; . "${VALIDATION_SUITES}/lib/sandbox_lifecycle.sh"; sandbox_lifecycle_load_context; sandbox_lifecycle_assert_nemoclaw_list_contains_sandbox; sandbox_lifecycle_assert_status_fields_present; sandbox_lifecycle_assert_logs_available; sandbox_lifecycle_assert_openshell_exec_ok`, { E2E_CONTEXT_DIR: tmp, PATH: `${bin}:${process.env.PATH}` });
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.stdout).toMatch(/validation\.sandbox_operations\.sandbox_listed/);
+      expect(r.stdout).toMatch(/validation\.sandbox_operations\.openshell_exec_ok/);
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+  });
+});
