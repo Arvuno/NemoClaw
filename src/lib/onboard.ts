@@ -304,6 +304,7 @@ const {
   getRecordedMessagingChannelsForResume: getRecordedMessagingChannelsForResumeFromState,
 }: typeof import("./onboard/messaging-credentials") = require("./onboard/messaging-credentials");
 const {
+  computeTelegramRequireMention,
   getStoredMessagingChannelConfig,
   messagingChannelConfigsEqual,
   persistMessagingChannelConfigToSession,
@@ -511,18 +512,6 @@ let AUTO_YES = false;
 // Set by onboard() before preflight() when --control-ui-port is specified.
 // null means "use auto-allocation" (skip dashboard port check in preflight).
 let _preflightDashboardPort: number | null = null;
-
-// Read TELEGRAM_REQUIRE_MENTION (set either by the interactive mention prompt
-// or by the user's shell) and map it to a boolean, or null when the env var
-// is unset / invalid. Used at build time to bake groupPolicy into
-// openclaw.json and at resume time to detect drift against the recorded
-// session state. See #1737 and the CodeRabbit follow-up on #2417.
-function computeTelegramRequireMention(): boolean | null {
-  const raw = process.env.TELEGRAM_REQUIRE_MENTION;
-  if (raw === "1") return true;
-  if (raw === "0") return false;
-  return null;
-}
 
 function isNonInteractive(): boolean {
   return NON_INTERACTIVE || process.env.NEMOCLAW_NON_INTERACTIVE === "1";

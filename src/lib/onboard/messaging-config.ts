@@ -10,6 +10,18 @@ import type { Session } from "../state/onboard-session";
 import * as onboardSession from "../state/onboard-session";
 import * as registry from "../state/registry";
 
+// Read TELEGRAM_REQUIRE_MENTION (set either by the interactive mention prompt
+// or by the user's shell) and map it to a boolean, or null when the env var
+// is unset / invalid. Used at build time to bake groupPolicy into
+// openclaw.json and at resume time to detect drift against the recorded
+// session state. See #1737 and the CodeRabbit follow-up on #2417.
+export function computeTelegramRequireMention(): boolean | null {
+  const raw = process.env.TELEGRAM_REQUIRE_MENTION;
+  if (raw === "1") return true;
+  if (raw === "0") return false;
+  return null;
+}
+
 export function getStoredMessagingChannelConfig(
   sandboxName: string | null,
   session: Session | null,
