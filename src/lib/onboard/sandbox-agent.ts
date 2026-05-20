@@ -3,6 +3,7 @@
 
 import type { AgentDefinition } from "../agent/defs";
 import { loadAgent } from "../agent/defs";
+import { getNameValidationGuidance, NAME_ALLOWED_FORMAT } from "../name-validation";
 import { validateName } from "../runner";
 import type { SandboxEntry } from "../state/registry";
 import * as registry from "../state/registry";
@@ -103,5 +104,65 @@ export function getSandboxAgentDrift(
     changed: existingAgentName !== requestedAgentName,
     existingAgentName,
     requestedAgentName,
+  };
+}
+
+export interface PromptSandboxNameDeps {
+  promptOrDefault(question: string, envVar: string, defaultValue: string): Promise<string>;
+  cliDisplayName(): string;
+  isNonInteractive(): boolean;
+  exit(code: number): never;
+}
+
+export function createPromptValidatedSandboxName(deps: PromptSandboxNameDeps) {
+  return async function promptValidatedSandboxName(agent: AgentDefinition | null = null) {
+    const MAX_ATTEMPTS = 3;
+    const defaultSandboxName = getSandboxPromptDefault(agent);
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const nameAnswer = await deps.promptOrDefault(
+        `  Sandbox name (${NAME_ALLOWED_FORMAT}) [${defaultSandboxName}]: `,
+        "NEMOCLAW_SANDBOX_NAME",
+        defaultSandboxName,
+      );
+      const sandboxName = (nameAnswer || defaultSandboxName).trim();
+
+      try {
+        const validatedSandboxName = validateName(sandboxName, "sandbox name");
+        if (RESERVED_SANDBOX_NAMES.has(sandboxName)) {
+          console.error(`  Reserved name: '${sandboxName}' is a ${deps.cliDisplayName()} CLI command.`);
+          console.error("  Choose a different name to avoid routing conflicts.");
+          if (deps.isNonInteractive()) {
+            deps.exit(1);
+          }
+          if (attempt < MAX_ATTEMPTS - 1) {
+            console.error("  Please try again.\n");
+          }
+          continue;
+        }
+        return validatedSandboxName;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`  ${errorMessage}`);
+      }
+
+      for (const line of getNameValidationGuidance("sandbox name", sandboxName, {
+        includeAllowedFormat: false,
+      })) {
+        console.error(`  ${line}`);
+      }
+
+      // Non-interactive runs cannot re-prompt — abort so the caller can fix the
+      // NEMOCLAW_SANDBOX_NAME env var and retry.
+      if (deps.isNonInteractive()) {
+        deps.exit(1);
+      }
+
+      if (attempt < MAX_ATTEMPTS - 1) {
+        console.error("  Please try again.\n");
+      }
+    }
+
+    console.error("  Too many invalid attempts.");
+    deps.exit(1);
   };
 }

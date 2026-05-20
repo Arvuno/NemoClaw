@@ -322,6 +322,12 @@ const {
   getSandboxPromptDefault,
   normalizeSandboxAgentName,
 } = sandboxAgent;
+const promptValidatedSandboxName = sandboxAgent.createPromptValidatedSandboxName({
+  promptOrDefault,
+  cliDisplayName,
+  isNonInteractive,
+  exit: process.exit,
+});
 const modelRouter: typeof import("./onboard/model-router") = require("./onboard/model-router");
 const {
   DEFAULT_MODEL_ROUTER_CREDENTIAL_ENV,
@@ -3686,57 +3692,6 @@ const { getSandboxRuntimeRegistryFields, hasSandboxGpuDrift, updateReusedSandbox
     runCaptureOpenshell,
   });
 
-
-async function promptValidatedSandboxName(agent: AgentDefinition | null = null) {
-  const MAX_ATTEMPTS = 3;
-  const defaultSandboxName = getSandboxPromptDefault(agent);
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const nameAnswer = await promptOrDefault(
-      `  Sandbox name (${NAME_ALLOWED_FORMAT}) [${defaultSandboxName}]: `,
-      "NEMOCLAW_SANDBOX_NAME",
-      defaultSandboxName,
-    );
-    const sandboxName = (nameAnswer || defaultSandboxName).trim();
-
-    try {
-      const validatedSandboxName = validateName(sandboxName, "sandbox name");
-      if (RESERVED_SANDBOX_NAMES.has(sandboxName)) {
-        console.error(`  Reserved name: '${sandboxName}' is a ${cliDisplayName()} CLI command.`);
-        console.error("  Choose a different name to avoid routing conflicts.");
-        if (isNonInteractive()) {
-          process.exit(1);
-        }
-        if (attempt < MAX_ATTEMPTS - 1) {
-          console.error("  Please try again.\n");
-        }
-        continue;
-      }
-      return validatedSandboxName;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`  ${errorMessage}`);
-    }
-
-    for (const line of getNameValidationGuidance("sandbox name", sandboxName, {
-      includeAllowedFormat: false,
-    })) {
-      console.error(`  ${line}`);
-    }
-
-    // Non-interactive runs cannot re-prompt — abort so the caller can fix the
-    // NEMOCLAW_SANDBOX_NAME env var and retry.
-    if (isNonInteractive()) {
-      process.exit(1);
-    }
-
-    if (attempt < MAX_ATTEMPTS - 1) {
-      console.error("  Please try again.\n");
-    }
-  }
-
-  console.error("  Too many invalid attempts.");
-  process.exit(1);
-}
 
 // ── Step 5: Sandbox ──────────────────────────────────────────────
 
