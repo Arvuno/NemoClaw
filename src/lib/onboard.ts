@@ -9336,7 +9336,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         session,
         loadBlueprintProfile("routed")?.router.port || 4000,
       );
-      session = onboardSession.updateSession((current: Session) =>
+      onboardSession.updateSession((current: Session) =>
         clearAgentScopedResumeState(current, selectedAgentName),
       );
     }
