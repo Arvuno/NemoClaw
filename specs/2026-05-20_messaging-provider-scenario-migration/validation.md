@@ -23,7 +23,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 ## Phase 1: Messaging Primitive Library - Validation Scenarios
 
-### Scenario 1.1: Helper library supports local fixture contexts [STATUS: pending]
+### Scenario 1.1: Helper library supports local fixture contexts [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Happy Path
 
 **Given**: A synthetic `$E2E_CONTEXT_DIR/context.env` for each supported messaging provider and agent.
@@ -37,7 +37,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 **Tools Required**: Vitest, Bash.
 
-### Scenario 1.2: Missing context fails clearly [STATUS: pending]
+### Scenario 1.2: Missing context fails clearly [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Sad Path
 
 **Given**: No `$E2E_CONTEXT_DIR/context.env` exists.
@@ -53,7 +53,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 ## Phase 2: Provider Expected-State Suites - Validation Scenarios
 
-### Scenario 2.1: Messaging provider suites replace generic smoke aliases [STATUS: pending]
+### Scenario 2.1: Messaging provider suites replace generic smoke aliases [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Happy Path
 
 **Given**: `messaging-telegram`, `messaging-discord`, and `messaging-slack` suites exist in `test/e2e/validation_suites/suites.yaml`.
@@ -67,7 +67,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 **Tools Required**: Vitest, Bash.
 
-### Scenario 2.2: Affected provider scenarios remain plan-only compatible [STATUS: pending]
+### Scenario 2.2: Affected provider scenarios remain plan-only compatible [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Happy Path
 
 **Given**: The existing Telegram, Discord, and Slack messaging scenarios are wired to matching suite IDs.
@@ -81,7 +81,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 **Tools Required**: Bash, scenario runner.
 
-### Scenario 2.3: Live provider context absence is explicit [STATUS: pending]
+### Scenario 2.3: Live provider context absence is explicit [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Sad Path
 
 **Given**: A messaging suite script is executed outside a prepared scenario context.
@@ -97,7 +97,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 ## Phase 3: Token Rotation and Channel Lifecycle Suites - Validation Scenarios
 
-### Scenario 3.1: Token rotation suite detects provider-specific changes [STATUS: pending]
+### Scenario 3.1: Token rotation suite detects provider-specific changes [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Happy Path
 
 **Given**: Mock rotation signals for Telegram, Discord, and Slack.
@@ -111,7 +111,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 **Tools Required**: Vitest, Bash.
 
-### Scenario 3.2: Unsupported lifecycle matrix coverage is deferred, not hidden [STATUS: pending]
+### Scenario 3.2: Unsupported lifecycle matrix coverage is deferred, not hidden [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Sad Path
 
 **Given**: Legacy stop/start/remove lifecycle cases require orchestration not represented by current scenario setup.
@@ -127,7 +127,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 ## Phase 4: Security and Compatible Endpoint Assertions - Validation Scenarios
 
-### Scenario 4.1: Telegram injection payload classes are covered by stable assertions [STATUS: pending]
+### Scenario 4.1: Telegram injection payload classes are covered by stable assertions [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Happy Path
 
 **Given**: Telegram injection payload classes for command substitution, backticks, variable expansion, and shell metacharacters.
@@ -141,7 +141,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 **Tools Required**: Vitest, Bash.
 
-### Scenario 4.2: Compatible endpoint assertions are mapped or deferred [STATUS: pending]
+### Scenario 4.2: Compatible endpoint assertions are mapped or deferred [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Sad Path
 
 **Given**: Legacy compatible-endpoint checks depend on custom endpoint fixtures and proxy behavior.
@@ -155,7 +155,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 **Tools Required**: Vitest, Bash.
 
-### Scenario 4.3: Brave search is not counted as messaging-provider coverage [STATUS: pending]
+### Scenario 4.3: Brave search is not counted as messaging-provider coverage [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Sad Path
 
 **Given**: Brave search legacy assertions are primarily web-search coverage.
@@ -171,7 +171,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 ## Phase 5: Parity Map and Coverage Report Integration - Validation Scenarios
 
-### Scenario 5.1: All issue #3810 legacy assertions are classified [STATUS: pending]
+### Scenario 5.1: All issue #3810 legacy assertions are classified [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Happy Path
 
 **Given**: The six legacy scripts named in the spec.
@@ -185,7 +185,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 **Tools Required**: Vitest, Bash.
 
-### Scenario 5.2: Parity report shows coverage status accurately [STATUS: pending]
+### Scenario 5.2: Parity report shows coverage status accurately [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Happy Path
 
 **Given**: Updated parity metadata for mapped, deferred, and retired assertions.
@@ -199,7 +199,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 **Tools Required**: Vitest, Bash.
 
-### Scenario 5.3: Legacy onboarding coverage parity is re-reviewed [STATUS: pending]
+### Scenario 5.3: Legacy onboarding coverage parity is re-reviewed [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Happy Path
 
 **Given**: Existing legacy E2E onboarding coverage and the new scenario/parity-map coverage.
@@ -215,7 +215,7 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 ## Phase 6: Scenario Framework Validation - Validation Scenarios
 
-### Scenario 6.1: Local scenario framework tests pass [STATUS: pending]
+### Scenario 6.1: Local scenario framework tests pass [STATUS: passed] [VALIDATED: e577a930e]
 **Type**: Happy Path
 
 **Given**: All implementation phases are complete.
@@ -247,10 +247,10 @@ Test Spec: `specs/2026-05-20_messaging-provider-scenario-migration/tests.md`
 
 | Phase | Happy | Sad | Total | Passed | Failed | Pending |
 |-------|-------|-----|-------|--------|--------|---------|
-| Phase 1 | 1 | 1 | 2 | 0 | 0 | 2 |
-| Phase 2 | 2 | 1 | 3 | 0 | 0 | 3 |
-| Phase 3 | 1 | 1 | 2 | 0 | 0 | 2 |
-| Phase 4 | 1 | 2 | 3 | 0 | 0 | 3 |
-| Phase 5 | 3 | 0 | 3 | 0 | 0 | 3 |
-| Phase 6 | 2 | 0 | 2 | 0 | 0 | 2 |
-| **Total** | **10** | **5** | **15** | **0** | **0** | **15** |
+| Phase 1 | 1 | 1 | 2 | 2 | 0 | 0 |
+| Phase 2 | 2 | 1 | 3 | 3 | 0 | 0 |
+| Phase 3 | 1 | 1 | 2 | 2 | 0 | 0 |
+| Phase 4 | 1 | 2 | 3 | 3 | 0 | 0 |
+| Phase 5 | 3 | 0 | 3 | 3 | 0 | 0 |
+| Phase 6 | 2 | 0 | 2 | 1 | 0 | 1 |
+| **Total** | **10** | **5** | **15** | **14** | **0** | **1** |

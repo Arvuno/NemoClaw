@@ -490,8 +490,8 @@ describe("Issue #3810 messaging provider helper library", () => {
     const r = runBash(`
       set -euo pipefail
       . "${VALIDATION_LIB}/messaging_providers.sh"
-      e2e_messaging_assert_placeholder_configured 'token=$${TELEGRAM_BOT_TOKEN}' 'TELEGRAM_BOT_TOKEN'
-      e2e_messaging_assert_no_secret_leak 'safe placeholder $${TELEGRAM_BOT_TOKEN}' 'raw-secret-123'
+      e2e_messaging_assert_placeholder_configured 'token=\${TELEGRAM_BOT_TOKEN}' 'TELEGRAM_BOT_TOKEN'
+      e2e_messaging_assert_no_secret_leak 'safe placeholder \${TELEGRAM_BOT_TOKEN}' 'raw-secret-123'
       if e2e_messaging_assert_no_secret_leak 'oops raw-secret-123' 'raw-secret-123'; then
         echo unexpected-pass
         exit 1
