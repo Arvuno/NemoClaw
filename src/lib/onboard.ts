@@ -308,6 +308,7 @@ const {
   persistMessagingChannelConfigToSession,
 } = messagingConfig;
 const sandboxAgent: typeof import("./onboard/sandbox-agent") = require("./onboard/sandbox-agent");
+const sandboxRegistryMetadata: typeof import("./onboard/sandbox-registry-metadata") = require("./onboard/sandbox-registry-metadata");
 const sandboxReuse: typeof import("./onboard/sandbox-reuse") = require("./onboard/sandbox-reuse");
 const {
   RESERVED_SANDBOX_NAMES,
@@ -3677,61 +3678,13 @@ async function recoverGatewayRuntime() {
 
 // ── Step 3: Sandbox ──────────────────────────────────────────────
 
-function getSandboxRuntimeRegistryFields(
-  config: SandboxGpuConfig,
-): Pick<
-  SandboxEntry,
-  | "gpuEnabled"
-  | "hostGpuDetected"
-  | "sandboxGpuEnabled"
-  | "sandboxGpuMode"
-  | "sandboxGpuDevice"
-  | "openshellDriver"
-  | "openshellVersion"
-> {
-  return {
-    gpuEnabled: config.sandboxGpuEnabled,
-    hostGpuDetected: config.hostGpuDetected,
-    sandboxGpuEnabled: config.sandboxGpuEnabled,
-    sandboxGpuMode: config.mode,
-    sandboxGpuDevice: config.sandboxGpuDevice,
-    openshellDriver: isLinuxDockerDriverGatewayEnabled() ? (process.platform === "darwin" ? "vm" : "docker") : "kubernetes",
-    openshellVersion: getInstalledOpenshellVersion(
-      runCaptureOpenshell(["--version"], { ignoreError: true }),
-    ),
-  };
-}
-
-function hasSandboxGpuDrift(sandboxName: string, config: SandboxGpuConfig): boolean {
-  const existingEntry: SandboxEntry | null = registry.getSandbox(sandboxName);
-  if (!existingEntry) return false;
-  return (
-    (existingEntry.sandboxGpuEnabled === true) !== config.sandboxGpuEnabled ||
-    (existingEntry.sandboxGpuMode || "auto") !== config.mode ||
-    (existingEntry.sandboxGpuDevice || null) !== config.sandboxGpuDevice
-  );
-}
-
-function updateReusedSandboxMetadata(
-  sandboxName: string,
-  agent: AgentDefinition | null | undefined,
-  model: string,
-  provider: string,
-  dashboardPort: number,
-  selectionVerified = true,
-  sandboxGpuConfig: SandboxGpuConfig | null = null,
-): void {
-  const existingEntry = registry.getSandbox(sandboxName);
-  const agentVersionKnown = existingEntry?.agentVersion !== null;
-  const selectionUpdates = selectionVerified ? { model, provider } : {};
-  registry.updateSandbox(sandboxName, {
-    ...selectionUpdates,
-    dashboardPort,
-    ...getSandboxAgentRegistryFields(agent, agentVersionKnown),
-    ...(sandboxGpuConfig ? getSandboxRuntimeRegistryFields(sandboxGpuConfig) : {}),
+const { getSandboxRuntimeRegistryFields, hasSandboxGpuDrift, updateReusedSandboxMetadata } =
+  sandboxRegistryMetadata.createSandboxRegistryMetadataHelpers({
+    isLinuxDockerDriverGatewayEnabled,
+    getInstalledOpenshellVersion,
+    runCaptureOpenshell,
   });
-  registry.setDefault(sandboxName);
-}
+
 
 async function promptValidatedSandboxName(agent: AgentDefinition | null = null) {
   const MAX_ATTEMPTS = 3;
