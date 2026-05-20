@@ -167,7 +167,7 @@ function listBrevInstances(): BrevInstance[] {
       : Array.isArray(parsed?.workspaces)
         ? parsed.workspaces
         : [];
-    return rawInstances.flatMap((instance) => {
+    return rawInstances.flatMap((instance: unknown) => {
       const normalized = normalizeBrevInstance(instance);
       return normalized ? [normalized] : [];
     });
