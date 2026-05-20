@@ -232,7 +232,7 @@ Migrate the highest-value credential storage, listing, migration, and sanitizati
 - `security-credentials` executes credential-specific steps, not generic placeholder aliases.
 - Stable assertion IDs are emitted or represented in suite output/parity metadata.
 - Scenario framework tests for helper behavior, suite schema, and parity-map metadata pass.
-- Plan-only scenario execution still succeeds.
+- `run-suites.sh security-credentials` succeeds in `E2E_DRY_RUN=1` with a temp context, and plan-only scenario execution still succeeds.
 
 ## Phase 3: Security Policy, Shields, and Gateway Health Migration
 
@@ -321,6 +321,7 @@ Before marking issue #3815 complete:
 - [ ] PR opened from `issue-3815-migrate-security-policy-credential-e2e`.
 - [ ] All added/modified tests pass in CI.
 - [ ] `run-scenario.sh <id> --plan-only` still works for affected scenarios.
+- [ ] `test/e2e/runtime/run-suites.sh security-credentials security-policy security-shields security-injection` succeeds with `E2E_DRY_RUN=1` and a temp context containing the required keys.
 - [ ] `suites.yaml` uses focused security-policy/credential suite steps.
 - [ ] `parity-map.yaml` has layer/domain/owner metadata for migrated/deferred/retired entries.
 - [ ] Legacy coverage re-review confirms 100%+ parity for the eight listed scripts.

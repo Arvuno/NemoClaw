@@ -36,7 +36,7 @@ Use the existing Vitest scenario-framework tests plus shell dry-run checks. Test
 
 **Existing Tests to Modify:**
 - `test/e2e/scenario-framework-tests/e2e-suite-runner.test.ts`
-  - Assert `security-credentials` resolves to credential-specific scripts and succeeds in dry-run/plan-only mode.
+  - Assert `security-credentials` resolves to credential-specific scripts and succeeds through `run-suites.sh` in `E2E_DRY_RUN=1` with a seeded temp `context.env`.
 - `test/e2e/scenario-framework-tests/e2e-parity-map.test.ts`
   - Assert `test-credential-migration.sh` and `test-credential-sanitization.sh` entries contain mapped/deferred/retired assertions with required metadata.
 
@@ -139,4 +139,5 @@ Use the existing Vitest scenario-framework tests plus shell dry-run checks. Test
 - `npm test -- test/e2e/scenario-framework-tests/e2e-suite-runner.test.ts`
 - `npm test -- test/e2e/scenario-framework-tests/e2e-parity-map.test.ts`
 - `npm test -- test/e2e/scenario-framework-tests/e2e-coverage-report.test.ts`
+- `E2E_CONTEXT_DIR=$(mktemp -d) E2E_DRY_RUN=1 bash test/e2e/runtime/run-suites.sh security-credentials security-policy security-shields security-injection` after writing required keys to `$E2E_CONTEXT_DIR/context.env`
 - `bash test/e2e/runtime/run-scenario.sh <affected-scenario-id> --plan-only`
