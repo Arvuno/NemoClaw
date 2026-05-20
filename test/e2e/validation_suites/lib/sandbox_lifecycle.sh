@@ -49,7 +49,7 @@ sandbox_lifecycle_run_with_timeout() {
       return "${rc}"
     }
   else
-    SANDBOX_LIFECYCLE_LAST_OUTPUT="$($@ 2>&1)" || {
+    SANDBOX_LIFECYCLE_LAST_OUTPUT="$("$@" 2>&1)" || {
       local rc=$?
       printf '%s\n' "${SANDBOX_LIFECYCLE_LAST_OUTPUT}" >&2
       return "${rc}"
@@ -98,8 +98,8 @@ sandbox_lifecycle_assert_gateway_health() {
 
 sandbox_lifecycle_assert_gateway_recovers_after_probe() {
   local id="validation.sandbox_lifecycle.gateway_recovers"
-  local attempt
-  for attempt in 1 2 3; do
+  local _attempt
+  for _attempt in 1 2 3; do
     if sandbox_lifecycle_run_with_timeout 20 curl -fsS "${E2E_GATEWAY_URL}/health" >/dev/null; then
       sandbox_lifecycle_pass "${id}" "gateway recovered after probe"
       return 0
