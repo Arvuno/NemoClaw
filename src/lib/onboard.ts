@@ -326,6 +326,7 @@ const {
   persistMessagingChannelConfigToSession,
 } = messagingConfig;
 const sandboxAgent: typeof import("./onboard/sandbox-agent") = require("./onboard/sandbox-agent");
+const sandboxLifecycle: typeof import("./onboard/sandbox-lifecycle") = require("./onboard/sandbox-lifecycle");
 const sandboxRegistryMetadata: typeof import("./onboard/sandbox-registry-metadata") = require("./onboard/sandbox-registry-metadata");
 const sandboxReuse: typeof import("./onboard/sandbox-reuse") = require("./onboard/sandbox-reuse");
 const {
@@ -1176,54 +1177,20 @@ function isInferenceRouteReady(provider: string, model: string): boolean {
   return Boolean(live && live.provider === provider && live.model === model);
 }
 
-function sandboxExistsInGateway(sandboxName: string): boolean {
-  const output = runCaptureOpenshell(["sandbox", "get", sandboxName], { ignoreError: true });
-  return Boolean(output);
-}
+const {
+  sandboxExistsInGateway,
+  pruneStaleSandboxEntry,
+  shouldRestoreLatestBackupOnRecreate,
+  confirmRecreateForSelectionDrift,
+  isOpenclawReady,
+} = sandboxLifecycle.createSandboxLifecycleHelpers({
+  runCaptureOpenshell,
+  fetchGatewayAuthTokenFromSandbox: (sandboxName: string) => fetchGatewayAuthTokenFromSandbox(sandboxName),
+  agentProductName,
+  prompt,
+  isAffirmativeAnswer,
+});
 
-function pruneStaleSandboxEntry(sandboxName: string): boolean {
-  const existing = registry.getSandbox(sandboxName);
-  const liveExists = sandboxExistsInGateway(sandboxName);
-  if (existing && !liveExists) {
-    registry.removeSandbox(sandboxName);
-  }
-  return liveExists;
-}
-
-function shouldRestoreLatestBackupOnRecreate(): boolean {
-  return process.env.NEMOCLAW_RESTORE_LATEST_BACKUP_ON_RECREATE === "1";
-}
-
-async function confirmRecreateForSelectionDrift(
-  sandboxName: string,
-  drift: SelectionDrift,
-  requestedProvider: string | null,
-  requestedModel: string | null,
-): Promise<boolean> {
-  const currentProvider = drift.existingProvider || "unknown";
-  const currentModel = drift.existingModel || "unknown";
-  const nextProvider = requestedProvider || "unknown";
-  const nextModel = requestedModel || "unknown";
-
-  console.log(`  Sandbox '${sandboxName}' exists but requested inference selection changed.`);
-  console.log(`  Current:   provider=${currentProvider}  model=${currentModel}`);
-  console.log(`  Requested: provider=${nextProvider}  model=${nextModel}`);
-  console.log(
-    `  Recreating the sandbox is required to apply this change to the running ${agentProductName()} UI.`,
-  );
-
-  if (isNonInteractive()) {
-    note("  [non-interactive] Recreating sandbox due to provider/model drift.");
-    return true;
-  }
-
-  const answer = await prompt(`  Recreate sandbox '${sandboxName}' now? [y/N]: `);
-  return isAffirmativeAnswer(answer);
-}
-
-function isOpenclawReady(sandboxName: string): boolean {
-  return Boolean(fetchGatewayAuthTokenFromSandbox(sandboxName));
-}
 
 function validateBraveSearchApiKey(apiKey: string): CurlProbeResult {
   return runCurlProbe([
