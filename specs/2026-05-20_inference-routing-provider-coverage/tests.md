@@ -32,9 +32,9 @@ Use TDD around the existing scenario framework tests. Prefer static and plan-onl
 
 **Existing Tests to Modify:**
 - `test/e2e/scenario-framework-tests/e2e-lib-helpers.test.ts`
-  - Add `inference_routing.sh` sourceability checks.
+  - Add `inference_routing.sh` sourceability checks using the same strict-shell subprocess pattern as existing helper tests.
 - `test/e2e/scenario-framework-tests/e2e-convention-lint.test.ts`
-  - Ensure helper naming, assertion IDs, and shell conventions pass.
+  - Ensure helper naming, assertion IDs, dry-run handling, bounded `curl --max-time`, and shell conventions pass.
 
 **New Tests to Create:**
 1. `test_should_source_inference_routing_helpers_under_strict_shell_mode`
@@ -57,6 +57,7 @@ Use TDD around the existing scenario framework tests. Prefer static and plan-onl
 **Test Implementation Notes:**
 - Use fake context directories and shell subprocess tests already used by framework tests.
 - Assert command timeouts or bounded flags by inspecting scripts where practical.
+- Assert helper output includes stable assertion IDs but never includes fake values assigned to `*TOKEN*`, `*API_KEY*`, `*SECRET*`, or `*CREDENTIAL*` context keys.
 
 ## Phase 3: Domain Suite Migration - Test Guide
 
@@ -67,6 +68,8 @@ Use TDD around the existing scenario framework tests. Prefer static and plan-onl
   - Confirm plan-only execution includes new inference suites.
 - `test/e2e/scenario-framework-tests/e2e-scenario-schema.test.ts`
   - Update only if new suite names require schema awareness.
+- `test/e2e/scenario-framework-tests/e2e-scenario-additional-families.test.ts`
+  - Prefer this existing family-coverage test for assertions that suite families such as `inference-routing`, `inference-switch`, `kimi-compatibility`, `ollama-auth-proxy`, and `model-router` resolve to domain-specific steps.
 
 **New Tests to Create:**
 1. `test_should_route_inference_suite_families_to_domain_specific_steps`
@@ -85,6 +88,7 @@ Use TDD around the existing scenario framework tests. Prefer static and plan-onl
 **Test Implementation Notes:**
 - Avoid live inference in static tests.
 - Add scenario IDs to fixtures only when needed by existing resolver patterns.
+- Verify `suites.yaml` edits directly where possible instead of creating duplicate fixture-only suite definitions.
 
 ## Phase 4: Parity Map and Coverage Report Completion - Test Guide
 
@@ -115,6 +119,8 @@ Use TDD around the existing scenario framework tests. Prefer static and plan-onl
 ## Phase 5: PR Validation and Live-Capable Verification - Test Guide
 
 **Existing Tests to Run:**
+- `npm test -- test/e2e/scenario-framework-tests/e2e-legacy-assertion-inventory.test.ts`
+- `npm test -- test/e2e/scenario-framework-tests/e2e-lib-helpers.test.ts`
 - `npm test -- test/e2e/scenario-framework-tests/e2e-scenario-resolver.test.ts`
 - `npm test -- test/e2e/scenario-framework-tests/e2e-scenario-schema.test.ts`
 - `npm test -- test/e2e/scenario-framework-tests/e2e-suite-runner.test.ts`

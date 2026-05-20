@@ -81,14 +81,14 @@ flowchart TD
 
 ### Primitive library
 
-Add `test/e2e/validation_suites/lib/inference_routing.sh` as the domain primitive layer.
+Add `test/e2e/validation_suites/lib/inference_routing.sh` as the domain primitive layer, following the existing validation-suite shell-helper pattern.
 
 Responsibilities:
 
-- Source the runtime environment and context helpers.
+- Source `test/e2e/runtime/lib/env.sh` and `test/e2e/runtime/lib/context.sh` directly, as existing suite scripts do.
 - Consume only `$E2E_CONTEXT_DIR/context.env` for scenario state.
-- Require context explicitly with `e2e_context_require`.
-- Support dry-run / plan-only behavior without live infrastructure.
+- Require context explicitly with `e2e_context_require` at the narrowest helper/suite boundary.
+- Use `e2e_env_is_dry_run` for dry-run / plan-only behavior without live infrastructure.
 - Provide bounded helper functions for:
   - sandbox HTTP status checks
   - sandbox JSON requests to `https://inference.local/v1/*`
@@ -96,7 +96,7 @@ Responsibilities:
   - provider route inspection
   - auth-proxy positive and negative checks
   - response content checks that avoid leaking secrets
-- Emit stable assertion IDs using `<layer>.<domain>.<behavior>`.
+- Emit stable assertion IDs using `<layer>.<domain>.<behavior>` before performing each check.
 
 Non-goals:
 
@@ -107,13 +107,14 @@ Non-goals:
 
 ### Suite organization
 
-Add or extend domain-specific suite scripts under `test/e2e/validation_suites/inference/`, for example:
+Add or extend domain-specific suite scripts under `test/e2e/validation_suites/inference/`, reusing the existing `inference/cloud/` and `inference/ollama-auth-proxy/` directories where their current steps already express the domain behavior. Add new directories only for behaviors that currently alias generic cloud inference:
 
 ```text
 test/e2e/validation_suites/
   lib/
     inference_routing.sh
   inference/
+    cloud/                         # existing generic cloud checks; keep only generic behavior here
     routing/
       00-inference-local-chat-completion.sh
       01-provider-route-health.sh
@@ -131,7 +132,7 @@ test/e2e/validation_suites/
       01-provider-routed-completion.sh
 ```
 
-Exact filenames may change during implementation, but the suite family entries in `suites.yaml` must point at domain-specific steps rather than generic aliases where behavior differs.
+Exact filenames may change during implementation, but the suite family entries in `suites.yaml` must point at domain-specific steps rather than generic aliases where behavior differs. Prefer editing existing suite-family entries in place over adding parallel suite names.
 
 ### Assertion ID strategy
 
@@ -173,6 +174,8 @@ Environment and runner requirements must be represented in parity metadata where
 - Docker/OpenShell/NemoClaw runner for sandbox-backed tests.
 - Ollama/local model runner where local Ollama behavior is validated.
 - Kimi-compatible mock endpoint or fixture requirements where Kimi compatibility is validated.
+
+Do not add new external dependencies for the migration; use Bash, existing runtime helpers, `openshell sandbox exec`, `curl`, and existing npm/Vitest scenario-framework tests.
 
 ## Validation Strategy
 
@@ -356,9 +359,9 @@ Test requirements:
 | Coverage report overstates migration | Require every target legacy assertion to have explicit mapped/deferred/retired status |
 | Product bugs discovered during migration | Split product fixes into separate issues/PRs unless blocking test migration |
 
-## Open Questions
+## Implementation Decisions
 
-1. Which scenario IDs should own Kimi compatibility and model-router coverage if they require special fixtures or secrets?
-2. Should model-router provider-routed inference be a separate suite family or a step under `inference-routing`?
-3. Which assertions from `test-inference-routing.sh` are security/credential hygiene assertions already covered by existing security credential suites?
-4. What exact coverage-report threshold or command should be used to demonstrate “100% or greater parity” in the PR?
+1. Kimi compatibility and model-router coverage should be owned by the existing scenario IDs that already select those suite families, if present; otherwise add the smallest static fixture/scenario entry needed for resolver and plan-only coverage. Live execution remains gated by runner/secret metadata.
+2. Model-router provider-routed inference should be a separate `model-router` suite family because its endpoint health and routed-completion assertions are distinct from generic `inference-routing`.
+3. Credential hygiene assertions from `test-inference-routing.sh` should map to existing `security-credentials` assertions when they verify no raw secrets are exposed; only route-specific secret behavior should stay in inference/provider parity metadata.
+4. “100% or greater parity” is demonstrated by `npm test -- test/e2e/scenario-framework-tests/e2e-parity-map.test.ts test/e2e/scenario-framework-tests/e2e-coverage-report.test.ts` plus a post-implementation review confirming every assertion from the five target scripts is `migrated`, `covered`, `deferred`, or `retired`.
