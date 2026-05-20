@@ -244,7 +244,7 @@ Test requirements:
 - Static parity-map tests still pass if metadata is updated in this phase.
 - No live E2E execution is required for this phase.
 
-## Phase 2: Inference Routing Primitive Library
+## Phase 2: Inference Routing Primitive Library [COMPLETED: 6c96e7d3a]
 
 Add reusable shell primitives for inference/provider scenario suites.
 
