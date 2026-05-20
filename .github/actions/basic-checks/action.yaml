@@ -24,11 +24,19 @@ runs:
         [ "$EXPECTED" = "$ACTUAL" ] || { echo "::error::hadolint checksum mismatch"; exit 1; }
         chmod +x /usr/local/bin/hadolint
 
+    - name: Validate npm lockfiles
+      shell: bash
+      run: |
+        npm ci --ignore-scripts --dry-run
+        cd nemoclaw
+        npm ci --ignore-scripts --dry-run
+
     - name: Install dependencies
       shell: bash
       run: |
-        npm install --ignore-scripts
-        cd nemoclaw && npm install
+        npm ci --ignore-scripts
+        cd nemoclaw
+        npm ci --ignore-scripts
 
     - name: Build TypeScript plugin
       shell: bash

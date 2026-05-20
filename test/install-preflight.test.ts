@@ -95,7 +95,7 @@ function writeNpmStub(fakeBin: string, installSnippet: string = "exit 0") {
 set -euo pipefail
 if [ "$1" = "--version" ]; then echo "10.9.2"; exit 0; fi
 if [ "$1" = "config" ] && [ "$2" = "get" ] && [ "$3" = "prefix" ]; then echo "$NPM_PREFIX"; exit 0; fi
-if [ "$1" = "install" ] || [ "$1" = "link" ] || [ "$1" = "uninstall" ] || [ "$1" = "pack" ] || [ "$1" = "run" ]; then
+if [ "$1" = "ci" ] || [ "$1" = "install" ] || [ "$1" = "link" ] || [ "$1" = "uninstall" ] || [ "$1" = "pack" ] || [ "$1" = "run" ]; then
   ${installSnippet}
 fi
 echo "unexpected npm invocation: $*" >&2; exit 98`,
@@ -552,7 +552,7 @@ exit 98
     expect(output).not.toMatch(/0\.1\.0/);
   });
 
-  it("uses npm install + npm link for a source checkout (no -g)", { timeout: 20000 }, () => {
+  it("uses npm ci + npm link for a source checkout (no -g)", { timeout: 20000 }, () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-install-source-"));
     const fakeBin = path.join(tmp, "bin");
     const prefix = path.join(tmp, "prefix");
@@ -594,6 +594,7 @@ if [ "$1" = "pack" ]; then
   tar -czf "$tmpdir/openclaw-2026.3.11.tgz" -C "$tmpdir" package
   exit 0
 fi
+if [ "$1" = "ci" ]; then exit 0; fi
 if [ "$1" = "install" ]; then exit 0; fi
 if [ "$1" = "run" ] && { [ "$2" = "build" ] || [ "$2" = "build:cli" ] || [ "$2" = "--if-present" ]; }; then exit 0; fi
 if [ "$1" = "link" ]; then
@@ -645,8 +646,10 @@ fi`,
 
     expect(result.status).toBe(0);
     const log = fs.readFileSync(npmLog, "utf-8");
-    // install (no -g) and link must both have been called
-    expect(log).toMatch(/^install(?!\s+-g)/m);
+    // Root and sandbox payload installs must use npm ci so host installs do not rewrite lockfiles.
+    const ciCalls = log.split("\n").filter((line) => line === "ci --ignore-scripts");
+    expect(ciCalls).toHaveLength(2);
+    expect(log).not.toMatch(/^install(?!\s+-g)/m);
     expect(log).toMatch(/^link/m);
     // the GitHub URL must NOT appear — this is a local install
     expect(log).not.toMatch(new RegExp(GITHUB_INSTALL_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
