@@ -128,6 +128,7 @@ security_posture_assert_rc_files() {
   local out rc
 
   rc=0
+  # shellcheck disable=SC2016 # Remote shell snippet; expansion must happen inside the sandbox.
   out="$(security_posture_sandbox_exec "$sandbox_name" 'bad=0; for f in /sandbox/.bashrc /sandbox/.profile; do if [ ! -f "$f" ]; then echo "MISSING $f"; bad=1; continue; fi; if [ -L "$f" ]; then echo "SYMLINK $f"; bad=1; fi; meta=$(stat -c "%a %U:%G" "$f" 2>/dev/null || true); echo "META $f $meta"; set -- $meta; mode="${1:-}"; owner="${2:-}"; if [ "$mode" != "444" ]; then echo "BAD_MODE $f $mode"; bad=1; fi; if [ "$owner" != "root:root" ]; then echo "BAD_OWNER $f $owner"; bad=1; fi; if grep -Eq "nemoclaw-configure-guard|^(openclaw|hermes)\(\)" "$f" 2>/dev/null; then echo "INLINE_GUARD $f"; bad=1; fi; done; exit "$bad"')" || rc=$?
   info "rc-file metadata: ${out//$'\n'/; }"
   if [ "$rc" -eq 0 ]; then

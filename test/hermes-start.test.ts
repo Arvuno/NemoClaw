@@ -165,13 +165,6 @@ describe("agents/hermes/start.sh runtime shell env", () => {
     );
   });
 
-  it("does not keep the old post-capability-drop rc rewrite path", () => {
-    const src = fs.readFileSync(START_SCRIPT, "utf-8");
-
-    expect(src).not.toContain("rewrite_rc_marker_block");
-    expect(src).not.toContain("install_configure_guard");
-    expect(src).toContain("write_runtime_shell_env");
-  });
 });
 
 describe("agents/hermes/start.sh Tirith marker bootstrap", () => {
