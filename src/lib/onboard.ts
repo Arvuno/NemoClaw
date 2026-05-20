@@ -9059,6 +9059,24 @@ async function recordStepSkipped(stepName: string): Promise<Session> {
   return getOnboardRuntime().markStepSkipped(stepName);
 }
 
+async function recordStateSkipped(
+  state: import("./onboard/machine/types").OnboardMachineState,
+  metadata: Record<string, unknown> | null = null,
+): Promise<Session> {
+  return getOnboardRuntime().markSkipped(state, metadata);
+}
+
+async function recordRepairEvent(
+  type: "state.repair.started" | "state.repair.completed" | "state.repair.failed",
+  options: {
+    state?: import("./onboard/machine/types").OnboardMachineState | null;
+    error?: string | null;
+    metadata?: Record<string, unknown> | null;
+  } = {},
+): Promise<Session> {
+  return getOnboardRuntime().emitRepairEvent(type, options);
+}
+
 async function recordSessionComplete(updates: SessionUpdates = {}): Promise<Session> {
   return getOnboardRuntime().completeSession(updates);
 }
@@ -9430,6 +9448,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         resolveSandboxGpuConfig,
         validateSandboxGpuPreflight,
         skippedStepMessage,
+        recordStateSkipped,
         startRecordedStep,
         recordStepComplete,
         updateSession: onboardSession.updateSession,
@@ -9497,6 +9516,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         retireLegacyGatewayForDockerDriverUpgrade,
         destroyGatewayRuntimeForGpuReuse: () => destroyGateway(() => undefined, () => false),
         skippedStepMessage,
+        recordStateSkipped,
         note,
         startRecordedStep,
         startGateway,
@@ -9552,6 +9572,8 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         recordStepComplete,
         toSessionUpdates: (updates) => toSessionUpdates(updates as Parameters<typeof toSessionUpdates>[0]),
         skippedStepMessage,
+        recordStateSkipped,
+        recordRepairEvent,
         hydrateCredentialEnv,
         repairLocalInferenceSystemdOverrideOrExit,
         isNonInteractive,
@@ -9644,6 +9666,8 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         recordStepComplete,
         toSessionUpdates: (updates) => toSessionUpdates(updates as Parameters<typeof toSessionUpdates>[0]),
         skippedStepMessage,
+        recordStateSkipped,
+        recordRepairEvent,
         error: (message) => console.error(message),
         exitProcess: (code) => process.exit(code),
       },
@@ -9683,6 +9707,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         recordStepSkipped,
         isOpenclawReady,
         skippedStepMessage,
+        recordStateSkipped,
         startRecordedStep,
         setupOpenclaw,
         recordStepComplete,
@@ -9719,6 +9744,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         mergeRequiredHermesToolGatewayPolicyPresets,
         arePolicyPresetsApplied,
         skippedStepMessage,
+        recordStateSkipped,
         startRecordedStep,
         setupPoliciesWithSelection,
         updateSession: onboardSession.updateSession,

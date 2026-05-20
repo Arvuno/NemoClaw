@@ -27,6 +27,7 @@ export interface AgentSetupStateOptions<Agent> {
     recordStepSkipped(stepName: string): Promise<Session>;
     isOpenclawReady(sandboxName: string): boolean;
     skippedStepMessage(stepName: string, detail?: string | null): void;
+    recordStateSkipped(state: "openclaw", metadata?: Record<string, unknown> | null): Promise<Session>;
     startRecordedStep(
       stepName: string,
       updates: { sandboxName: string; provider: string; model: string },
@@ -70,6 +71,7 @@ export async function handleAgentSetupState<Agent>({
   const resumeOpenclaw = resume && sandboxName && deps.isOpenclawReady(sandboxName);
   if (resumeOpenclaw) {
     deps.skippedStepMessage("openclaw", sandboxName);
+    await deps.recordStateSkipped("openclaw", { reason: "resume", sandboxName });
     session = await deps.recordStepComplete(
       "openclaw",
       deps.toSessionUpdates({ sandboxName, provider, model, hermesAuthMethod, hermesToolGateways }),

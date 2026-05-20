@@ -57,6 +57,14 @@ export interface ProviderInferenceStateOptions<Gpu, Agent, Host> {
     recordStepComplete(stepName: string, updates: SessionUpdates): Promise<Session>;
     toSessionUpdates(updates: Record<string, unknown>): SessionUpdates;
     skippedStepMessage(stepName: string, detail?: string | null): void;
+    recordStateSkipped(
+      state: "provider_selection" | "inference",
+      metadata?: Record<string, unknown> | null,
+    ): Promise<Session>;
+    recordRepairEvent(
+      type: "state.repair.started" | "state.repair.completed" | "state.repair.failed",
+      options?: { state?: "provider_selection" | "inference"; error?: string | null; metadata?: Record<string, unknown> | null },
+    ): Promise<Session>;
     hydrateCredentialEnv(credentialEnv: string | null): void;
     repairLocalInferenceSystemdOverrideOrExit(provider: string | null, isNonInteractive: () => boolean): void;
     isNonInteractive(): boolean;
@@ -144,8 +152,25 @@ export async function handleProviderInferenceState<Gpu, Agent, Host>({
       typeof model === "string";
     if (resumeProviderSelection) {
       deps.skippedStepMessage("provider_selection", `${provider} / ${model}`);
+      await deps.recordStateSkipped("provider_selection", {
+        reason: "resume",
+        provider,
+        model,
+      });
       deps.hydrateCredentialEnv(credentialEnv);
+      if (provider === "ollama-local") {
+        await deps.recordRepairEvent("state.repair.started", {
+          state: "provider_selection",
+          metadata: { repair: "ollama-systemd-loopback" },
+        });
+      }
       deps.repairLocalInferenceSystemdOverrideOrExit(provider, deps.isNonInteractive);
+      if (provider === "ollama-local") {
+        await deps.recordRepairEvent("state.repair.completed", {
+          state: "provider_selection",
+          metadata: { repair: "ollama-systemd-loopback" },
+        });
+      }
     } else {
       await deps.startRecordedStep("provider_selection");
       const selection = await deps.setupNim(gpu, sandboxName, agent);
@@ -214,6 +239,11 @@ export async function handleProviderInferenceState<Gpu, Agent, Host>({
         }
       }
       deps.skippedStepMessage("inference", `${provider} / ${model}`);
+      await deps.recordStateSkipped("inference", {
+        reason: "resume",
+        provider,
+        model,
+      });
       if (nimContainer && sandboxName) deps.registryUpdateSandbox(sandboxName, { nimContainer });
       session = await deps.recordStepComplete(
         "inference",

@@ -32,6 +32,8 @@ function createDeps(overrides: Partial<ProviderInferenceStateOptions<Gpu, Agent,
     startStep: vi.fn(async () => undefined),
     complete: vi.fn(async () => createSession()),
     skipped: vi.fn(),
+    recordSkip: vi.fn(async () => createSession()),
+    repairEvent: vi.fn(async () => createSession()),
     hydrate: vi.fn(),
     repair: vi.fn(),
     routeReady: vi.fn(() => false),
@@ -56,6 +58,8 @@ function createDeps(overrides: Partial<ProviderInferenceStateOptions<Gpu, Agent,
       recordStepComplete: calls.complete,
       toSessionUpdates: (updates: Record<string, unknown>) => updates as SessionUpdates,
       skippedStepMessage: calls.skipped,
+      recordStateSkipped: calls.recordSkip,
+      recordRepairEvent: calls.repairEvent,
       hydrateCredentialEnv: calls.hydrate,
       repairLocalInferenceSystemdOverrideOrExit: calls.repair,
       isNonInteractive: () => true,
@@ -163,9 +167,27 @@ describe("handleProviderInferenceState", () => {
     expect(calls.setupNim).not.toHaveBeenCalled();
     expect(calls.setupInference).not.toHaveBeenCalled();
     expect(calls.skipped).toHaveBeenCalledWith("provider_selection", "ollama-local / llama3.1");
+    expect(calls.recordSkip).toHaveBeenCalledWith("provider_selection", {
+      reason: "resume",
+      provider: "ollama-local",
+      model: "llama3.1",
+    });
     expect(calls.hydrate).toHaveBeenCalledWith(null);
+    expect(calls.repairEvent).toHaveBeenCalledWith("state.repair.started", {
+      state: "provider_selection",
+      metadata: { repair: "ollama-systemd-loopback" },
+    });
     expect(calls.repair).toHaveBeenCalledWith("ollama-local", deps.isNonInteractive);
+    expect(calls.repairEvent).toHaveBeenCalledWith("state.repair.completed", {
+      state: "provider_selection",
+      metadata: { repair: "ollama-systemd-loopback" },
+    });
     expect(calls.skipped).toHaveBeenCalledWith("inference", "ollama-local / llama3.1");
+    expect(calls.recordSkip).toHaveBeenCalledWith("inference", {
+      reason: "resume",
+      provider: "ollama-local",
+      model: "llama3.1",
+    });
     expect(result).toMatchObject({ provider: "ollama-local", model: "llama3.1" });
   });
 

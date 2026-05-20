@@ -35,6 +35,8 @@ function createDeps(overrides: Partial<SandboxStateOptions<Gpu, Agent, WebSearch
     setDefault: vi.fn(),
     complete: vi.fn(async () => createSession()),
     skipped: vi.fn(),
+    recordSkip: vi.fn(async () => createSession()),
+    repairEvent: vi.fn(async () => createSession()),
     error: vi.fn(),
     exit: vi.fn((code: number): never => {
       throw new Error(`exit ${code}`);
@@ -77,6 +79,8 @@ function createDeps(overrides: Partial<SandboxStateOptions<Gpu, Agent, WebSearch
       recordStepComplete: calls.complete,
       toSessionUpdates: (updates: Record<string, unknown>) => updates as SessionUpdates,
       skippedStepMessage: calls.skipped,
+      recordStateSkipped: calls.recordSkip,
+      recordRepairEvent: calls.repairEvent,
       error: calls.error,
       exitProcess: calls.exit,
       ...overrides,
@@ -153,6 +157,10 @@ describe("handleSandboxState", () => {
 
     expect(calls.createSandbox).not.toHaveBeenCalled();
     expect(calls.skipped).toHaveBeenCalledWith("sandbox", "saved");
+    expect(calls.recordSkip).toHaveBeenCalledWith("sandbox", {
+      reason: "resume",
+      sandboxName: "saved",
+    });
     expect(result.selectedMessagingChannels).toEqual(["slack"]);
   });
 
@@ -182,7 +190,15 @@ describe("handleSandboxState", () => {
 
     await handleSandboxState({ ...baseOptions(deps, session), resume: true, sandboxName: "saved" });
 
+    expect(calls.repairEvent).toHaveBeenCalledWith("state.repair.started", {
+      state: "sandbox",
+      metadata: { repair: "recorded-sandbox-cleanup", sandboxName: "saved" },
+    });
     expect(calls.repairSandbox).toHaveBeenCalledWith("saved");
+    expect(calls.repairEvent).toHaveBeenCalledWith("state.repair.completed", {
+      state: "sandbox",
+      metadata: { repair: "recorded-sandbox-cleanup", sandboxName: "saved" },
+    });
     expect(calls.createSandbox).toHaveBeenCalled();
   });
 

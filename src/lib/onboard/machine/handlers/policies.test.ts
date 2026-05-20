@@ -22,6 +22,7 @@ function createDeps(overrides: Partial<PoliciesStateOptions<Agent, WebSearchConf
     mergeHermes: vi.fn((selected: string[], tools: string[]) => [...selected, ...tools]),
     appliedCheck: vi.fn(() => false),
     skipped: vi.fn(),
+    recordSkip: vi.fn(async () => session),
     startStep: vi.fn(async () => undefined),
     setupPolicies: vi.fn(async () => ["npm"]),
     updateSession: vi.fn((mutator: (value: Session) => Session | void) => {
@@ -43,6 +44,7 @@ function createDeps(overrides: Partial<PoliciesStateOptions<Agent, WebSearchConf
       mergeRequiredHermesToolGatewayPolicyPresets: calls.mergeHermes,
       arePolicyPresetsApplied: calls.appliedCheck,
       skippedStepMessage: calls.skipped,
+      recordStateSkipped: calls.recordSkip,
       startRecordedStep: calls.startStep,
       setupPoliciesWithSelection: calls.setupPolicies,
       updateSession: calls.updateSession,
@@ -135,6 +137,10 @@ describe("handlePoliciesState", () => {
     const result = await handlePoliciesState({ ...baseOptions(deps), resume: true });
 
     expect(calls.skipped).toHaveBeenCalledWith("policies", "npm");
+    expect(calls.recordSkip).toHaveBeenCalledWith("policies", {
+      reason: "resume",
+      policyPresets: ["npm"],
+    });
     expect(calls.setupPolicies).not.toHaveBeenCalled();
     expect(calls.complete).toHaveBeenCalledWith(
       "policies",
