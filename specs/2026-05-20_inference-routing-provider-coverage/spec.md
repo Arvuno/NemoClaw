@@ -269,7 +269,7 @@ Test requirements:
 - Add or extend scenario-framework helper tests to validate sourceability/conventions.
 - Existing shellcheck/convention tests pass.
 
-## Phase 3: Domain Suite Migration
+## Phase 3: Domain Suite Migration [COMPLETED: 4b03eefc7]
 
 Move selected highest-value assertions into domain-specific validation suites.
 
