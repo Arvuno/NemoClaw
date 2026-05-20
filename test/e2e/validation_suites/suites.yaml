@@ -105,6 +105,8 @@ suites:
       script: messaging/common/03-bridge-reachable.sh
     - id: telegram-injection-safety
       script: messaging/telegram/00-telegram-injection-safety.sh
+    - id: telegram-injection-payload-classes
+      script: messaging/telegram/01-telegram-injection-payload-classes.sh
   messaging-discord:
     requires_state: *id001
     steps:
