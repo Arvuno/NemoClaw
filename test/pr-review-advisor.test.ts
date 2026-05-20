@@ -274,6 +274,9 @@ describe("PR review advisor", () => {
     for (const step of steps.filter((step: { uses?: string }) => step.uses)) {
       expect(step.uses).toMatch(/@[0-9a-f]{40}(?:\s*#.*)?$/);
     }
+    expect(analyzeStep.env.PR_REVIEW_ADVISOR_API_KEY).toBe(
+      "${{ secrets.PR_REVIEW_ADVISOR_API_KEY || secrets.PI_PR_REVIEW_ADVISOR_API_KEY }}",
+    );
     expect(installStep.run.includes("--ignore-scripts")).toBe(true);
     expect(analyzeStep.run.includes("$ADVISOR_DIR/tools/pr-review-advisor/analyze.mts")).toBe(true);
     expect(analyzeStep.run).toContain("trusted main checkout does not yet contain analyze.mts");
