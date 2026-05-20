@@ -4,7 +4,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { getChangedFiles, getCommits, getDiff, getDiffStat, getHeadSha, gitOutput } from "../advisors/git.mts";
 import { githubGraphql, githubRest, githubRestPaginated } from "../advisors/github.mts";
@@ -17,6 +17,12 @@ const ADVISOR_PROVIDER = DEFAULT_ADVISOR_PROVIDER;
 const ADVISOR_MODEL = DEFAULT_ADVISOR_MODEL;
 const ADVISOR_CREDENTIAL_ENV = ["PR", "REVIEW", "ADVISOR", "API", "KEY"].join("_");
 const SECURITY_REVIEW_SKILL_PATH = ".agents/skills/nemoclaw-maintainer-security-code-review/SKILL.md";
+const TRUSTED_SECURITY_REVIEW_SKILL_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  SECURITY_REVIEW_SKILL_PATH,
+);
 const SECURITY_CATEGORIES = [
   "Secrets and Credentials",
   "Input Validation and Data Sanitization",
@@ -553,12 +559,12 @@ query($owner: String!, $name: String!, $number: Int!) {
 }
 
 export function readTrustedSecurityReviewSkill(): string {
-  const skillPath = path.join(root, SECURITY_REVIEW_SKILL_PATH);
   try {
-    return fs.readFileSync(skillPath, "utf8");
+    return fs.readFileSync(TRUSTED_SECURITY_REVIEW_SKILL_PATH, "utf8");
   } catch (error: unknown) {
     const reason = error instanceof Error ? error.message : String(error);
-    return `Security review skill unavailable at ${SECURITY_REVIEW_SKILL_PATH}: ${reason}`;
+    console.error(`Security review skill unavailable at ${TRUSTED_SECURITY_REVIEW_SKILL_PATH}: ${reason}`);
+    return "";
   }
 }
 
