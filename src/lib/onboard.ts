@@ -284,6 +284,7 @@ const {
   getResumeSandboxConflict,
 } = resumeConfig;
 const { pruneKnownHostsEntries }: typeof import("./onboard/known-hosts") = require("./onboard/known-hosts");
+const { createOpenclawSetup }: typeof import("./onboard/openclaw-setup") = require("./onboard/openclaw-setup");
 const openshellVersion: typeof import("./onboard/openshell-version") = require("./onboard/openshell-version");
 const {
   getBlueprintMaxOpenshellVersion,
@@ -7081,30 +7082,16 @@ async function setupMessagingChannels(
 
 // ── Step 7: OpenClaw ─────────────────────────────────────────────
 
-async function setupOpenclaw(sandboxName: string, model: string, provider: string): Promise<void> {
-  step(7, 8, `Setting up ${agentProductName()} inside sandbox`);
-
-  const selectionConfig = getProviderSelectionConfig(provider, model);
-  if (selectionConfig) {
-    const sandboxConfig = {
-      ...selectionConfig,
-      onboardedAt: new Date().toISOString(),
-    };
-    const script = buildSandboxConfigSyncScript(sandboxConfig);
-    const scriptFile = writeSandboxConfigSyncFile(script);
-    try {
-      const scriptContent = fs.readFileSync(scriptFile, "utf-8");
-      run(openshellArgv(["sandbox", "connect", sandboxName]), {
-        stdio: ["pipe", "ignore", "inherit"],
-        input: scriptContent,
-      });
-    } finally {
-      cleanupTempDir(scriptFile, "nemoclaw-sync");
-    }
-  }
-
-  console.log(`  ✓ ${agentProductName()} gateway launched inside sandbox`);
-}
+const setupOpenclaw = createOpenclawSetup({
+  step,
+  agentProductName,
+  getProviderSelectionConfig,
+  buildSandboxConfigSyncScript,
+  writeSandboxConfigSyncFile,
+  run,
+  openshellArgv,
+  cleanupTempDir,
+});
 
 // ── Step 7: Policy presets ───────────────────────────────────────
 
