@@ -25,7 +25,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "child_process";
 
-import { captureOpenshellCommand } from "../adapters/openshell/client.js";
+import { captureSandboxSshConfigCommand } from "../adapters/openshell/client.js";
 import { resolveOpenshell } from "../adapters/openshell/resolve.js";
 import type { AgentStateFile } from "../agent/defs.js";
 import { loadAgent } from "../agent/defs.js";
@@ -469,7 +469,7 @@ function getSshConfig(sandboxName: string): string | null {
   const openshellBinary = resolveOpenshell();
   if (!openshellBinary) return null;
 
-  const result = captureOpenshellCommand(openshellBinary, ["sandbox", "ssh-config", sandboxName], {
+  const result = captureSandboxSshConfigCommand(openshellBinary, sandboxName, {
     ignoreError: true,
   });
   if (result.status !== 0) return null;

@@ -6,8 +6,9 @@ import type { SpawnSyncReturns } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 import {
-  captureOpenshellCommandAsync,
   captureOpenshellCommand,
+  captureOpenshellCommandAsync,
+  captureSandboxSshConfigCommand,
   getInstalledOpenshellVersion,
   type OpenshellSpawnSync,
   parseVersionFromText,
@@ -151,6 +152,42 @@ describe("openshell helpers", () => {
       error: expect.objectContaining({ message: expect.stringContaining("ETIMEDOUT") }),
       signal: "SIGTERM",
     });
+  });
+
+  it("verifies sandbox existence before requesting SSH config", () => {
+    const calls: string[][] = [];
+    const spawnSyncImpl: OpenshellSpawnSync = (_command, args) => {
+      calls.push([...args]);
+      if (args.join(" ") === "sandbox get alpha") {
+        return makeSpawnResult({ status: 0, stdout: "alpha Ready\n", stderr: "" });
+      }
+      return makeSpawnResult({
+        status: 0,
+        stdout: "Host openshell-alpha\n",
+        stderr: "",
+      });
+    };
+
+    const result = captureSandboxSshConfigCommand("openshell", "alpha", { spawnSyncImpl });
+
+    expect(result).toEqual({ status: 0, output: "Host openshell-alpha" });
+    expect(calls).toEqual([
+      ["sandbox", "get", "alpha"],
+      ["sandbox", "ssh-config", "alpha"],
+    ]);
+  });
+
+  it("does not request SSH config when the sandbox is missing", () => {
+    const calls: string[][] = [];
+    const spawnSyncImpl: OpenshellSpawnSync = (_command, args) => {
+      calls.push([...args]);
+      return makeSpawnResult({ status: 1, stdout: "", stderr: "sandbox not found\n" });
+    };
+
+    const result = captureSandboxSshConfigCommand("openshell", "bogus", { spawnSyncImpl });
+
+    expect(result).toEqual({ status: 1, output: "sandbox 'bogus' not found" });
+    expect(calls).toEqual([["sandbox", "get", "bogus"]]);
   });
 
   it("bounds async captures and reports timeout metadata", async () => {

@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  spawn,
-  spawnSync,
   type ChildProcess,
   type SpawnSyncOptions,
   type SpawnSyncOptionsWithStringEncoding,
   type SpawnSyncReturns,
+  spawn,
+  spawnSync,
 } from "node:child_process";
 
 export type OpenshellSpawnSync = (
@@ -169,6 +169,24 @@ export function captureOpenshellCommand(
     status: result.status ?? 1,
     output: `${result.stdout || ""}${opts.ignoreError ? "" : result.stderr || ""}`.trim(),
   };
+}
+
+export function captureSandboxSshConfigCommand(
+  binary: string,
+  sandboxName: string,
+  opts: CaptureOpenshellOptions = {},
+): CaptureOpenshellResult {
+  const sandboxGet = captureOpenshellCommand(binary, ["sandbox", "get", sandboxName], {
+    ...opts,
+    ignoreError: true,
+  });
+  if (sandboxGet.status !== 0) {
+    return {
+      ...sandboxGet,
+      output: sandboxGet.output || `sandbox '${sandboxName}' not found`,
+    };
+  }
+  return captureOpenshellCommand(binary, ["sandbox", "ssh-config", sandboxName], opts);
 }
 
 export function captureOpenshellCommandAsync(
