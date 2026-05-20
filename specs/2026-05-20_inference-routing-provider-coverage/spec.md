@@ -213,7 +213,7 @@ Re-review the legacy target scripts and `test/e2e/docs/parity-map.yaml` after im
 
 The coverage result must be 100% or greater parity, meaning no assertion remains unknown, unmapped, or silently dropped.
 
-## Phase 1: Coverage Inventory and Parity Baseline
+## Phase 1: Coverage Inventory and Parity Baseline [COMPLETED: e3002b46f]
 
 Create a precise baseline of the legacy assertions and decide which behaviors migrate now.
 
