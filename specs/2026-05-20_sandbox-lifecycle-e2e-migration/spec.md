@@ -487,7 +487,7 @@ Validate the migrated suite through local/framework checks and PR CI.
 - All added tests are passing in PR CI or equivalent documented validation.
 - Legacy parity review evidence is included in the PR.
 
-## Phase 6: Clean the House
+## Phase 6: Clean the House [COMPLETED: ff7f73b]
 
 ### Objective
 
