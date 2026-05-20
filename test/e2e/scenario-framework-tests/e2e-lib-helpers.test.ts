@@ -30,6 +30,58 @@ function runBash(script: string, env: Record<string, string> = {}): SpawnSyncRet
 // ──────────────────────────────────────────────────────────────────────────
 
 describe("E2E shell helpers", () => {
+  it("security_policy_credentials_helper_should_load_with_context_library", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "spc-context-"));
+    try {
+      fs.writeFileSync(path.join(tmp, "context.env"), "E2E_SCENARIO=test\nE2E_PROVIDER=nvidia\nE2E_CREDENTIALS_EXPECTED=present\n");
+      const r = runBash(
+        `
+        set -euo pipefail
+        . "${VALIDATION_SUITES}/lib/security_policy_credentials.sh"
+        spc_require_context E2E_SCENARIO E2E_PROVIDER
+        echo "provider=$(spc_context_get E2E_PROVIDER)"
+        `,
+        { E2E_CONTEXT_DIR: tmp, E2E_DRY_RUN: "1" },
+      );
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.stdout).toContain("provider=nvidia");
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("security_policy_credentials_helper_should_fail_when_required_context_missing", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "spc-context-missing-"));
+    try {
+      fs.writeFileSync(path.join(tmp, "context.env"), "E2E_SCENARIO=test\n");
+      const r = runBash(
+        `
+        set -euo pipefail
+        . "${VALIDATION_SUITES}/lib/security_policy_credentials.sh"
+        spc_require_context E2E_PROVIDER
+        `,
+        { E2E_CONTEXT_DIR: tmp, E2E_DRY_RUN: "1" },
+      );
+      expect(r.status).not.toBe(0);
+      expect(r.stderr).toContain("E2E_PROVIDER");
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("security_policy_credentials_helper_should_not_log_secret_values", () => {
+    const r = runBash(`
+      set -euo pipefail
+      . "${VALIDATION_SUITES}/lib/security_policy_credentials.sh"
+      spc_log_provider_metadata "nvidia" "primary"
+      printf 'token=nvapi-secret-value-1234567890 sk-abcdefghijklmnop\n' | spc_redact_secret_text
+    `);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toContain("provider=nvidia name=primary");
+    expect(r.stdout).not.toMatch(/nvapi-secret-value|sk-abcdefghijklmnop/);
+    expect(r.stdout).toMatch(/\[REDACTED\]/);
+  });
+
   it("env_helper_should_set_standard_noninteractive_env", () => {
     const r = runBash(`
       set -euo pipefail
