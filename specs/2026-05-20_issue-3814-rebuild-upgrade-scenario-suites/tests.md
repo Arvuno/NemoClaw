@@ -11,6 +11,7 @@ Primary existing test locations:
 
 - `test/e2e/scenario-framework-tests/e2e-suite-runner.test.ts`
 - `test/e2e/scenario-framework-tests/e2e-lib-helpers.test.ts`
+- `test/e2e/scenario-framework-tests/e2e-legacy-assertion-inventory.test.ts`
 - `test/e2e/scenario-framework-tests/e2e-parity-map.test.ts`
 - `test/e2e/scenario-framework-tests/e2e-coverage-report.test.ts`
 - `test/e2e/scenario-framework-tests/e2e-scenarios-workflow.test.ts`
@@ -57,7 +58,7 @@ Suggested new or expanded tests:
   - Current behavior: validates helper library sourcing and shell helper conventions.
   - Required changes: include `lib/rebuild_upgrade.sh` in sourceability and side-effect checks.
 
-**New Tests to Create:**
+**New Tests to Create or Add to Existing Helper Coverage:**
 
 1. `test_should_source_rebuild_upgrade_library_without_side_effects`
    - **Input**: `bash -c 'source test/e2e/validation_suites/lib/rebuild_upgrade.sh'` with a clean environment.
@@ -81,6 +82,7 @@ Suggested new or expanded tests:
 
 **Test Implementation Notes:**
 
+- Add these cases to `e2e-lib-helpers.test.ts` unless the file becomes too large; prefer direct integration with existing helper tests over a parallel helper-test harness.
 - Use temporary directories and fake executable shims.
 - Validate no helper function installs, onboards, rebuilds, or rediscover hidden setup state.
 
@@ -94,7 +96,7 @@ Suggested new or expanded tests:
   - Current behavior: validates suite runner behavior and suite metadata.
   - Required changes: assert `rebuild` and `upgrade` resolve to rebuild/upgrade-specific scripts rather than generic smoke-only steps.
 
-**New Tests to Create:**
+**New Tests to Create or Add to Existing Suite Runner Coverage:**
 
 1. `test_should_resolve_rebuild_suite_to_domain_specific_steps`
    - **Input**: `test/e2e/validation_suites/suites.yaml`.
@@ -123,6 +125,7 @@ Suggested new or expanded tests:
 
 **Test Implementation Notes:**
 
+- Add metadata resolution tests to `e2e-suite-runner.test.ts` when practical so suite parsing remains covered in one place.
 - Select concrete affected scenario IDs during implementation after suite metadata is updated.
 - Use dry-run/fake context tests rather than live sandbox commands.
 

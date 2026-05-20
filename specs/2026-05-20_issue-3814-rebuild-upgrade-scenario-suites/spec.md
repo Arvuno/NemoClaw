@@ -69,9 +69,10 @@ flowchart TD
 
 1. **Context-first**: suite scripts source `$E2E_CONTEXT_DIR/context.env` and require keys such as `E2E_SCENARIO`, `E2E_AGENT`, `E2E_SANDBOX_NAME`, and `E2E_GATEWAY_URL`.
 2. **Primitive-driven**: repeated rebuild/upgrade checks live in `lib/rebuild_upgrade.sh` rather than in each suite step.
-3. **Stable IDs**: user-visible assertions use stable IDs such as `suite.rebuild.workspace_state_preserved`.
-4. **No setup rediscovery**: suites validate the environment provided by the scenario runner; they do not install, onboard, or infer hidden state from scratch.
-5. **Parity-auditable**: every relevant legacy assertion has an explicit `mapped`, `deferred`, or `retired` status.
+3. **Reuse existing helpers**: the primitive library should source existing runtime and assertion helpers such as `test/e2e/runtime/lib/context.sh`, `test/e2e/runtime/lib/logging.sh`, gateway helpers, and the existing `assert/*` scripts where they already cover the behavior.
+4. **Stable IDs**: user-visible assertions use stable IDs such as `suite.rebuild.workspace_state_preserved`.
+5. **No setup rediscovery**: suites validate the environment provided by the scenario runner; they do not install, onboard, or infer hidden state from scratch.
+6. **Parity-auditable**: every relevant legacy assertion has an explicit `mapped`, `deferred`, or `retired` status.
 
 ### Proposed File Layout
 
@@ -186,7 +187,7 @@ Add reusable shell helpers for rebuild/upgrade suite steps.
 ### Work Items
 
 - Create `test/e2e/validation_suites/lib/rebuild_upgrade.sh`.
-- Source existing context/logging helpers.
+- Source existing context/logging helpers instead of adding parallel environment parsing or logging conventions.
 - Add context validation for required keys.
 - Add primitive functions for checks such as:
   - sandbox exists/is reachable
@@ -218,6 +219,7 @@ Wire rebuild/upgrade-specific checks into the scenario suite framework.
   - `rebuild` points to rebuild-specific suite steps.
   - `upgrade` points to upgrade-specific suite steps.
 - Preserve existing generic smoke coverage through separate smoke suite inclusion where needed.
+- Keep `suites.yaml` updates direct: replace the `rebuild` and `upgrade` placeholder aliases with explicit domain-specific steps rather than adding a second metadata system.
 - Ensure scripts emit stable assertion IDs in PASS/FAIL messages.
 - Ensure scripts work under the suite runner and respect `E2E_DRY_RUN` if applicable.
 
