@@ -85,13 +85,17 @@ jobs:
 
       - name: Render coverage report
         if: ${{ !startsWith(github.event.inputs.scenario, 'wsl-') }}
+        env:
+          SCENARIO: ${{ github.event.inputs.scenario }}
         run: |
           mkdir -p .e2e
           bash test/e2e/runtime/coverage-report.sh > .e2e/coverage.md
           {
             echo '# E2E Scenario Report'
             echo ''
-            echo '**Scenario:** `${{ github.event.inputs.scenario }}`'
+            # Keep workflow_dispatch input in an env var so untrusted scenario text
+            # is data, not YAML-interpolated shell source.
+            printf '**Scenario:** `%s`\n' "$SCENARIO"
             echo ''
             cat .e2e/coverage.md
           } | tee -a "$GITHUB_STEP_SUMMARY"
@@ -101,13 +105,16 @@ jobs:
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           E2E_SUITE_FILTER: ${{ github.event.inputs.suite_filter }}
+          SCENARIO: ${{ github.event.inputs.scenario }}
         run: |
-          bash test/e2e/runtime/run-scenario.sh "${{ github.event.inputs.scenario }}"
+          # Keep workflow_dispatch input in an env var so untrusted scenario text
+          # is data, not YAML-interpolated shell source.
+          bash test/e2e/runtime/run-scenario.sh "$SCENARIO"
           {
             echo ''
             echo '## Scenario execution result'
             echo ''
-            echo '- Scenario `${{ github.event.inputs.scenario }}` completed successfully.'
+            printf -- '- Scenario `%s` completed successfully.\n' "$SCENARIO"
             if grep -R '^SKIP:' .e2e test/e2e/logs >/tmp/e2e-skips.txt 2>/dev/null; then
               echo ''
               echo '### Runtime skips observed'
