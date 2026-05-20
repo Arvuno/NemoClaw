@@ -285,6 +285,7 @@ const {
   getResumeSandboxConflict,
 } = resumeConfig;
 const { pruneKnownHostsEntries }: typeof import("./onboard/known-hosts") = require("./onboard/known-hosts");
+const onboardPromptHelpers: typeof import("./onboard/prompt-helpers") = require("./onboard/prompt-helpers");
 const { createOpenclawSetup }: typeof import("./onboard/openclaw-setup") = require("./onboard/openclaw-setup");
 const openshellVersion: typeof import("./onboard/openshell-version") = require("./onboard/openshell-version");
 const {
@@ -530,48 +531,22 @@ function note(message: string): void {
   console.log(`${DIM}${message}${RESET}`);
 }
 
-// Prompt wrapper: returns env var value or default in non-interactive mode,
-// otherwise prompts the user interactively.
+const promptHelperDeps = { isNonInteractive, note, prompt };
+
 async function promptOrDefault(
   question: string,
   envVar: string | null,
   defaultValue: string,
 ): Promise<string> {
-  if (isNonInteractive()) {
-    const val = envVar ? process.env[envVar] : null;
-    const result = val || defaultValue;
-    note(`  [non-interactive] ${question.trim()} → ${result}`);
-    return result;
-  }
-  return prompt(question);
+  return onboardPromptHelpers.promptOrDefault(promptHelperDeps, question, envVar, defaultValue);
 }
 
-// Yes/no prompt with a typed default. The `[Y/n]` / `[y/N]` indicator and
-// the non-interactive echo letter are both derived from `defaultIsYes`, so
-// the case of the indicator and the echoed default cannot drift apart.
-// Returns a boolean — callers no longer have to parse reply strings.
-// Replies of "y"/"yes" and "n"/"no" win regardless of case; empty and
-// unknown input fall back to the default.
 async function promptYesNoOrDefault(
   question: string,
   envVar: string | null,
   defaultIsYes: boolean,
 ): Promise<boolean> {
-  const fullQuestion = `${question} ${defaultIsYes ? "[Y/n]" : "[y/N]"}: `;
-  const nonInteractive = isNonInteractive();
-  const input = nonInteractive ? (envVar ? process.env[envVar] : null) : await prompt(fullQuestion);
-
-  const value = String(input ?? "")
-    .trim()
-    .toLowerCase();
-  let chosen = defaultIsYes;
-  if (value === "y" || value === "yes") chosen = true;
-  else if (value === "n" || value === "no") chosen = false;
-
-  if (nonInteractive) {
-    note(`  [non-interactive] ${fullQuestion.trim()} → ${chosen ? "Y" : "N"}`);
-  }
-  return chosen;
+  return onboardPromptHelpers.promptYesNoOrDefault(promptHelperDeps, question, envVar, defaultIsYes);
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
