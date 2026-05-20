@@ -1273,8 +1273,8 @@ fix_npm_permissions() {
 # Work around openclaw tarball missing directory entries (GH-503).
 # npm's tar extractor hard-fails because the tarball is missing directory
 # entries for extensions/, skills/, and dist/plugin-sdk/config/. System tar
-# handles this fine. We pre-extract openclaw into node_modules BEFORE npm
-# install so npm sees the dependency is already satisfied and skips it.
+# handles this fine. npm ci removes node_modules before installing, so restore
+# the package after ci and before build steps that need the unpacked contents.
 pre_extract_openclaw() {
   local install_dir="$1"
   local openclaw_version
@@ -1311,6 +1311,17 @@ pre_extract_openclaw() {
     return 1
   fi
   rm -rf "$tmpdir"
+}
+
+restore_pre_extracted_openclaw() {
+  local install_dir="$1"
+
+  if [[ -n "${NEMOCLAW_AGENT:-}" && "${NEMOCLAW_AGENT}" != "openclaw" ]]; then
+    return 0
+  fi
+
+  spin "Restoring OpenClaw package" bash -c "$(declare -f info warn resolve_openclaw_version pre_extract_openclaw); pre_extract_openclaw \"\$1\"" _ "$install_dir" \
+    || warn "OpenClaw package restore failed - subsequent build steps may fail"
 }
 
 resolve_openclaw_version() {
@@ -1376,13 +1387,12 @@ install_nemoclaw() {
   if is_source_checkout "$repo_root"; then
     info "${_CLI_DISPLAY} package.json found in the selected source checkout — installing from source…"
     NEMOCLAW_SOURCE_ROOT="$repo_root"
-    if [[ -z "${NEMOCLAW_AGENT:-}" || "${NEMOCLAW_AGENT}" == "openclaw" ]]; then
-      spin "Preparing OpenClaw package" bash -c "$(declare -f info warn resolve_openclaw_version pre_extract_openclaw); pre_extract_openclaw \"\$1\"" _ "$NEMOCLAW_SOURCE_ROOT" \
-        || warn "Pre-extraction failed — npm install may fail if openclaw tarball is broken"
-    fi
     spin "Installing ${_CLI_DISPLAY} dependencies" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\" && npm ci --ignore-scripts"
+    restore_pre_extracted_openclaw "$NEMOCLAW_SOURCE_ROOT"
     spin "Building ${_CLI_DISPLAY} CLI modules" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\" && npm run --if-present build:cli"
-    spin "Building ${_CLI_DISPLAY} plugin" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\"/nemoclaw && npm ci --ignore-scripts && npm run build"
+    spin "Installing ${_CLI_DISPLAY} plugin dependencies" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\"/nemoclaw && npm ci --ignore-scripts"
+    restore_pre_extracted_openclaw "$NEMOCLAW_SOURCE_ROOT"
+    spin "Building ${_CLI_DISPLAY} plugin" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\"/nemoclaw && npm run build"
     spin "Linking ${_CLI_DISPLAY} CLI" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\" && npm link"
   else
     if [[ -f "$package_json" ]]; then
@@ -1409,13 +1419,12 @@ install_nemoclaw() {
     # unavailable or tags are pruned later.
     git -C "$nemoclaw_src" describe --tags --match 'v*' 2>/dev/null \
       | sed 's/^v//' >"$nemoclaw_src/.version" || true
-    if [[ -z "${NEMOCLAW_AGENT:-}" || "${NEMOCLAW_AGENT}" == "openclaw" ]]; then
-      spin "Preparing OpenClaw package" bash -c "$(declare -f info warn resolve_openclaw_version pre_extract_openclaw); pre_extract_openclaw \"\$1\"" _ "$nemoclaw_src" \
-        || warn "Pre-extraction failed — npm install may fail if openclaw tarball is broken"
-    fi
     spin "Installing ${_CLI_DISPLAY} dependencies" bash -c "cd \"$nemoclaw_src\" && npm ci --ignore-scripts"
+    restore_pre_extracted_openclaw "$nemoclaw_src"
     spin "Building ${_CLI_DISPLAY} CLI modules" bash -c "cd \"$nemoclaw_src\" && npm run --if-present build:cli"
-    spin "Building ${_CLI_DISPLAY} plugin" bash -c "cd \"$nemoclaw_src\"/nemoclaw && npm ci --ignore-scripts && npm run build"
+    spin "Installing ${_CLI_DISPLAY} plugin dependencies" bash -c "cd \"$nemoclaw_src\"/nemoclaw && npm ci --ignore-scripts"
+    restore_pre_extracted_openclaw "$nemoclaw_src"
+    spin "Building ${_CLI_DISPLAY} plugin" bash -c "cd \"$nemoclaw_src\"/nemoclaw && npm run build"
     spin "Linking ${_CLI_DISPLAY} CLI" bash -c "cd \"$nemoclaw_src\" && npm link"
 
     # Install/upgrade the OpenShell CLI on the GitHub-clone path (curl|bash).
