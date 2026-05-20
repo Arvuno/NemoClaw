@@ -1514,20 +1514,11 @@ export function findBackup(sandboxName: string, selector: string): SnapshotMatch
 
 // ── CLI argv parser ────────────────────────────────────────────────
 //
-// Argument parser for
-//   `nemoclaw <name> snapshot restore [selector] [--to <dst>] [--force] [--yes|-y]`.
-//
-// --force is required when `--to <dst>` names an existing sandbox; without it,
-// restore refuses to mutate the destination (#3756). --force performs a
-// destructive delete-then-recreate of the destination, so the action prompts
-// for interactive confirmation unless --yes (or NEMOCLAW_NON_INTERACTIVE=1) is
-// also set.
+// Argument parser for `nemoclaw <name> snapshot restore [selector] [--to <dst>]`.
 export interface RestoreArgs {
   ok: true;
   targetSandbox: string;
   selector: string | null;
-  force: boolean;
-  yes: boolean;
 }
 
 export interface RestoreArgsError {
@@ -1543,8 +1534,6 @@ export function parseRestoreArgs(
 ): RestoreArgsResult {
   const positional: string[] = [];
   let targetSandbox = sandboxName;
-  let force = false;
-  let yes = false;
   for (let i = 1; i < subArgs.length; i++) {
     const token = subArgs[i];
     if (token === "--to") {
@@ -1554,10 +1543,6 @@ export function parseRestoreArgs(
       }
       targetSandbox = value;
       i++;
-    } else if (token === "--force") {
-      force = true;
-    } else if (token === "--yes" || token === "-y") {
-      yes = true;
     } else {
       positional.push(token);
     }
@@ -1566,7 +1551,5 @@ export function parseRestoreArgs(
     ok: true,
     targetSandbox,
     selector: positional[0] ?? null,
-    force,
-    yes,
   };
 }
