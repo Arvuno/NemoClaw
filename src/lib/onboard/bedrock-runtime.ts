@@ -64,7 +64,11 @@ export async function selectBedrockRuntimeCustomAnthropic(options: {
   backToSelection: string;
   isNonInteractive: () => boolean;
   promptInputModel: (label: string, defaultModel: string, validator: null) => Promise<string>;
-  replaceNamedCredential: (envName: string, label: string, helpUrl: string | null) => Promise<string>;
+  replaceNamedCredential: (
+    envName: string,
+    label: string,
+    helpUrl: string | null,
+  ) => Promise<string>;
 }): Promise<
   | { action: "not-bedrock" }
   | { action: "retry-selection" }
@@ -82,7 +86,14 @@ export async function selectBedrockRuntimeCustomAnthropic(options: {
       printMissingBedrockAuth();
       process.exit(1);
     }
-    await options.replaceNamedCredential(credentialEnv, `${options.label} API key`, options.helpUrl);
+    const credentialResult = await options.replaceNamedCredential(
+      credentialEnv,
+      `${options.label} API key`,
+      options.helpUrl,
+    );
+    if (credentialResult === options.backToSelection) {
+      return { action: "retry-selection" };
+    }
   }
 
   const model = options.isNonInteractive()

@@ -262,6 +262,7 @@ const { resolveOpenshell } = require("./adapters/openshell/resolve");
 const credentials: typeof import("./credentials/store") = require("./credentials/store");
 const {
   prompt,
+  readCredentialPrompt,
   ensureApiKey,
   getCredential,
   stageLegacyCredentialsToEnv,
@@ -444,6 +445,7 @@ type OnboardOptions = {
   noGpu?: boolean;
   autoYes?: boolean;
 };
+type CredentialPromptIntent = import("./credentials/store").CredentialPromptIntent;
 // Non-interactive mode: set by --non-interactive flag or env var.
 // When active, all prompts use env var overrides or sensible defaults.
 let NON_INTERACTIVE = false;
@@ -1391,6 +1393,18 @@ function getNavigationChoice(value = ""): "back" | "exit" | null {
   return null;
 }
 
+function getCredentialPromptNavigation(intent: unknown): "back" | "exit" | null {
+  if (!intent || typeof intent !== "object") return null;
+  const kind = (intent as { kind?: unknown }).kind;
+  if (kind === "back" || kind === "exit") return kind;
+  return null;
+}
+
+function printReturningToProviderSelection(): void {
+  console.log("  Returning to provider selection.");
+  console.log("");
+}
+
 function exitOnboardFromPrompt(): never {
   console.log("  Exiting onboarding.");
   process.exit(1);
@@ -1485,7 +1499,7 @@ function stageNousApiKeyProviderEnv(): void {
   }
 }
 
-async function ensureHermesNousApiKeyEnv(): Promise<string> {
+async function ensureHermesNousApiKeyEnv(): Promise<string | typeof BACK_TO_SELECTION> {
   const existing = resolveHermesNousApiKey();
   if (existing) {
     process.env[HERMES_NOUS_API_KEY_CREDENTIAL_ENV] = existing;
@@ -1494,11 +1508,11 @@ async function ensureHermesNousApiKeyEnv(): Promise<string> {
   console.log("");
   console.log("  Hermes Provider Nous API Key");
   console.log(`  Create or copy a key from ${HERMES_NOUS_API_KEY_HELP_URL}`);
-  const key = normalizeCredentialValue(
-    await prompt("  Nous API Key: ", {
-      secret: true,
-    }),
-  );
+  const input = await readCredentialPrompt("  Nous API Key: ", prompt);
+  const navigation = getCredentialPromptNavigation(input);
+  if (navigation === "back") return BACK_TO_SELECTION;
+  if (navigation === "exit") exitOnboardFromPrompt();
+  const key = input.kind === "credential" ? input.value : "";
   const validationError = validateNvidiaApiKeyValue(key, HERMES_NOUS_API_KEY_CREDENTIAL_ENV);
   if (validationError) {
     console.error(validationError);
@@ -1569,7 +1583,7 @@ async function replaceNamedCredential(
   label: string,
   helpUrl: string | null = null,
   validator: ((value: string) => string | null) | null = null,
-): Promise<string> {
+): Promise<string | typeof BACK_TO_SELECTION> {
   if (helpUrl) {
     console.log("");
     console.log(`  Get your ${label} from: ${helpUrl}`);
@@ -1577,7 +1591,11 @@ async function replaceNamedCredential(
   }
 
   while (true) {
-    const key = normalizeCredentialValue(await prompt(`  ${label}: `, { secret: true }));
+    const input = await readCredentialPrompt(`  ${label}: `, prompt);
+    const navigation = getCredentialPromptNavigation(input);
+    if (navigation === "back") return BACK_TO_SELECTION;
+    if (navigation === "exit") exitOnboardFromPrompt();
+    const key = input.kind === "credential" ? input.value : "";
     if (!key) {
       console.error(`  ${label} is required.`);
       continue;
@@ -1634,7 +1652,11 @@ async function promptValidationRecovery(
     if (looksLikeToken) {
       console.log("  ⚠️  That looks like an API key — do not paste credentials here.");
       console.log("  Treating as 'retry'. You will be prompted to enter the key securely.");
-      await replaceNamedCredential(credentialEnv, `${label} API key`, helpUrl, validator);
+      const result = await replaceNamedCredential(credentialEnv, `${label} API key`, helpUrl, validator);
+      if (result === BACK_TO_SELECTION) {
+        printReturningToProviderSelection();
+        return "selection";
+      }
       return "credential";
     }
     if (choice === "back") {
@@ -1646,7 +1668,11 @@ async function promptValidationRecovery(
       exitOnboardFromPrompt();
     }
     if (choice === "" || choice === "retry") {
-      await replaceNamedCredential(credentialEnv, `${label} API key`, helpUrl, validator);
+      const result = await replaceNamedCredential(credentialEnv, `${label} API key`, helpUrl, validator);
+      if (result === BACK_TO_SELECTION) {
+        printReturningToProviderSelection();
+        return "selection";
+      }
       return "credential";
     }
     console.log("  Please choose a provider/model again.");
@@ -3256,7 +3282,7 @@ async function ensureNamedCredential(
   envName: string | null,
   label: string,
   helpUrl: string | null = null,
-): Promise<string> {
+): Promise<string | typeof BACK_TO_SELECTION> {
   if (!envName) {
     console.error(`  Missing credential target for ${label}.`);
     process.exit(1);
@@ -6518,7 +6544,12 @@ async function setupNim(
                 process.exit(1);
               }
             } else {
-              await ensureHermesNousApiKeyEnv();
+              const hermesCredentialResult = await ensureHermesNousApiKeyEnv();
+              if (hermesCredentialResult === BACK_TO_SELECTION) {
+                hermesAuthMethod = null;
+                printReturningToProviderSelection();
+                continue selectionLoop;
+              }
             }
           } else {
             credentialEnv = remoteConfig.credentialEnv;
@@ -6602,7 +6633,15 @@ async function setupNim(
               process.exit(1);
             }
           } else {
-            await ensureApiKey();
+            const apiKeyResult = await ensureApiKey();
+            const navigation = getCredentialPromptNavigation(apiKeyResult);
+            if (navigation === "back") {
+              printReturningToProviderSelection();
+              continue selectionLoop;
+            }
+            if (navigation === "exit") {
+              exitOnboardFromPrompt();
+            }
           }
           const _envModel = (process.env.NEMOCLAW_MODEL || "").trim();
           model =
@@ -6670,11 +6709,15 @@ async function setupNim(
               process.exit(1);
             }
           } else {
-            await ensureNamedCredential(
+            const credentialResult = await ensureNamedCredential(
               selectedCredentialEnv,
               remoteConfig.label + " API key",
               remoteConfig.helpUrl,
             );
+            if (credentialResult === BACK_TO_SELECTION) {
+              printReturningToProviderSelection();
+              continue selectionLoop;
+            }
           }
           let modelValidator: ((candidate: string) => ModelValidationResult) | null = null;
           if (selected.key === "openai" || selected.key === "gemini") {
@@ -6915,9 +6958,17 @@ async function setupNim(
             console.log("  NGC API Key required to pull NIM images.");
             console.log("  Get one from: https://org.ngc.nvidia.com/setup/api-key");
             console.log("");
-            let ngcKey = normalizeCredentialValue(
-              await prompt("  NGC API Key: ", { secret: true }),
+            let ngcInput: CredentialPromptIntent = await readCredentialPrompt(
+              "  NGC API Key: ",
+              prompt,
             );
+            let navigation = getCredentialPromptNavigation(ngcInput);
+            if (navigation === "back") {
+              printReturningToProviderSelection();
+              continue selectionLoop;
+            }
+            if (navigation === "exit") exitOnboardFromPrompt();
+            let ngcKey = ngcInput.kind === "credential" ? ngcInput.value : "";
             if (!ngcKey) {
               console.error("  NGC API Key is required for Local NIM.");
               process.exit(1);
@@ -6925,7 +6976,14 @@ async function setupNim(
             if (!nim.dockerLoginNgc(ngcKey)) {
               console.error("  Failed to login to NGC registry. Check your API key and try again.");
               console.log("");
-              ngcKey = normalizeCredentialValue(await prompt("  NGC API Key: ", { secret: true }));
+              ngcInput = await readCredentialPrompt("  NGC API Key: ", prompt);
+              navigation = getCredentialPromptNavigation(ngcInput);
+              if (navigation === "back") {
+                printReturningToProviderSelection();
+                continue selectionLoop;
+              }
+              if (navigation === "exit") exitOnboardFromPrompt();
+              ngcKey = ngcInput.kind === "credential" ? ngcInput.value : "";
               if (!ngcKey || !nim.dockerLoginNgc(ngcKey)) {
                 console.error("  NGC login failed. Cannot pull NIM images.");
                 process.exit(1);
@@ -6947,9 +7005,14 @@ async function setupNim(
               console.log("");
               console.log("  NGC API Key required to download NIM model weights at runtime.");
               console.log("  (Docker is logged in to nvcr.io, but the key was not saved.)");
-              ngcApiKey = normalizeCredentialValue(
-                await prompt("  NGC API Key: ", { secret: true }),
-              );
+              const ngcInput = await readCredentialPrompt("  NGC API Key: ", prompt);
+              const navigation = getCredentialPromptNavigation(ngcInput);
+              if (navigation === "back") {
+                printReturningToProviderSelection();
+                continue selectionLoop;
+              }
+              if (navigation === "exit") exitOnboardFromPrompt();
+              ngcApiKey = ngcInput.kind === "credential" ? ngcInput.value : null;
             }
           }
 
@@ -7335,7 +7398,15 @@ async function setupNim(
             console.log("  Model Router accepts NVIDIA API keys (nvapi-...).");
             console.log("  Get one at https://build.nvidia.com");
             console.log("");
-            await ensureNamedCredential(routerCredentialEnv, "Model Router API key", null);
+            const credentialResult = await ensureNamedCredential(
+              routerCredentialEnv,
+              "Model Router API key",
+              null,
+            );
+            if (credentialResult === BACK_TO_SELECTION) {
+              printReturningToProviderSelection();
+              continue selectionLoop;
+            }
           }
         }
         provider = bp.provider_name || "nvidia-router";

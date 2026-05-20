@@ -674,6 +674,21 @@ prompt('secret: ', { secret: true })
     expect(result.stdout).toContain("REJECTED=raw mode unavailable");
   });
 
+  it("classifies secret credential prompts as navigation or credential intent", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-creds-"));
+    const credentials = await importCredentialsModule(home);
+
+    await expect(
+      credentials.readCredentialPrompt("secret: ", async () => "  back \r\n"),
+    ).resolves.toEqual({ kind: "back" });
+    await expect(
+      credentials.readCredentialPrompt("secret: ", async () => "QUIT"),
+    ).resolves.toEqual({ kind: "exit" });
+    await expect(
+      credentials.readCredentialPrompt("secret: ", async () => " sk-real-key "),
+    ).resolves.toEqual({ kind: "credential", value: "sk-real-key" });
+  });
+
   it("re-raises SIGINT from standard readline prompts instead of treating it like an empty answer", async () => {
     const readline = require("node:readline") as typeof import("node:readline");
     const rl = new EventEmitter() as EventEmitter & {
@@ -728,7 +743,7 @@ set -euo pipefail
 pipe="$(mktemp -u)"
 mkfifo "$pipe"
 trap 'rm -f "$pipe"' EXIT
-{ printf 'not-a-key\\n'; sleep 0.2; printf 'nvapi-good-key\\n'; } > "$pipe" &
+{ printf 'not-a-key\\n'; sleep 1; printf 'nvapi-good-key\\n'; } > "$pipe" &
 ${JSON.stringify(process.execPath)} ${JSON.stringify(scriptFile)} < "$pipe"
 `;
     let result: ReturnType<typeof spawnSync>;
@@ -750,6 +765,46 @@ ${JSON.stringify(process.execPath)} ${JSON.stringify(scriptFile)} < "$pipe"
       "Invalid NVIDIA API key. Must start with nvapi-",
     );
     expect(result.stdout).toContain("STAGED=nvapi-good-key");
+  });
+
+  it("returns navigation from the NVIDIA API key prompt without staging it", () => {
+    const script = `
+const { ensureApiKey } = require(${JSON.stringify(path.join(import.meta.dirname, "..", "dist", "lib", "credentials", "store.js"))});
+delete process.env.NVIDIA_API_KEY;
+ensureApiKey()
+  .then((result) => console.log(JSON.stringify({ result, key: process.env.NVIDIA_API_KEY || null })))
+  .catch((err) => { console.error(err && err.stack ? err.stack : String(err)); process.exit(1); });
+`;
+    const result = spawnSync(process.execPath, ["-e", script], {
+      encoding: "utf-8",
+      input: "back\n",
+      env: { ...process.env, NVIDIA_API_KEY: "" },
+      timeout: 5000,
+    });
+
+    expect(result.status).toBe(0);
+    const payload = JSON.parse(String(result.stdout).trim().split("\n").pop() || "{}");
+    expect(payload).toEqual({ result: { kind: "back" }, key: null });
+  });
+
+  it("returns exit from the NVIDIA API key prompt without staging it", () => {
+    const script = `
+const { ensureApiKey } = require(${JSON.stringify(path.join(import.meta.dirname, "..", "dist", "lib", "credentials", "store.js"))});
+delete process.env.NVIDIA_API_KEY;
+ensureApiKey()
+  .then((result) => console.log(JSON.stringify({ result, key: process.env.NVIDIA_API_KEY || null })))
+  .catch((err) => { console.error(err && err.stack ? err.stack : String(err)); process.exit(1); });
+`;
+    const result = spawnSync(process.execPath, ["-e", script], {
+      encoding: "utf-8",
+      input: "exit\n",
+      env: { ...process.env, NVIDIA_API_KEY: "" },
+      timeout: 5000,
+    });
+
+    expect(result.status).toBe(0);
+    const payload = JSON.parse(String(result.stdout).trim().split("\n").pop() || "{}");
+    expect(payload).toEqual({ result: { kind: "exit" }, key: null });
   });
 
   it("normal and secret prompts re-ref, cleanup stdin, and preserve masked input", () => {

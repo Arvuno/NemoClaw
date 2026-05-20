@@ -53,6 +53,35 @@ describe("Bedrock Runtime onboarding helper", () => {
     });
   });
 
+  it("returns to provider selection when the Bedrock-compatible credential prompt chooses back", async () => {
+    clearBedrockAuthEnv();
+    const replaceNamedCredential = vi.fn(async () => "__BACK__");
+    const promptInputModel = vi.fn(async () => {
+      throw new Error("model prompt should not run after back navigation");
+    });
+
+    const result = await selectBedrockRuntimeCustomAnthropic({
+      selectedKey: "anthropicCompatible",
+      endpointUrl: BEDROCK_URL,
+      credentialEnv: "COMPATIBLE_ANTHROPIC_API_KEY",
+      label: "Other Anthropic-compatible endpoint",
+      helpUrl: null,
+      defaultModel: "anthropic.claude",
+      backToSelection: "__BACK__",
+      isNonInteractive: () => false,
+      promptInputModel,
+      replaceNamedCredential,
+    });
+
+    expect(replaceNamedCredential).toHaveBeenCalledWith(
+      "COMPATIBLE_ANTHROPIC_API_KEY",
+      "Other Anthropic-compatible endpoint API key",
+      null,
+    );
+    expect(promptInputModel).not.toHaveBeenCalled();
+    expect(result).toEqual({ action: "retry-selection" });
+  });
+
   it("accepts an explicit AWS profile without prompting for the compatible endpoint key", async () => {
     clearBedrockAuthEnv();
     process.env.AWS_PROFILE = "bedrock-dev";
