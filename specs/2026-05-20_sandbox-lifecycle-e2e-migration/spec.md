@@ -435,7 +435,7 @@ Expose sandbox lifecycle helper assertions through scenario validation suites.
 - Docker/OpenShell-dependent steps are not attached to scenarios that cannot satisfy them.
 - Snapshot validation is isolated from non-destructive lifecycle checks through the opt-in `snapshot-lifecycle` suite.
 
-## Phase 4: Parity Map and Coverage Report Visibility
+## Phase 4: Parity Map and Coverage Report Visibility [COMPLETED: 04cea05]
 
 ### Objective
 
