@@ -32,34 +32,44 @@ def _payloads(doc: Any) -> list[Any]:
     return []
 
 
-def _load_agent_json(text: str) -> Any:
+def _load_agent_json_docs(text: str) -> list[Any]:
     try:
-        return json.loads(text)
+        doc = json.loads(text)
     except json.JSONDecodeError:
         pass
+    else:
+        return doc if isinstance(doc, list) else [doc]
 
     decoder = json.JSONDecoder()
-    for index, char in enumerate(text):
-        if char != "{":
-            continue
+    docs: list[Any] = []
+    index = 0
+    while index < len(text):
+        start = text.find("{", index)
+        if start < 0:
+            break
         try:
-            doc, _end = decoder.raw_decode(text[index:])
+            doc, end = decoder.raw_decode(text[start:])
         except json.JSONDecodeError:
+            index = start + 1
             continue
-        return doc
+        docs.append(doc)
+        index = start + end
+    if docs:
+        return docs
     raise json.JSONDecodeError("no JSON object found", text, 0)
 
 
 def main() -> int:
     raw = sys.stdin.read()
     try:
-        doc = _load_agent_json(raw)
+        docs = _load_agent_json_docs(raw)
     except json.JSONDecodeError as err:
         print(f"invalid JSON: {err}", file=sys.stderr)
         return 1
 
     parts = [
         payload["text"]
+        for doc in docs
         for payload in _payloads(doc)
         if isinstance(payload, dict) and isinstance(payload.get("text"), str)
     ]

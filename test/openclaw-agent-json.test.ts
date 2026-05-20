@@ -54,4 +54,14 @@ describe("openclaw-agent-json.py", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toBe("PONG\n");
   });
+
+  it("extracts payload text from later JSON envelopes in a stream", () => {
+    const result = runHelper([
+      JSON.stringify({ payloads: [] }),
+      "progress line",
+      JSON.stringify({ payloads: [{ text: "42" }] }),
+    ].join("\n"));
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe("42\n");
+  });
 });
