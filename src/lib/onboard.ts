@@ -67,6 +67,9 @@ const {
 const {
   getSelectionDrift,
 }: typeof import("./onboard/selection-drift") = require("./onboard/selection-drift");
+const {
+  resolveProviderKeyFallback,
+}: typeof import("./onboard/provider-key-fallback") = require("./onboard/provider-key-fallback");
 const { isLinuxDockerDriverGatewayEnabled }: typeof import("./onboard/docker-driver-platform") = require("./onboard/docker-driver-platform");
 const {
   reconcileGatewayGpuReuseForGpuIntent,
@@ -3355,7 +3358,7 @@ async function preflight(
     process.exit(1);
   }
   console.log("  ✓ Docker is running");
-
+  require("./onboard/http-proxy-preflight").warnIfHostProxyMissesLoopback();
   const optedOutGpuPassthrough =
     preflightOpts.optedOutGpuPassthrough === true || preflightOpts.noGpu === true;
   assertCdiNvidiaGpuSpecPresent(host, optedOutGpuPassthrough);
@@ -4355,7 +4358,7 @@ function applyOverlayfsAutoFix(upstreamImage: string): string | null {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`  Patched cluster image build failed: ${reason}`);
     console.error(
-      "  Falling back to the upstream image. The k3s server will likely fail; see docs/reference/troubleshooting.md.",
+      "  Falling back to the upstream image. The k3s server will likely fail; see docs/reference/troubleshooting.mdx.",
     );
     overlayFixResultCache.set(upstreamImage, null);
     return null;
@@ -6372,16 +6375,9 @@ async function setupNim(
         }
         selected = options.find((o) => o.key === providerKey);
         if (!selected) {
-          // Install action keys fall back to the equivalent running-provider
-          // key when the menu only emits the running entry (the install would
-          // have been a no-op anyway).
-          if (providerKey === "install-ollama") {
-            selected = options.find((o) => o.key === "ollama");
-          } else if (providerKey === "install-vllm") {
-            selected = options.find((o) => o.key === "vllm");
-          } else if (providerKey === "ollama") {
-            selected = options.find((o) => o.key === "install-ollama");
-          }
+          selected = resolveProviderKeyFallback(options, providerKey, {
+            isWindowsHostOllama: ollamaHost === OLLAMA_HOST_DOCKER_INTERNAL,
+          });
           if (!selected) {
             if (providerKey === "hermesProvider" && !hermesProviderAvailable) {
               console.error("  Hermes Provider is only available when onboarding Hermes Agent.");
