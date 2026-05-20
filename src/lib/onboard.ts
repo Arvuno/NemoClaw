@@ -74,9 +74,8 @@ const { isLinuxDockerDriverGatewayEnabled }: typeof import("./onboard/docker-dri
 const {
   reconcileGatewayGpuReuseForGpuIntent,
 }: typeof import("./onboard/gateway-gpu-passthrough") = require("./onboard/gateway-gpu-passthrough");
-const {
-  syncPresetSelection,
-}: typeof import("./onboard/policy-preset-sync") = require("./onboard/policy-preset-sync");
+const { syncPresetSelection }: typeof import("./onboard/policy-preset-sync") = require("./onboard/policy-preset-sync");
+const { maybeForceE2eStepFailure }: typeof import("./onboard/e2e-failure-injection") = require("./onboard/e2e-failure-injection");
 const {
   gatherWechatConfig,
   hasWechatConfigDrift,
@@ -3358,7 +3357,7 @@ async function preflight(
     process.exit(1);
   }
   console.log("  ✓ Docker is running");
-
+  require("./onboard/http-proxy-preflight").warnIfHostProxyMissesLoopback();
   const optedOutGpuPassthrough =
     preflightOpts.optedOutGpuPassthrough === true || preflightOpts.noGpu === true;
   assertCdiNvidiaGpuSpecPresent(host, optedOutGpuPassthrough);
@@ -4358,7 +4357,7 @@ function applyOverlayfsAutoFix(upstreamImage: string): string | null {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`  Patched cluster image build failed: ${reason}`);
     console.error(
-      "  Falling back to the upstream image. The k3s server will likely fail; see docs/reference/troubleshooting.md.",
+      "  Falling back to the upstream image. The k3s server will likely fail; see docs/reference/troubleshooting.mdx.",
     );
     overlayFixResultCache.set(upstreamImage, null);
     return null;
@@ -9037,6 +9036,7 @@ function startRecordedStep(
       return session;
     });
   }
+  maybeForceE2eStepFailure(stepName);
 }
 
 const ONBOARD_STEP_INDEX: Record<string, { number: number; title: string }> = {
