@@ -705,7 +705,7 @@ describe("sandbox lifecycle validation helper", () => {
     try {
       const bin = path.join(tmp, "bin"); fs.mkdirSync(bin);
       fs.writeFileSync(path.join(bin, "nemoclaw"), `#!/usr/bin/env bash
-case "$1" in list) echo sb1;; status) echo 'status running gateway healthy sandbox running';; logs) echo logline;; esac
+if [[ "$1 $2" == "sandbox status" ]]; then echo 'status running gateway healthy sandbox running'; elif [[ "$1 $2" == "sandbox logs" ]]; then echo logline; elif [[ "$1" == "list" ]]; then echo sb1; fi
 `, { mode: 0o755 });
       fs.writeFileSync(path.join(bin, "openshell"), `#!/usr/bin/env bash
 echo lifecycle-ok
