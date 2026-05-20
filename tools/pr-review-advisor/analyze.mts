@@ -407,7 +407,7 @@ function countLines(text: string): number {
   return text.endsWith("\n") ? text.split("\n").length - 1 : text.split("\n").length;
 }
 
-function deriveGateStatus(
+export function deriveGateStatus(
   github: GitHubReviewContext | null,
   changedFiles: string[],
   riskyAreas: string[],
@@ -428,7 +428,7 @@ function deriveGateStatus(
     stringOrUndefined(getPath<unknown>(github?.pullRequest, ["mergeable_state"]));
   const mergeability: GateStatus = !mergeState
     ? { status: "unknown", evidence: "Merge state was unavailable." }
-    : /CLEAN|clean|HAS_HOOKS|unstable/i.test(mergeState)
+    : /CLEAN|MERGEABLE/i.test(mergeState)
       ? { status: "pass", evidence: `mergeStateStatus=${mergeState}` }
       : /DIRTY|CONFLICT|BLOCKED|behind/i.test(mergeState)
         ? { status: "fail", evidence: `mergeStateStatus=${mergeState}` }

@@ -4,11 +4,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import YAML from "yaml";
 
 import { buildComment } from "../tools/pr-review-advisor/comment.mts";
-import { classifyTestDepth, normalizeReviewResult, renderSummary } from "../tools/pr-review-advisor/analyze.mts";
+import { classifyTestDepth, deriveGateStatus, normalizeReviewResult, renderSummary } from "../tools/pr-review-advisor/analyze.mts";
+import { githubGraphql } from "../tools/advisors/github.mts";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 type ReviewMetadata = Parameters<typeof normalizeReviewResult>[1];
@@ -101,6 +102,9 @@ function validResult(overrides = {}) {
 }
 
 describe("PR review advisor", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
   it("normalizes advisor output into the schema-owned metadata", () => {
     const result = normalizeReviewResult(validResult(), metadata());
 
@@ -138,6 +142,36 @@ describe("PR review advisor", () => {
     expect(classifyTestDepth(["docs/get-started/quickstart.mdx"]).verdict).toBe("unit_sufficient");
   });
 
+  it("treats mergeable-but-not-ready GitHub merge states as warnings", () => {
+    for (const mergeStateStatus of ["UNSTABLE", "HAS_HOOKS", "unstable"]) {
+      const gates = deriveGateStatus(
+        { graphQl: { data: { repository: { pullRequest: { mergeStateStatus } } } } } as never,
+        [],
+        [],
+      );
+
+      expect(gates.mergeability).toMatchObject({ status: "warning", evidence: `mergeStateStatus=${mergeStateStatus}` });
+    }
+
+    const clean = deriveGateStatus(
+      { graphQl: { data: { repository: { pullRequest: { mergeStateStatus: "CLEAN" } } } } } as never,
+      [],
+      [],
+    );
+    expect(clean.mergeability.status).toBe("pass");
+  });
+
+  it("surfaces GitHub GraphQL errors even when the HTTP status is successful", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: { repository: null }, errors: [{ message: "rate limit" }] }),
+    } as Response);
+
+    await expect(githubGraphql("token", "query { viewer { login } }", {})).rejects.toThrow(
+      "GitHub GraphQL returned errors: rate limit",
+    );
+  });
+
   it("renders summaries and sticky comments with human-review framing", () => {
     const result = normalizeReviewResult(validResult(), metadata());
     const summary = renderSummary(result);
@@ -156,6 +190,7 @@ describe("PR review advisor", () => {
     const validate = ajv.compile(schema);
     const result = normalizeReviewResult(validResult(), metadata());
 
+    expect(schema["SPDX-License-Identifier"]).toBe("Apache-2.0");
     expect(validate(result)).toBe(true);
   });
 
@@ -181,6 +216,9 @@ describe("PR review advisor", () => {
     expect(prCheckout).toMatchObject({ with: { path: "pr-workdir", "persist-credentials": false } });
     const commentStep = steps.find((step: { name?: string }) => step.name === "Post PR review advisor comment");
 
+    for (const step of steps.filter((step: { uses?: string }) => step.uses)) {
+      expect(step.uses).toMatch(/@[0-9a-f]{40}(?:\s*#.*)?$/);
+    }
     expect(installStep.run.includes("--ignore-scripts")).toBe(true);
     expect(analyzeStep.run.includes("$ADVISOR_DIR/tools/pr-review-advisor/analyze.mts")).toBe(true);
     expect(analyzeStep.run).toContain("trusted main checkout does not yet contain analyze.mts");
