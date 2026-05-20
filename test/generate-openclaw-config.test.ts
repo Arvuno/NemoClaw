@@ -67,6 +67,10 @@ function writeWeChatPluginMetadata(manifest: Record<string, unknown>) {
   fs.writeFileSync(path.join(pluginDir, "openclaw.plugin.json"), JSON.stringify(manifest, null, 2));
 }
 
+function wechatExtensionPath(stateDir = path.join(tmpDir, ".openclaw")) {
+  return path.join(fs.realpathSync(stateDir), "extensions", "openclaw-weixin");
+}
+
 function writeRegistryManifest(
   blueprintDir: string,
   relativeManifestPath: string,
@@ -290,7 +294,11 @@ describe("generate-openclaw-config.py: config generation", () => {
       NEMOCLAW_WECHAT_CONFIG_B64: wechatConfig,
     });
 
-    expect(config.plugins?.installs?.["openclaw-weixin"]).toEqual(installEntry);
+    expect(config.plugins?.installs?.["openclaw-weixin"]).toEqual({
+      ...installEntry,
+      installPath: wechatExtensionPath(),
+    });
+    expect(config.plugins?.load?.paths).toEqual([wechatExtensionPath()]);
     expect(config.channels?.["openclaw-weixin"]?.accounts?.primary).toEqual({
       enabled: true,
     });
@@ -330,7 +338,9 @@ describe("generate-openclaw-config.py: config generation", () => {
     expect(config.plugins?.installs?.["openclaw-weixin"]).toEqual({
       source: "npm",
       spec: "@tencent-weixin/openclaw-weixin@2.4.3",
+      installPath: wechatExtensionPath(),
     });
+    expect(config.plugins?.load?.paths).toEqual([wechatExtensionPath()]);
     expect(config.channels?.["openclaw-weixin"]?.accounts?.primary).toEqual({
       enabled: true,
     });

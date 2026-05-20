@@ -60,6 +60,10 @@ function writeWeChatPluginMetadata(manifest: Record<string, unknown>) {
   fs.writeFileSync(path.join(pluginDir, "openclaw.plugin.json"), JSON.stringify(manifest, null, 2));
 }
 
+function wechatExtensionPath(stateDir = path.join(tmpDir, ".openclaw")) {
+  return path.join(fs.realpathSync(stateDir), "extensions", "openclaw-weixin");
+}
+
 function readJson(p: string): any {
   return JSON.parse(fs.readFileSync(p, "utf-8"));
 }
@@ -295,9 +299,45 @@ describe("seed-wechat-accounts.py: openclaw.json patching (channels.openclaw-wei
     expect(cfg.plugins.installs["openclaw-weixin"]).toEqual({
       source: "npm",
       spec: "@tencent-weixin/openclaw-weixin@2.4.3",
+      installPath: wechatExtensionPath(),
     });
+    expect(cfg.plugins.load.paths).toEqual([wechatExtensionPath()]);
     expect(cfg.plugins.entries["openclaw-weixin"].enabled).toBe(true);
     expect(Object.keys(cfg.channels)).toEqual(["telegram", "slack", "openclaw-weixin"]);
+    expect(cfg.channels["openclaw-weixin"].accounts.primary.enabled).toBe(true);
+  });
+
+  it("preserves existing plugin load paths and appends the WeChat extension path", () => {
+    writeOpenclawConfig({
+      plugins: {
+        load: { paths: ["/opt/custom-openclaw-plugin"] },
+        installs: {
+          "openclaw-weixin": {
+            source: "npm",
+            spec: "@tencent-weixin/openclaw-weixin@2.4.2",
+            installPath: "/already/installed/openclaw-weixin",
+            pinned: true,
+          },
+        },
+      },
+    });
+
+    const result = runSeed({
+      NEMOCLAW_WECHAT_CONFIG_B64: configB64({ accountId: "primary" }),
+    });
+    expect(result.status).toBe(0);
+
+    const cfg = readJson(path.join(tmpDir, ".openclaw", "openclaw.json"));
+    expect(cfg.plugins.installs["openclaw-weixin"]).toEqual({
+      source: "npm",
+      spec: "@tencent-weixin/openclaw-weixin@2.4.2",
+      installPath: "/already/installed/openclaw-weixin",
+      pinned: true,
+    });
+    expect(cfg.plugins.load.paths).toEqual([
+      "/opt/custom-openclaw-plugin",
+      "/already/installed/openclaw-weixin",
+    ]);
     expect(cfg.channels["openclaw-weixin"].accounts.primary.enabled).toBe(true);
   });
 
