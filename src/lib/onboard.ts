@@ -282,6 +282,7 @@ const onboardSession: typeof import("./state/onboard-session") = require("./stat
 const { OnboardRuntime }: typeof import("./onboard/machine/runtime") = require("./onboard/machine/runtime");
 const { handleAgentSetupState }: typeof import("./onboard/machine/handlers/agent-setup") = require("./onboard/machine/handlers/agent-setup");
 const { handleGatewayState }: typeof import("./onboard/machine/handlers/gateway") = require("./onboard/machine/handlers/gateway");
+const { handlePoliciesState }: typeof import("./onboard/machine/handlers/policies") = require("./onboard/machine/handlers/policies");
 const { handlePreflightState }: typeof import("./onboard/machine/handlers/preflight") = require("./onboard/machine/handlers/preflight");
 const { handleProviderInferenceState }: typeof import("./onboard/machine/handlers/provider-inference") = require("./onboard/machine/handlers/provider-inference");
 const { handleSandboxState }: typeof import("./onboard/machine/handlers/sandbox") = require("./onboard/machine/handlers/sandbox");
@@ -9686,97 +9687,42 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
     });
     session = agentSetupResult.session;
 
-    const latestSession = onboardSession.loadSession();
-    const recordedPolicyPresets = Array.isArray(latestSession?.policyPresets)
-      ? latestSession.policyPresets
-      : null;
-    const recordedMessagingChannels = Array.isArray(latestSession?.messagingChannels)
-      ? latestSession.messagingChannels
-      : [];
-    const activeMessagingChannels = registry.getSandbox(sandboxName)?.messagingChannels;
-    verifyCompatibleEndpointSandboxSmoke({
+    const policiesResult = await handlePoliciesState({
+      resume,
       sandboxName,
       provider,
       model,
-      runOpenshell,
-      redact,
       endpointUrl,
       credentialEnv,
-      messagingChannels: Array.isArray(activeMessagingChannels) ? activeMessagingChannels : [],
+      selectedMessagingChannels,
+      webSearchConfig,
+      webSearchSupported,
+      hermesToolGateways,
       agent,
+      deps: {
+        loadSession: onboardSession.loadSession,
+        getActiveMessagingChannels: (name) => registry.getSandbox(name)?.messagingChannels,
+        verifyCompatibleEndpointSandboxSmoke: (options) =>
+          verifyCompatibleEndpointSandboxSmoke({
+            ...options,
+            runOpenshell,
+            redact,
+          }),
+        listSetupPolicyPresets: policies.listSetupPolicyPresets,
+        getAppliedPolicyPresets: policies.getAppliedPresets,
+        listCustomPolicyPresets: policies.listCustomPresets,
+        clampSetupPolicyPresetNames: policies.clampSetupPolicyPresetNames,
+        mergeRequiredHermesToolGatewayPolicyPresets,
+        arePolicyPresetsApplied,
+        skippedStepMessage,
+        startRecordedStep,
+        setupPoliciesWithSelection,
+        updateSession: onboardSession.updateSession,
+        recordStepComplete,
+        toSessionUpdates: (updates) => toSessionUpdates(updates as Parameters<typeof toSessionUpdates>[0]),
+      },
     });
-    const policyPresetSupportOptions = { webSearchSupported };
-    const selectablePolicyPresetsForSupport = [
-      ...policies.listSetupPolicyPresets(sandboxName, policyPresetSupportOptions),
-      ...policies.getAppliedPresets(sandboxName).map((name) => ({ name })),
-    ];
-    const customPolicyPresetNames = new Set(
-      policies.listCustomPresets(sandboxName).map((p: { name: string }) => p.name),
-    );
-    let recordedPolicyPresetsForSupport = policies.clampSetupPolicyPresetNames(
-      recordedPolicyPresets || [],
-      selectablePolicyPresetsForSupport,
-      policyPresetSupportOptions,
-      customPolicyPresetNames,
-    );
-    if (recordedPolicyPresets) {
-      recordedPolicyPresetsForSupport = mergeRequiredHermesToolGatewayPolicyPresets(
-        recordedPolicyPresetsForSupport,
-        hermesToolGateways,
-        selectablePolicyPresetsForSupport.map((p) => p.name),
-      );
-    }
-    const recordedPolicyPresetsHaveUnsupported =
-      Array.isArray(recordedPolicyPresets) &&
-      recordedPolicyPresetsForSupport.length !== recordedPolicyPresets.length;
-    const resumePolicies =
-      resume &&
-      sandboxName &&
-      !recordedPolicyPresetsHaveUnsupported &&
-      arePolicyPresetsApplied(sandboxName, recordedPolicyPresetsForSupport);
-    if (resumePolicies) {
-      skippedStepMessage("policies", recordedPolicyPresetsForSupport.join(", "));
-      await recordStepComplete(
-        "policies",
-        toSessionUpdates({
-          sandboxName,
-          provider,
-          model,
-          policyPresets: recordedPolicyPresetsForSupport,
-        }),
-      );
-    } else {
-      await startRecordedStep("policies", {
-        sandboxName,
-        provider,
-        model,
-        policyPresets: recordedPolicyPresetsForSupport,
-      });
-      const appliedPolicyPresets = await setupPoliciesWithSelection(sandboxName, {
-        selectedPresets:
-          Array.isArray(recordedPolicyPresets)
-            ? recordedPolicyPresetsForSupport
-            : null,
-        enabledChannels:
-          selectedMessagingChannels.length > 0
-            ? selectedMessagingChannels
-            : recordedMessagingChannels,
-        webSearchConfig,
-        provider,
-        webSearchSupported,
-        hermesToolGateways,
-        onSelection: (policyPresets) => {
-          onboardSession.updateSession((current: Session) => {
-            current.policyPresets = policyPresets;
-            return current;
-          });
-        },
-      });
-      await recordStepComplete(
-        "policies",
-        toSessionUpdates({ sandboxName, provider, model, policyPresets: appliedPolicyPresets }),
-      );
-    }
+    session = policiesResult.session;
 
     if (agent) {
       ensureAgentDashboardForward(sandboxName, agent);
