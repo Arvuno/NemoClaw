@@ -258,7 +258,7 @@ Migrate the policy/shields/gateway health coverage into post-onboard suite asser
 - Coverage report surfaces this domain as covered/deferred/retired.
 - Scenario framework tests pass.
 
-## Phase 4: Injection and OpenShell Version Coverage Migration
+## Phase 4: Injection and OpenShell Version Coverage Migration [COMPLETED: 04d6c80a6]
 
 Migrate the security-injection and version pin checks without coupling suite steps to legacy setup flows.
 
