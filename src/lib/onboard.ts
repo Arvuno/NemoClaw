@@ -7727,7 +7727,6 @@ const {
   ensureAgentDashboardForward,
   fetchGatewayAuthTokenFromSandbox,
   getDashboardForwardPort,
-  getDashboardForwardTarget,
   getWslHostAddress,
   printDashboard,
   stopAllDashboardForwards,
