@@ -56,7 +56,7 @@ rebuild_upgrade_assert_marker_preserved() {
   marker_path="${E2E_REBUILD_MARKER_PATH:-/workspace/.nemoclaw-rebuild-marker}"
   expected="${E2E_REBUILD_MARKER_EXPECTED:-${E2E_STATE_MARKER_EXPECTED:-}}"
   actual="$(_rebuild_upgrade_run REBUILD_UPGRADE_SANDBOX_CMD openshell sandbox exec "${sandbox}" -- cat "${marker_path}" 2>/dev/null || true)"
-  if [[ -n "${actual}" && ( -z "${expected}" || "${actual}" == "${expected}" ) ]]; then
+  if [[ -n "${actual}" && (-z "${expected}" || "${actual}" == "${expected}") ]]; then
     e2e_pass "suite.rebuild.workspace_state_preserved"
   else
     e2e_fail "suite.rebuild.workspace_state_preserved"
@@ -75,7 +75,7 @@ rebuild_upgrade_assert_agent_version_upgraded() {
   expected="${E2E_EXPECTED_AGENT_VERSION:-}"
   cmd="${E2E_AGENT_VERSION_COMMAND:-openclaw --version}"
   actual="$(_rebuild_upgrade_run REBUILD_UPGRADE_SANDBOX_CMD openshell sandbox exec "${sandbox}" -- bash -lc "${cmd}" 2>/dev/null || true)"
-  if [[ -n "${actual}" && ( -z "${old}" || "${actual}" != *"${old}"* ) && ( -z "${expected}" || "${actual}" == *"${expected}"* ) ]]; then
+  if [[ -n "${actual}" && (-z "${old}" || "${actual}" != *"${old}"*) && (-z "${expected}" || "${actual}" == *"${expected}"*) ]]; then
     e2e_pass "suite.rebuild.agent_version_upgraded"
   else
     e2e_fail "suite.rebuild.agent_version_upgraded"
@@ -159,7 +159,7 @@ rebuild_upgrade_assert_gateway_version_upgraded() {
   local expected output
   expected="${E2E_EXPECTED_OPENSHELL_VERSION:-}"
   output="$(_rebuild_upgrade_run REBUILD_UPGRADE_GATEWAY_CMD curl -fsS "$(_rebuild_upgrade_ctx E2E_GATEWAY_URL)/version" 2>/dev/null || true)"
-  if [[ -n "${output}" && ( -z "${expected}" || "${output}" == *"${expected}"* ) ]]; then
+  if [[ -n "${output}" && (-z "${expected}" || "${output}" == *"${expected}"*) ]]; then
     e2e_pass "suite.upgrade.gateway_version_upgraded"
   else
     e2e_fail "suite.upgrade.gateway_version_upgraded"

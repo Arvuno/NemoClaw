@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import yaml from "js-yaml";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const CHECK_BIN = path.join(REPO_ROOT, "scripts/e2e/check-parity-map.ts");
@@ -54,7 +55,19 @@ describe("rebuild/upgrade parity map records", () => {
     const inventory = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "test/e2e/docs/parity-inventory.generated.json"), "utf8")) as {
       entrypoints: Array<{ script: string; assertions: Array<{ text: string }> }>;
     };
-    const mapText = fs.readFileSync(path.join(REPO_ROOT, "test/e2e/docs/parity-map.yaml"), "utf8");
+    const parityMap = yaml.load(fs.readFileSync(path.join(REPO_ROOT, "test/e2e/docs/parity-map.yaml"), "utf8")) as {
+      scripts: Record<string, { assertions?: Array<{ legacy?: string; id?: string }> }>;
+    };
+    const expectedIds = new Set([
+      "suite.rebuild.workspace_state_preserved",
+      "suite.rebuild.agent_version_upgraded",
+      "suite.rebuild.inference_still_works",
+      "suite.rebuild.policy_presets_preserved",
+      "suite.upgrade.sandbox_registry_preserved",
+      "suite.upgrade.gateway_version_upgraded",
+      "suite.upgrade.survivor_agent_reachable",
+    ]);
+    const mappedIds = new Set<string>();
     for (const script of [
       "test-rebuild-openclaw.sh",
       "test-rebuild-hermes.sh",
@@ -63,23 +76,17 @@ describe("rebuild/upgrade parity map records", () => {
     ]) {
       const entry = inventory.entrypoints.find((item) => path.basename(item.script) === script);
       expect(entry, `missing inventory for ${script}`).toBeTruthy();
-      expect(mapText).toContain(`  ${script}:`);
+      const scriptMap = parityMap.scripts[script];
+      expect(scriptMap, `missing parity map entry for ${script}`).toBeTruthy();
+      const mappedLegacyAssertions = new Set((scriptMap.assertions ?? []).map((assertion) => assertion.legacy));
       for (const assertion of entry?.assertions ?? []) {
-        expect(mapText, `${script} missing ${assertion.text}`).toContain(assertion.text);
+        expect(mappedLegacyAssertions, `${script} missing ${assertion.text}`).toContain(assertion.text);
+      }
+      for (const assertion of scriptMap.assertions ?? []) {
+        if (assertion.id) mappedIds.add(assertion.id);
       }
     }
-    for (const id of [
-      "suite.rebuild.workspace_state_preserved",
-      "suite.rebuild.agent_version_upgraded",
-      "suite.rebuild.inference_still_works",
-      "suite.rebuild.policy_presets_preserved",
-      "suite.rebuild.hermes_config_preserved",
-      "suite.upgrade.sandbox_registry_preserved",
-      "suite.upgrade.gateway_version_upgraded",
-      "suite.upgrade.survivor_agent_reachable",
-    ]) {
-      expect(mapText).toContain(id);
-    }
+    for (const id of expectedIds) expect(mappedIds).toContain(id);
   });
 });
 
