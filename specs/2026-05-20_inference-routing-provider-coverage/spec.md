@@ -1,8 +1,8 @@
 # Specification: Inference Routing and Provider E2E Scenario Migration
 
-Issue: #3812  
-Parent epic: #3588  
-Created: 2026-05-20  
+Issue: #3812
+Parent epic: #3588
+Created: 2026-05-20
 Worktree: `/Users/jyaunches/Development/NemoClaw-working/issue-3812`
 
 ## Overview & Objectives

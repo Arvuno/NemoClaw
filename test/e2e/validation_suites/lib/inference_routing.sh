@@ -90,7 +90,10 @@ e2e_inference_routing_assert_health() {
   local sandbox status
   sandbox="$(_e2e_inference_sandbox_name)"
   status="$(_e2e_inference_status "${sandbox}" "${url}")"
-  [[ "${status}" =~ ^2[0-9][0-9]$ ]] || { echo "e2e_inference_routing: ${url} returned HTTP ${status}" >&2; return 1; }
+  [[ "${status}" =~ ^2[0-9][0-9]$ ]] || {
+    echo "e2e_inference_routing: ${url} returned HTTP ${status}" >&2
+    return 1
+  }
   e2e_pass "${assertion_id}"
 }
 
@@ -107,8 +110,11 @@ e2e_inference_routing_assert_auth_proxy() {
   sandbox="$(_e2e_inference_sandbox_name)"
   status="$(_e2e_inference_status "${sandbox}" "https://inference.local/v1/models")"
   case "${mode}" in
-    invalid|unauthenticated) [[ "${status}" =~ ^(401|403)$ ]] ;;
+    invalid | unauthenticated) [[ "${status}" =~ ^(401|403)$ ]] ;;
     valid) [[ "${status}" =~ ^2[0-9][0-9]$ ]] ;;
-    *) echo "e2e_inference_routing: unknown auth proxy mode ${mode}" >&2; return 2 ;;
+    *)
+      echo "e2e_inference_routing: unknown auth proxy mode ${mode}" >&2
+      return 2
+      ;;
   esac
 }
