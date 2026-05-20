@@ -276,6 +276,12 @@ const { resolveSandboxImageTagFromCreateOutput } =
 const nim: typeof import("./inference/nim") = require("./inference/nim");
 const onboardSession: typeof import("./state/onboard-session") = require("./state/onboard-session");
 const { toSessionUpdates }: typeof import("./onboard/session-updates") = require("./onboard/session-updates");
+const messagingConfig: typeof import("./onboard/messaging-config") = require("./onboard/messaging-config");
+const {
+  getStoredMessagingChannelConfig,
+  messagingChannelConfigsEqual,
+  persistMessagingChannelConfigToSession,
+} = messagingConfig;
 const sandboxAgent: typeof import("./onboard/sandbox-agent") = require("./onboard/sandbox-agent");
 const {
   RESERVED_SANDBOX_NAMES,
@@ -375,9 +381,7 @@ import type { WebSearchConfig } from "./inference/web-search";
 import {
   hydrateMessagingChannelConfig,
   type MessagingChannelConfig,
-  mergeMessagingChannelConfigs,
   readMessagingChannelConfigFromEnv,
-  sanitizeMessagingChannelConfig,
 } from "./messaging-channel-config";
 import { streamGatewayStart } from "./onboard/gateway";
 import {
@@ -7182,38 +7186,6 @@ async function setupInference(
 // ── Step 6: Messaging channels ───────────────────────────────────
 
 const MESSAGING_CHANNELS = listChannels();
-
-function getStoredMessagingChannelConfig(
-  sandboxName: string | null,
-  session: Session | null,
-): MessagingChannelConfig | null {
-  const registryConfig = sandboxName
-    ? sanitizeMessagingChannelConfig(registry.getSandbox(sandboxName)?.messagingChannelConfig)
-    : null;
-  const sessionMatchesSandbox =
-    !session?.sandboxName || !sandboxName || session.sandboxName === sandboxName;
-  const sessionConfig = sessionMatchesSandbox
-    ? sanitizeMessagingChannelConfig(session?.messagingChannelConfig)
-    : null;
-  return mergeMessagingChannelConfigs(registryConfig, sessionConfig);
-}
-
-function persistMessagingChannelConfigToSession(config: MessagingChannelConfig | null): void {
-  onboardSession.updateSession((current: Session) => {
-    current.messagingChannelConfig = config;
-    return current;
-  });
-}
-
-function messagingChannelConfigsEqual(
-  left: MessagingChannelConfig | null,
-  right: MessagingChannelConfig | null,
-): boolean {
-  const leftKeys = Object.keys(left || {}).sort();
-  const rightKeys = Object.keys(right || {}).sort();
-  if (leftKeys.length !== rightKeys.length) return false;
-  return leftKeys.every((key, index) => key === rightKeys[index] && left?.[key] === right?.[key]);
-}
 
 // Curl exit codes that indicate a network-level failure (not a token problem).
 // 35 (TLS handshake failure) covers corporate proxies that MITM HTTPS.
