@@ -56,6 +56,10 @@ import sys
 
 WECHAT_PLUGIN_ID = "openclaw-weixin"
 WECHAT_PLUGIN_SPEC = "@tencent-weixin/openclaw-weixin@2.4.2"
+WECHAT_PLUGIN_INSTALL = {
+    "source": "npm",
+    "spec": WECHAT_PLUGIN_SPEC,
+}
 WECHAT_TOKEN_PLACEHOLDER = "openshell:resolve:env:WECHAT_BOT_TOKEN"
 
 
@@ -152,14 +156,13 @@ def _patch_openclaw_config(account_id: str) -> None:
     if not isinstance(installs, dict):
         installs = {}
         plugins["installs"] = installs
-    installs.setdefault(
-        WECHAT_PLUGIN_ID,
-        {
-            "type": "npm",
-            "spec": WECHAT_PLUGIN_SPEC,
-            "resolved": WECHAT_PLUGIN_SPEC,
-        },
-    )
+    wechat_install = installs.get(WECHAT_PLUGIN_ID)
+    if (
+        not isinstance(wechat_install, dict)
+        or wechat_install.get("source") != WECHAT_PLUGIN_INSTALL["source"]
+        or not wechat_install.get("spec")
+    ):
+        installs[WECHAT_PLUGIN_ID] = dict(WECHAT_PLUGIN_INSTALL)
     entries = plugins.setdefault("entries", {})
     if not isinstance(entries, dict):
         entries = {}

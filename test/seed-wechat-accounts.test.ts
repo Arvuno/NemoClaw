@@ -255,9 +255,8 @@ describe("seed-wechat-accounts.py: openclaw.json patching (channels.openclaw-wei
 
     const cfg = readJson(path.join(tmpDir, ".openclaw", "openclaw.json"));
     expect(cfg.plugins.installs["openclaw-weixin"]).toEqual({
-      type: "npm",
+      source: "npm",
       spec: "@tencent-weixin/openclaw-weixin@2.4.2",
-      resolved: "@tencent-weixin/openclaw-weixin@2.4.2",
     });
     expect(cfg.plugins.entries["openclaw-weixin"].enabled).toBe(true);
     expect(Object.keys(cfg.channels)).toEqual(["telegram", "slack", "openclaw-weixin"]);
