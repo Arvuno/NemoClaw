@@ -30,6 +30,8 @@ suites:
     steps: &id008
     - id: credentials-present
       script: security/credentials/00-credentials-present.sh
+    - id: no-plaintext-host-store
+      script: security/credentials/01-no-plaintext-host-store.sh
   onboarding-state:
     requires_state:
       sandbox.status: running
@@ -90,8 +92,13 @@ suites:
     requires_state: *id005
     steps: *id006
   security-credentials:
-    requires_state: *id007
-    steps: *id008
+    requires_state:
+      credentials.expected: present
+    steps:
+    - id: credentials-present
+      script: security/credentials/00-credentials-present.sh
+    - id: no-plaintext-host-store
+      script: security/credentials/01-no-plaintext-host-store.sh
   messaging-telegram:
     requires_state: *id001
     steps: *id002
