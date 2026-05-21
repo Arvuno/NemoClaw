@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { platform, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
@@ -122,6 +122,25 @@ function collectShell(collectDir: string, label: string, shellCmd: string): void
 
   if (result.status !== 0) {
     console.log("  (command exited with non-zero status)");
+  }
+}
+
+function collectNativeInstallerAppContext(collectDir: string): void {
+  const contextDir = process.env.NEMOCLAW_MAC_INSTALLER_DIAGNOSTICS_DIR;
+  if (!contextDir || !existsSync(contextDir)) return;
+
+  section("Mac Installer Preview App");
+  for (const entry of readdirSync(contextDir)) {
+    const safeName = basename(entry).replace(/[^A-Za-z0-9_.-]/g, "_");
+    if (!safeName) continue;
+    const source = join(contextDir, entry);
+    try {
+      const content = readFileSync(source, "utf8");
+      writeFileSync(join(collectDir, `native-installer-${safeName}`), redact(content));
+      console.log(`  collected ${safeName}`);
+    } catch {
+      // Ignore non-text files or entries that disappeared while diagnostics ran.
+    }
   }
 }
 
@@ -509,6 +528,7 @@ export function runDebug(opts: DebugOptions = {}): void {
     collectDocker(collectDir, quick);
     collectOpenshell(collectDir, sandboxName, quick);
     collectOnboardSession(collectDir, repoDir);
+    collectNativeInstallerAppContext(collectDir);
     collectSandboxInternals(collectDir, sandboxName, quick);
 
     if (!quick) {

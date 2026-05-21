@@ -37,6 +37,9 @@ navigation:
       - page: "Quickstart with Hermes"
         path: get-started/quickstart-hermes.mdx
         slug: quickstart-hermes
+      - page: "Mac Installer Preview"
+        path: get-started/mac-installer-preview.mdx
+        slug: mac-installer-preview
   - section: "Inference"
     slug: inference
     contents:

@@ -155,6 +155,55 @@ Use `--control-ui-port <N>` to choose the host dashboard port for a sandbox.
 The value must be an integer from `1024` through `65535`.
 This flag takes precedence over `CHAT_UI_URL`, `NEMOCLAW_DASHBOARD_PORT`, the previous registry value, and the default port.
 
+### `nemoclaw native-installer mac describe`
+
+Return the YAML-backed, app-facing Mac Installer Preview plan.
+The command reads `release/native-installers/macos/install-plan.yaml`, resolves stock agent metadata from `agents/*/manifest.yaml`, and verifies provider choices against the provider catalog used by `nemoclaw onboard`.
+The returned provider defaults are installer-backed; Mac Installer Preview does not publish a second provider/model catalog.
+
+```console
+$ nemoclaw native-installer mac describe --json
+```
+
+### `nemoclaw native-installer mac assess`
+
+Assess whether this Mac is eligible for the experimental Mac Installer Preview.
+The command checks Apple Silicon macOS support and normalizes the same host preflight used by `nemoclaw onboard`.
+It reports Docker missing separately from Docker installed but unreachable.
+
+```console
+$ nemoclaw native-installer mac assess [--json]
+```
+
+### `nemoclaw native-installer mac install`
+
+Install stock OpenClaw or Hermes through the experimental macOS Mac Installer Preview path.
+This command is not a replacement for the standard installer.
+It validates adapter-only config concerns, rejects secrets and custom Dockerfiles, translates the app handoff to existing onboard flags and environment variables, and then runs the supported non-interactive `onboard` path for the selected stock agent.
+
+```console
+$ nemoclaw native-installer mac install --config <json> [--json-progress]
+```
+
+Config JSON supports `agent`, `sandboxName`, `provider`, `model`, `endpoint`, `security.tier`, `security.presets`, `messaging`, `mode`, and `ports`.
+The `provider` value must be one of the installer-supported provider ids returned by `nemoclaw native-installer mac describe --json`.
+Secrets must be provided by environment variables or app-managed Keychain injection, never persisted in the JSON file.
+Mac Installer Preview supports stock OpenClaw and stock Hermes only; use `nemoclaw onboard --from <Dockerfile>` for custom images.
+
+`native-installer mac install` does not pull Docker images directly.
+Docker runtime checks, base image resolution, remediation, and user-specific Dockerfile generation remain owned by `nemoclaw onboard`.
+The `--json-progress` stream emits only coarse adapter events: `plan_loaded`, `onboard_started`, `onboard_finished`, `launch_ready`, or `failed`.
+
+### `nemoclaw native-installer mac launch`
+
+Launch the selected Mac Installer Preview agent or return app-native launch details.
+For OpenClaw, the command opens the local UI by default and can return the tokenized URL plus `nemoclaw <name> connect`.
+For Hermes, it returns the forwarded OpenAI-compatible endpoint and API token details when available.
+
+```console
+$ nemoclaw native-installer mac launch [--agent openclaw|hermes] [--json] [--no-open]
+```
+
 If you enable Slack during onboarding, the wizard collects both the Bot Token (`SLACK_BOT_TOKEN`) and the App-Level Token (`SLACK_APP_TOKEN`).
 Socket Mode requires both tokens.
 The app-level token is stored in a dedicated `slack-app` OpenShell provider and forwarded to the sandbox alongside the bot token.
@@ -1022,6 +1071,15 @@ $ nemoclaw debug [--quick|-q] [--sandbox NAME] [--output PATH|-o PATH]
 | `--output PATH`, `-o PATH` | Write diagnostics tarball to the given path |
 
 If `--output` is set and the tarball cannot be written (for example, the destination directory is missing or read-only), the command exits non-zero so scripts can detect the failure.
+
+### `nemoclaw diagnostics export`
+
+Export diagnostics to a tarball for the Mac Installer Preview app or support workflows.
+This is the app-facing wrapper around `nemoclaw debug --output`.
+
+```console
+$ nemoclaw diagnostics export --output <path> [--sandbox NAME] [--quick]
+```
 
 ### `nemoclaw credentials list`
 

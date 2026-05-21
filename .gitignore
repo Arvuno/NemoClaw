@@ -8,6 +8,8 @@ coverage/
 dist/
 docs/_build/
 node_modules/
+build/
+.build/
 
 # OS metadata
 .DS_Store

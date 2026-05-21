@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+name: Release / Mac Installer Preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-mac-installer-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-macos-dmg:
+    if: github.repository == 'NVIDIA/NemoClaw'
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.16.0"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build Mac Installer Preview DMG
+        env:
+          DEVELOPER_ID_APPLICATION: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: npm run build:native-mac-installer
+
+      - name: Upload Mac Installer Preview artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: NemoClaw-Mac-Installer-Preview
+          path: |
+            build/native-mac-installer-preview/*.dmg
+            build/native-mac-installer-preview/*.app
+          if-no-files-found: error

@@ -1,0 +1,130 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+version: 1
+experimental: true
+target: "Apple Silicon macOS 13+"
+summary: "Guided native macOS preview for stock OpenClaw and Hermes installs."
+
+requirements:
+  - id: platform
+    label: "Apple Silicon macOS 13+"
+    required: true
+    recovery: "Use the standard NemoClaw installer on Linux, WSL, DGX Spark, Intel Macs, or older macOS releases."
+  - id: docker-cli
+    label: "Docker CLI"
+    required: true
+    recovery: "Install Docker Desktop or Colima, then try again."
+  - id: docker-daemon
+    label: "Docker daemon"
+    required: true
+    recovery: "Start Docker Desktop or Colima, then try again."
+  - id: openshell
+    label: "OpenShell"
+    required: false
+    recovery: "The signed app bundle should carry a pinned OpenShell binary; the standard installer can repair it."
+
+agents:
+  - name: openclaw
+    label: "Browser UI sandbox"
+    description: "Standard NemoClaw/OpenClaw sandbox with browser UI and messaging support declared by the agent manifest."
+    icon: "rectangle.connected.to.line.below"
+    recommended: true
+  - name: hermes
+    label: "Local API sandbox"
+    description: "Hermes Agent sandbox with an OpenAI-compatible local API endpoint and bearer-token launch details."
+    icon: "curlybraces.square"
+    recommended: false
+
+model:
+  default_provider: openai
+  providers:
+    - id: openai
+      title: "OpenAI"
+      default_model: "gpt-5.4"
+      env_var: "OPENAI_API_KEY"
+      guidance: "OpenAI provider from the onboard catalog using its default model."
+      system_image: "cloud"
+      recommended: true
+    - id: anthropic
+      title: "Anthropic"
+      default_model: "claude-sonnet-4-6"
+      env_var: "ANTHROPIC_API_KEY"
+      guidance: "Anthropic provider from the onboard catalog using its default model."
+      system_image: "text.book.closed"
+    - id: gemini
+      title: "Google Gemini"
+      default_model: "gemini-2.5-flash"
+      env_var: "GEMINI_API_KEY"
+      guidance: "Google Gemini provider from the onboard catalog using its default model."
+      system_image: "diamond"
+    - id: build
+      title: "NVIDIA Endpoints"
+      default_model: "nvidia/nemotron-3-super-120b-a12b"
+      env_var: "NVIDIA_API_KEY"
+      guidance: "NVIDIA-hosted inference using the curated onboard default."
+      system_image: "cpu"
+    - id: ollama
+      title: "Local Ollama"
+      default_model: "nemotron-3-nano:30b"
+      guidance: "Local Ollama provider from the onboard catalog using its default model."
+      system_image: "desktopcomputer"
+    - id: hermesProvider
+      title: "Hermes Provider"
+      default_model: "moonshotai/kimi-k2.6"
+      env_var: "NOUS_API_KEY"
+      guidance: "Use the Hermes stack as the model provider when installing Hermes Agent."
+      system_image: "point.3.filled.connected.trianglepath.dotted"
+
+trust:
+  default_tier: balanced
+  tiers:
+    - id: restricted
+      title: "Careful"
+      description: "Tighter defaults for first-time installs or sensitive machines."
+      icon: "lock.shield"
+    - id: balanced
+      title: "Balanced"
+      description: "Recommended. Gives the agent room to work while keeping sharp edges covered."
+      icon: "checkmark.shield"
+      recommended: true
+    - id: open
+      title: "Open"
+      description: "For trusted experiments where speed matters more than restraint."
+      icon: "lock.open"
+
+review:
+  handoff_policy: "Provider keys are injected by environment or app-managed temporary handoff and are never stored in native Mac installer config JSON."
+  stock_only: "Mac Installer Preview supports stock OpenClaw and stock Hermes."
+
+install:
+  default_sandbox_name: "nemoclaw-mac-preview"
+  default_mode: fresh
+  progress_phases:
+    - id: plan_loaded
+      title: "Reading the plan"
+    - id: onboard_started
+      title: "Starting onboarding"
+    - id: onboard_finished
+      title: "Finishing onboarding"
+    - id: launch_ready
+      title: "Preparing launch"
+  base_images:
+    - agent: openclaw
+      ref: "ghcr.io/nvidia/nemoclaw/sandbox-base:latest"
+      env: "NEMOCLAW_SANDBOX_BASE_IMAGE_REF"
+      apply_by_default: false
+      note: "Optional onboard-owned base image override. Full stock sandbox images are deferred."
+    - agent: hermes
+      ref: "ghcr.io/nvidia/nemoclaw/hermes-sandbox-base:latest"
+      env: "NEMOCLAW_HERMES_SANDBOX_BASE_IMAGE_REF"
+      apply_by_default: false
+      note: "Optional onboard-owned base image override. Full stock sandbox images are deferred."
+
+launch:
+  openclaw:
+    kind: ui
+    action: "Open local browser UI"
+  hermes:
+    kind: api
+    action: "Show OpenAI-compatible endpoint and authorization header"

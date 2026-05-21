@@ -1,0 +1,17 @@
+{
+  "name": "NemoClaw Mac Installer Preview payload",
+  "experimental": true,
+  "target": "Apple Silicon macOS 13+",
+  "components": [
+    "private Node runtime",
+    "built NemoClaw CLI",
+    "built OpenClaw plugin package",
+    "pinned OpenShell binary",
+    "agent manifests",
+    "YAML native Mac installer install plan",
+    "uninstall and repair scripts",
+    "licenses",
+    "SBOM"
+  ],
+  "handoffPolicy": "Provider keys are injected through environment variables or Keychain-backed temporary files and are not persisted in native Mac installer config JSON."
+}

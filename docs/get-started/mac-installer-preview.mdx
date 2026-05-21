@@ -1,0 +1,78 @@
+---
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+title: "Mac Installer Preview"
+sidebar-title: "Mac Installer Preview"
+description: "Opt-in experimental native macOS installer path for stock OpenClaw and Hermes sandboxes."
+description-agent: "Explains the experimental macOS Mac Installer Preview installer, its supported scope, CLI APIs, payload model, recovery actions, and fallback to the standard installer."
+keywords: ["nemoclaw macos installer preview", "nemoclaw native mac app", "nemoclaw hermes native installer"]
+---
+
+<Warning>
+Mac Installer Preview is experimental and opt-in. The standard installer remains the default supported path:
+`curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash`.
+</Warning>
+
+Mac Installer Preview is a native macOS shell over the existing `nemoclaw onboard` flow for supported Apple Silicon Macs.
+It is scoped to stock **OpenClaw** and stock **Hermes Agent** sandboxes in this preview.
+Linux, WSL, DGX Spark, custom Dockerfiles, CI automation, and conservative installs should keep using the standard installer and `nemoclaw onboard`.
+
+## Supported Scope
+
+The preview targets Apple Silicon macOS 13 or newer with a supported container runtime already installed and running.
+NemoClaw detects Docker Desktop or Colima and explains how to recover when the runtime is missing or stopped, but it does not silently install third-party runtimes.
+
+Mac Installer Preview config JSON may include the selected agent, sandbox name, provider, model, endpoint, policy tier or presets, messaging choices, fresh or resume mode, and port choices.
+Secrets must come from the environment or a Keychain-backed temporary injection managed by the app.
+Do not put API keys, tokens, passwords, or credentials in the JSON config.
+
+## App-Facing CLI APIs
+
+The native app shells out to stable, machine-readable CLI commands:
+
+```console
+$ nemoclaw native-installer mac describe --json
+$ nemoclaw native-installer mac assess --json
+$ nemoclaw native-installer mac install --config mac-installer.json --json-progress
+$ nemoclaw native-installer mac launch --agent openclaw --json
+$ nemoclaw diagnostics export --output /tmp/nemoclaw-debug.tar.gz
+```
+
+`native-installer mac describe` returns the YAML-backed app plan from `release/native-installers/macos/install-plan.yaml`, resolved with the current `agents/*/manifest.yaml` metadata and the provider catalog used by `nemoclaw onboard`.
+The app uses this structured plan for requirements, supported agents, installer-supported model choices, trust tiers, install phases, and launch copy instead of hard-coding those choices.
+
+`native-installer mac assess` checks Mac Installer Preview macOS arm64 eligibility and normalizes the same Docker/OpenShell preflight truth used by `nemoclaw onboard`.
+It preserves the important distinction between Docker not being installed and Docker being installed but stopped or unreachable.
+
+`native-installer mac install` validates only adapter concerns in the config JSON: stock OpenClaw or Hermes, a provider id returned by `native-installer mac describe`, no secrets, and no custom Dockerfiles.
+It then translates the selected app handoff into existing `nemoclaw onboard` flags and environment variables and lets the supported onboard flow own Docker, image resolution, remediation, and failures.
+The Mac Installer Preview JSON progress stream is intentionally coarse: plan loaded, onboard started, onboard finished, launch ready, or failed.
+
+`native-installer mac launch` returns the agent-specific launch target.
+For OpenClaw, it returns the local browser URL with the gateway token and the terminal chat command.
+For Hermes, it returns the forwarded OpenAI-compatible `/v1` endpoint, health endpoint, and API token when it can be read from the sandbox.
+
+## Release Artifact
+
+The release builder is `scripts/native-installers/macos/build-preview.sh`.
+It stages the built NemoClaw CLI, agent manifests, scripts, uninstall helper, release metadata, optional pinned OpenShell binary, optional private Node runtime, licenses, and SBOM into the app payload.
+When Apple Developer credentials are provided, it signs the app with Developer ID, creates a DMG, submits it to notarization, and staples the result.
+
+Third-party marks are not bundled by default.
+Until each logo is approved for release use, internal app builds use branded text labels and neutral system icons.
+
+## Recovery
+
+The app should keep these recovery actions visible:
+
+- Retry the current step.
+- Resume an interrupted install.
+- Start Fresh with a new sandbox.
+- Fix Docker by opening Docker Desktop or guiding the user to start Colima.
+- Export Diagnostics.
+- Uninstall preview sandbox.
+
+If the preview path is unsupported or onboarding cannot complete, use the standard installer path and the normal `nemoclaw onboard` recovery guidance.
+
+Mac Installer Preview may declare optional onboard-owned sandbox base image references in `install-plan.yaml`.
+Full prebuilt stock sandbox images are deliberately deferred until onboard can configure stock images without patching or generating user-specific Dockerfile content.
