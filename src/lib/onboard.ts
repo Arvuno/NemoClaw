@@ -127,6 +127,7 @@ const {
 }: typeof import("./onboard/base-image") = require("./onboard/base-image");
 const errnoUtils: typeof import("./core/errno") = require("./core/errno");
 const { isErrnoException } = errnoUtils;
+const { requireValue }: typeof import("./core/require-value") = require("./core/require-value");
 
 type RunnerOptions = {
   env?: NodeJS.ProcessEnv;
@@ -137,12 +138,6 @@ type RunnerOptions = {
   openshellBinary?: string;
 };
 
-function requireValue<T>(value: T | null | undefined, message: string): T {
-  if (value == null) {
-    throw new Error(message);
-  }
-  return value;
-}
 const {
   collectBuildContextStats,
   stageOptimizedSandboxBuildContext,

@@ -7,7 +7,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-
+import { requireValue } from "../core/require-value";
 import {
   normalizeCredentialValue,
   resolveProviderCredential,
@@ -58,13 +58,6 @@ export type BlueprintInferenceProfile = {
   credential_default?: string;
   router: BlueprintRouterConfig;
 };
-
-function requireValue<T>(value: T | null | undefined, message: string): T {
-  if (value === null || value === undefined) {
-    throw new Error(message);
-  }
-  return value;
-}
 
 /**
  * Load a named inference profile and router config from blueprint.yaml.
