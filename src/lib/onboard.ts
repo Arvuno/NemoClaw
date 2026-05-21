@@ -5498,19 +5498,19 @@ async function createSandbox(
   // from openshell because bash returns the status of the last pipeline
   // command (awk, always 0) unless pipefail is set. Removing the pipe
   // lets the real exit code flow through to run().
+  const sandboxStartupCommand = ["env", ...envArgs, "nemoclaw-start"];
   const createCommand = `${openshellShellCommand([
     "sandbox",
     "create",
     ...createArgs,
     "--",
-    "env",
-    ...envArgs,
-    "nemoclaw-start",
+    ...sandboxStartupCommand,
   ])} 2>&1`;
   const dockerGpuCreatePatch = dockerGpuSandboxCreate.createDockerGpuSandboxCreatePatch({
     enabled: useDockerGpuPatch,
     sandboxName,
     gpuDevice: effectiveSandboxGpuConfig.sandboxGpuDevice,
+    openshellSandboxCommand: sandboxStartupCommand,
     timeoutSecs: sandboxReadyTimeoutSecs,
     deps: { runOpenshell, runCaptureOpenshell, sleep },
   });
@@ -7113,9 +7113,9 @@ async function setupNim(
           ensureOllamaLinuxExtractionDependencies();
           console.log(
             "  The Ollama installer creates a system user, a systemd service, and writes to /usr/local. " +
-              "It uses sudo for those steps; you may be prompted for your password.",
+              "It uses sudo, may ask for your password, and can take a few minutes; installer output will stream below.",
           );
-          runShell("set -o pipefail; curl -fsSL https://ollama.com/install.sh | sh");
+          runShell("set -o pipefail; curl -fsSL https://ollama.com/install.sh | sh", { stdio: "inherit" });
           // Give the just-started ollama.service a moment to bind port
           // 11434 before we probe or apply the systemd drop-in override.
           sleep(2);
