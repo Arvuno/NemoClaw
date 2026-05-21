@@ -15,6 +15,7 @@ const {
   cliName,
   setOnboardBrandingAgent,
 }: typeof import("./onboard/branding") = require("./onboard/branding");
+const { createSelectOnboardAgent }: typeof import("./onboard/agent-selection") = require("./onboard/agent-selection");
 const { cleanupTempDir }: typeof import("./onboard/temp-files") = require("./onboard/temp-files");
 const { stopStaleDashboardListenersForSandbox } = require("./onboard/stale-gateway-cleanup");
 const {
@@ -668,22 +669,13 @@ const {
 });
 
 
-async function selectOnboardAgent({
-  agentFlag = null,
-  session = null,
-}: {
-  agentFlag?: string | null;
-  session?: { agent?: string | null } | null;
-  resume?: boolean;
-  canPrompt?: boolean;
-} = {}): Promise<AgentDefinition | null> {
-  const agent = agentOnboard.resolveAgent({ agentFlag, session });
-  if (isNonInteractive()) {
-    const displayName = agent?.displayName || agentDefs.loadAgent("openclaw").displayName;
-    note(`  [non-interactive] Agent: ${displayName}`);
-  }
-  return agent;
-}
+const selectOnboardAgent = createSelectOnboardAgent({
+  resolveAgent: agentOnboard.resolveAgent,
+  loadAgent: agentDefs.loadAgent,
+  isNonInteractive,
+  note,
+});
+
 
 const { getTransportRecoveryMessage, getProbeRecovery } = validationRecovery;
 
