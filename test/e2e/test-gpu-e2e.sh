@@ -544,7 +544,7 @@ sandbox_response=""
 TIMEOUT_CMD=""
 command -v timeout >/dev/null 2>&1 && TIMEOUT_CMD="timeout 120"
 sandbox_payload=$(python3 -c 'import json, sys; print(json.dumps({"model": sys.argv[1], "messages": [{"role": "user", "content": "Reply with exactly one word: PONG"}], "max_tokens": 200}))' "$CONFIGURED_MODEL")
-sandbox_curl_cmd=$(printf "curl -sS --max-time 90 %q -H %q -d %q" \
+sandbox_curl_cmd=$(printf "curl -skS --max-time 90 %q -H %q -d %q" \
   "$SANDBOX_INFERENCE_URL" \
   "Content-Type: application/json" \
   "$sandbox_payload")
