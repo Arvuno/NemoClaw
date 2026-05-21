@@ -298,8 +298,8 @@ function rewriteSafeCombinedExecToolCallInEvent(event) {
   let changed = partialChanged || messageChanged;
 
   if (deltaSplit) {
-    if (!partialChanged) changed = applySafeExecSplitAtContentIndex(event.partial, deltaSplit) || changed;
-    if (!messageChanged) changed = applySafeExecSplitAtContentIndex(event.message, deltaSplit) || changed;
+    if (!partialChanged) applySafeExecSplitAtContentIndex(event.partial, deltaSplit);
+    if (!messageChanged) applySafeExecSplitAtContentIndex(event.message, deltaSplit);
     changed = true;
     const targetIndex = targetSplitCommandIndex(event, deltaSplit);
     const targetCommand = deltaSplit.commands[targetIndex];
