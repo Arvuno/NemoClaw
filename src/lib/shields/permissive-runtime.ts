@@ -7,46 +7,58 @@ import YAML from "yaml";
 import { secureTempFile } from "../onboard/temp-files";
 
 /**
- * Build a permissive policy YAML that is guaranteed to be a strict superset
- * of the live sandbox's filesystem policy.
+ * Build a permissive policy YAML whose filesystem path lists
+ * (`filesystem_policy.read_only` + `filesystem_policy.read_write`) are a
+ * superset of the live sandbox's, so OpenShell never has to remove a path
+ * on a live transition.
+ *
+ * Only the two path lists are unioned. Other `filesystem_policy` fields
+ * (e.g. `include_workdir`) are preserved verbatim from the static base —
+ * the bug class this helper exists for is path removal on a live sandbox,
+ * not policy shape changes.
  *
  * Background (#3942, #3957, #3168): OpenShell refuses to remove a
- * `filesystem_policy.read_only` or `filesystem_policy.read_write` entry on a
- * live sandbox. The static `openclaw-sandbox-permissive.yaml` baseline does
- * not see runtime-injected paths — `/proc` on GPU sandboxes, `/opt/hermes`
- * on Hermes, `/home/linuxbrew` on post-#3913 OpenClaw, and any future
- * agent- or feature-specific enrichment. Each of those past mismatches
- * shipped its own permissive-YAML patch. This helper closes the loop by
- * unioning whatever the live sandbox advertises into the permissive YAML
- * before it is applied, so future runtime injections are absorbed
- * automatically.
+ * `filesystem_policy.read_only` or `filesystem_policy.read_write` entry
+ * on a live sandbox. The static `openclaw-sandbox-permissive.yaml`
+ * baseline does not see runtime-injected paths — `/proc` on GPU
+ * sandboxes, `/opt/hermes` on Hermes, `/home/linuxbrew` on post-#3913
+ * OpenClaw, and any future agent- or feature-specific enrichment. Each
+ * past mismatch shipped its own permissive-YAML patch. This helper
+ * closes the loop by unioning whatever the live sandbox advertises into
+ * the permissive YAML before it is applied, so future runtime injections
+ * are absorbed automatically.
  *
- * Resolution rules when a path appears on both sides:
- * - Live `read_write` is the more permissive of the two and takes priority:
- *   if the live state writes a path, the permissive transition keeps it
- *   writable, removing it from `read_only` first so we never emit a path
- *   in both lists.
+ * Resolution rules when a path appears in both `read_only` and
+ * `read_write`:
+ * - Live `read_write` is the more permissive of the two and takes
+ *   priority: if the live state writes a path, the permissive transition
+ *   keeps it writable, removing it from `read_only` first so we never
+ *   emit a path in both lists.
  * - Live `read_only` is merged into base `read_only` only when the same
  *   path is not already granted `read_write` (either by base or by live).
  *
- * Returns the path to a freshly created temp YAML file. Falls back to the
- * base permissive path if the live policy can't be parsed or omits the
- * filesystem section — degrading to the existing static behavior rather
- * than failing closed.
+ * Returns the path to a freshly created temp YAML file when the live
+ * policy carries a filesystem section that needs merging. Falls back to
+ * the static base path when the live policy is empty / has no filesystem
+ * lists, when the base YAML cannot be parsed, or when temp-file I/O
+ * fails — degrading to the existing static apply path rather than
+ * aborting shields-down with an I/O error.
  */
 export interface PermissiveRuntimeDeps {
-  fetchLivePolicy: (sandboxName: string) => string;
+  // Pre-parsed live policy YAML body (e.g. parseCurrentPolicy(rawPolicy)
+  // from the caller, which already strips the OpenShell header). Passed
+  // in rather than fetched here so this helper stays a pure transform.
+  livePolicyYaml: string;
+  // Lazy because callers may want to defer the read until the helper
+  // actually needs it. The returned string is parsed by YAML.parse.
   readBasePolicy: () => string;
 }
 
 export function buildRuntimePermissivePolicy(
-  sandboxName: string,
   basePermissivePath: string,
   deps: PermissiveRuntimeDeps,
 ): string {
-  const liveRaw = deps.fetchLivePolicy(sandboxName);
-  const liveYaml = parsePolicyBlock(liveRaw);
-  const live = liveYaml ? safeYamlObject(liveYaml) : null;
+  const live = deps.livePolicyYaml ? safeYamlObject(deps.livePolicyYaml) : null;
   const liveRw = readStringList(live, "read_write");
   const liveRo = readStringList(live, "read_only");
 
@@ -56,7 +68,12 @@ export function buildRuntimePermissivePolicy(
     return basePermissivePath;
   }
 
-  const baseYaml = deps.readBasePolicy();
+  let baseYaml: string;
+  try {
+    baseYaml = deps.readBasePolicy();
+  } catch {
+    return basePermissivePath;
+  }
   const base = safeYamlObject(baseYaml);
   if (!base) {
     return basePermissivePath;
@@ -70,8 +87,8 @@ export function buildRuntimePermissivePolicy(
   const baseRw = new Set(readStringList(base, "read_write"));
   const baseRo = new Set(readStringList(base, "read_only"));
 
-  // RW wins: a live write-path must stay writable in the new policy, and
-  // the same path cannot also live in read_only afterwards.
+  // RW wins: a live write-path must stay writable in the new policy,
+  // and the same path cannot also live in read_only afterwards.
   for (const p of liveRw) {
     baseRo.delete(p);
     baseRw.add(p);
@@ -83,9 +100,13 @@ export function buildRuntimePermissivePolicy(
   fsPolicy.read_write = [...baseRw];
   fsPolicy.read_only = [...baseRo];
 
-  const tmpPath = secureTempFile("nemoclaw-permissive-runtime", ".yaml");
-  fs.writeFileSync(tmpPath, YAML.stringify(base), { mode: 0o600 });
-  return tmpPath;
+  try {
+    const tmpPath = secureTempFile("nemoclaw-permissive-runtime", ".yaml");
+    fs.writeFileSync(tmpPath, YAML.stringify(base), { mode: 0o600 });
+    return tmpPath;
+  } catch {
+    return basePermissivePath;
+  }
 }
 
 function safeYamlObject(text: string): Record<string, unknown> | null {
@@ -109,23 +130,4 @@ function readStringList(
   const value = (fsPolicy as Record<string, unknown>)[key];
   if (!Array.isArray(value)) return [];
   return value.filter((entry): entry is string => typeof entry === "string");
-}
-
-// Lightweight clone of policy/index.ts:parseCurrentPolicy that strips the
-// OpenShell header / error preamble before YAML.parse. Inlined to avoid a
-// runtime cycle with the policy module.
-function parsePolicyBlock(raw: string | null | undefined): string {
-  if (!raw) return "";
-  const sep = raw.indexOf("---");
-  const candidate = (sep === -1 ? raw : raw.slice(sep + 3)).trim();
-  if (!candidate) return "";
-  if (/^(error|failed|invalid|warning|status)\b/i.test(candidate)) return "";
-  if (!/^[a-z_][a-z0-9_]*\s*:/m.test(candidate)) return "";
-  try {
-    const parsed = YAML.parse(candidate);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return "";
-  } catch {
-    return "";
-  }
-  return candidate;
 }

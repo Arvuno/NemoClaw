@@ -909,13 +909,15 @@ function shieldsDown(sandboxName: string, opts: ShieldsDownOpts = {}): void {
   let policyFileIsTemp = false;
   if (policyName === "permissive") {
     const basePath = resolvePermissivePolicyPath(sandboxName);
-    // Union the live sandbox's filesystem_policy into the static permissive
-    // baseline. OpenShell rejects removal of read_only / read_write paths
-    // on a live sandbox, and runtime-injected entries (/proc on GPU,
-    // /opt/hermes on Hermes, /home/linuxbrew on post-#3913 OpenClaw, etc.)
-    // are not present in the static YAML. See #3942, #3957, #3168.
-    policyFile = buildRuntimePermissivePolicy(sandboxName, basePath, {
-      fetchLivePolicy: () => rawPolicy,
+    // Union the live sandbox's filesystem_policy.read_only/read_write into
+    // the static permissive baseline. OpenShell rejects removal of those
+    // paths on a live sandbox, and runtime-injected entries (/proc on
+    // GPU, /opt/hermes on Hermes, /home/linuxbrew on post-#3913 OpenClaw,
+    // etc.) are not present in the static YAML. See #3942, #3957, #3168.
+    // policyYaml is the pre-parsed body we already captured for the
+    // snapshot above — reuse it instead of re-fetching.
+    policyFile = buildRuntimePermissivePolicy(basePath, {
+      livePolicyYaml: policyYaml,
       readBasePolicy: () => fs.readFileSync(basePath, "utf-8"),
     });
     policyFileIsTemp = policyFile !== basePath;

@@ -10,6 +10,7 @@ import { buildRuntimePermissivePolicy } from "../dist/lib/shields/permissive-run
 
 const BASE_PERMISSIVE = YAML.stringify({
   filesystem_policy: {
+    include_workdir: true,
     read_only: ["/proc", "/etc"],
     read_write: ["/tmp", "/sandbox/.openclaw"],
   },
@@ -30,15 +31,9 @@ afterEach(() => {
   }
 });
 
-function withWrapper(yaml: string): string {
-  // Mirror `openshell policy get --full` output shape: a header line, then
-  // `---`, then the YAML body. parsePolicyBlock should strip the prefix.
-  return `policy: openclaw-sandbox\n---\n${yaml}`;
-}
-
 describe("buildRuntimePermissivePolicy (#3942)", () => {
   it("preserves /proc when the live GPU sandbox has it in read_write", () => {
-    const live = YAML.stringify({
+    const liveYaml = YAML.stringify({
       filesystem_policy: {
         read_only: ["/etc", "/usr"],
         // GPU enrichment from src/lib/onboard/initial-policy.ts:57.
@@ -46,8 +41,8 @@ describe("buildRuntimePermissivePolicy (#3942)", () => {
       },
     });
 
-    const out = buildRuntimePermissivePolicy("alpha", "/unused-base.yaml", {
-      fetchLivePolicy: () => withWrapper(live),
+    const out = buildRuntimePermissivePolicy("/unused-base.yaml", {
+      livePolicyYaml: liveYaml,
       readBasePolicy: () => BASE_PERMISSIVE,
     });
     tempFilesToClean.push(out);
@@ -60,8 +55,23 @@ describe("buildRuntimePermissivePolicy (#3942)", () => {
     expect(result.filesystem_policy.read_only).not.toContain("/proc");
   });
 
+  it("preserves non-list filesystem_policy fields (e.g. include_workdir)", () => {
+    const liveYaml = YAML.stringify({
+      filesystem_policy: { read_write: ["/proc"], read_only: ["/usr"] },
+    });
+
+    const out = buildRuntimePermissivePolicy("/unused-base.yaml", {
+      livePolicyYaml: liveYaml,
+      readBasePolicy: () => BASE_PERMISSIVE,
+    });
+    tempFilesToClean.push(out);
+
+    const result = YAML.parse(fs.readFileSync(out, "utf-8"));
+    expect(result.filesystem_policy.include_workdir).toBe(true);
+  });
+
   it("merges live read_only paths into base read_only without clobbering rw", () => {
-    const live = YAML.stringify({
+    const liveYaml = YAML.stringify({
       filesystem_policy: {
         // /tmp is in base read_write — live ro should NOT downgrade it.
         read_only: ["/usr", "/tmp"],
@@ -69,8 +79,8 @@ describe("buildRuntimePermissivePolicy (#3942)", () => {
       },
     });
 
-    const out = buildRuntimePermissivePolicy("alpha", "/unused-base.yaml", {
-      fetchLivePolicy: () => withWrapper(live),
+    const out = buildRuntimePermissivePolicy("/unused-base.yaml", {
+      livePolicyYaml: liveYaml,
       readBasePolicy: () => BASE_PERMISSIVE,
     });
     tempFilesToClean.push(out);
@@ -82,15 +92,15 @@ describe("buildRuntimePermissivePolicy (#3942)", () => {
   });
 
   it("deduplicates entries within each list and across lists", () => {
-    const live = YAML.stringify({
+    const liveYaml = YAML.stringify({
       filesystem_policy: {
-        read_only: ["/etc", "/etc"], // duplicate within live ro
-        read_write: ["/tmp", "/tmp", "/proc"], // duplicate within live rw
+        read_only: ["/etc", "/etc"],
+        read_write: ["/tmp", "/tmp", "/proc"],
       },
     });
 
-    const out = buildRuntimePermissivePolicy("alpha", "/unused-base.yaml", {
-      fetchLivePolicy: () => withWrapper(live),
+    const out = buildRuntimePermissivePolicy("/unused-base.yaml", {
+      livePolicyYaml: liveYaml,
       readBasePolicy: () => BASE_PERMISSIVE,
     });
     tempFilesToClean.push(out);
@@ -100,26 +110,16 @@ describe("buildRuntimePermissivePolicy (#3942)", () => {
     const roCount = result.filesystem_policy.read_only.filter((p: string) => p === "/etc").length;
     expect(rwCount).toBe(1);
     expect(roCount).toBe(1);
-    // No path appears in both lists.
     const rwSet = new Set(result.filesystem_policy.read_write);
     for (const p of result.filesystem_policy.read_only) {
       expect(rwSet.has(p)).toBe(false);
     }
   });
 
-  it("returns the static base path when live policy is empty / unparseable", () => {
+  it("returns the static base path when live policy is empty", () => {
     const basePath = "/path/to/static.yaml";
-    const out = buildRuntimePermissivePolicy("alpha", basePath, {
-      fetchLivePolicy: () => "",
-      readBasePolicy: () => BASE_PERMISSIVE,
-    });
-    expect(out).toBe(basePath);
-  });
-
-  it("returns the static base path when openshell policy get errored", () => {
-    const basePath = "/path/to/static.yaml";
-    const out = buildRuntimePermissivePolicy("alpha", basePath, {
-      fetchLivePolicy: () => "Error: sandbox not found",
+    const out = buildRuntimePermissivePolicy(basePath, {
+      livePolicyYaml: "",
       readBasePolicy: () => BASE_PERMISSIVE,
     });
     expect(out).toBe(basePath);
@@ -127,10 +127,36 @@ describe("buildRuntimePermissivePolicy (#3942)", () => {
 
   it("returns the static base path when live policy has no filesystem_policy section", () => {
     const basePath = "/path/to/static.yaml";
-    const live = YAML.stringify({ landlock: { compatibility: "best_effort" } });
-    const out = buildRuntimePermissivePolicy("alpha", basePath, {
-      fetchLivePolicy: () => withWrapper(live),
+    const liveYaml = YAML.stringify({ landlock: { compatibility: "best_effort" } });
+    const out = buildRuntimePermissivePolicy(basePath, {
+      livePolicyYaml: liveYaml,
       readBasePolicy: () => BASE_PERMISSIVE,
+    });
+    expect(out).toBe(basePath);
+  });
+
+  it("returns the static base path when readBasePolicy throws (I/O failure)", () => {
+    const basePath = "/path/to/static.yaml";
+    const liveYaml = YAML.stringify({
+      filesystem_policy: { read_write: ["/proc"] },
+    });
+    const out = buildRuntimePermissivePolicy(basePath, {
+      livePolicyYaml: liveYaml,
+      readBasePolicy: () => {
+        throw new Error("ENOENT");
+      },
+    });
+    expect(out).toBe(basePath);
+  });
+
+  it("returns the static base path when base YAML is unparseable", () => {
+    const basePath = "/path/to/static.yaml";
+    const liveYaml = YAML.stringify({
+      filesystem_policy: { read_write: ["/proc"] },
+    });
+    const out = buildRuntimePermissivePolicy(basePath, {
+      livePolicyYaml: liveYaml,
+      readBasePolicy: () => "::: not yaml :::",
     });
     expect(out).toBe(basePath);
   });
