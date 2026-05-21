@@ -721,6 +721,7 @@ function applyChannelPresetIfAvailable(sandboxName: string, channelName: string)
       );
       return false;
     }
+    syncSessionPolicyPresetsForChannel(sandboxName, channelName, "add");
     return true;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -729,6 +730,70 @@ function applyChannelPresetIfAvailable(sandboxName: string, channelName: string)
       `    Re-apply manually after rebuild with: ${CLI_NAME} ${sandboxName} policy-add ${channelName}`,
     );
     return false;
+  }
+}
+
+// Keep the onboard session's recorded preset selection in sync with the
+// registry whenever `channels add` / `channels remove` mutate the active
+// preset list. Without this, a later `nemoclaw <sb> rebuild` re-enters
+// onboard in resume mode, reads the stale `session.policyPresets`, and
+// the policy-selection step narrows the channel's preset back away. The
+// new sandbox then boots with the channel auto-launched but no matching
+// network policy active — the bridge's Slack/Telegram/Discord WebClient
+// hits 403 "CONNECT … not permitted by policy" during init and its
+// internal authorize path stays wedged even after rebuild's Step 5.5
+// reapplies the preset from the backup manifest. See "channels-add bug"
+// follow-up to #3437.
+//
+// Best-effort: any failure to load/save the session is logged and
+// swallowed. The registry update has already succeeded, so the gateway
+// is consistent; the only loss is that a subsequent rebuild may need
+// the operator to re-pick presets interactively.
+function syncSessionPolicyPresetsForChannel(
+  sandboxName: string,
+  channelName: string,
+  action: "add" | "remove",
+): void {
+  let session: ReturnType<typeof onboardSession.loadSession>;
+  try {
+    session = onboardSession.loadSession();
+  } catch {
+    return;
+  }
+  // No session file = user never onboarded this host, or it was cleared.
+  // There is no "intent" record to keep in sync, so leave well enough alone.
+  if (!session) return;
+  // The session file is single-tenant (last onboarded sandbox). If it
+  // currently tracks a different sandbox, mutating policyPresets here
+  // would corrupt that other sandbox's resume state.
+  if (session.sandboxName !== sandboxName) return;
+
+  const current = Array.isArray(session.policyPresets) ? session.policyPresets : [];
+  const has = current.includes(channelName);
+  // Avoid an unnecessary file write when the desired state already holds.
+  if (action === "add" && has) return;
+  if (action === "remove" && !has) return;
+
+  try {
+    onboardSession.updateSession((s) => {
+      const arr = Array.isArray(s.policyPresets) ? [...s.policyPresets] : [];
+      if (action === "add") {
+        if (!arr.includes(channelName)) arr.push(channelName);
+      } else {
+        const idx = arr.indexOf(channelName);
+        if (idx >= 0) arr.splice(idx, 1);
+      }
+      s.policyPresets = arr;
+      return s;
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(
+      `  ${YW}⚠${R} Could not record '${channelName}' preset ${action} in onboard session: ${msg}`,
+    );
+    console.error(
+      `    Registry is consistent; rerun '${CLI_NAME} ${sandboxName} policy-${action === "add" ? "add" : "remove"} ${channelName}' after rebuild if needed.`,
+    );
   }
 }
 
@@ -756,6 +821,8 @@ function removeChannelPresetIfPresent(sandboxName: string, channelName: string):
       console.error(
         `    Run manually after rebuild with: ${CLI_NAME} ${sandboxName} policy-remove ${channelName}`,
       );
+    } else {
+      syncSessionPolicyPresetsForChannel(sandboxName, channelName, "remove");
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
