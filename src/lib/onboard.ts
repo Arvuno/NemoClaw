@@ -5261,6 +5261,7 @@ async function createSandbox(
       directGpu: effectiveSandboxGpuConfig.sandboxGpuEnabled,
       dockerGpuPatch: useDockerGpuPatch,
       additionalPresets: hermesToolGateways,
+      agentName: agent?.name || null,
     },
   );
   if (initialSandboxPolicy.cleanup) {
