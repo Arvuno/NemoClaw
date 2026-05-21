@@ -3,7 +3,6 @@
 
 import { Args, Flags } from "@oclif/core";
 import { runSandboxSnapshot } from "../../../lib/actions/sandbox/snapshot";
-import type { PublicCommandDisplayEntry } from "../../../lib/cli/command-display";
 import { NemoClawCommand } from "../../../lib/cli/nemoclaw-oclif-command";
 
 import { sandboxNameArg, snapshotCommandError } from "../../../lib/sandbox/snapshot-command-support";
@@ -20,16 +19,6 @@ export default class SnapshotRestoreCommand extends NemoClawCommand {
     "<%= config.bin %> sandbox snapshot restore alpha before-upgrade --to beta",
     "<%= config.bin %> sandbox snapshot restore alpha v2 --to beta --force --yes",
   ];
-  static publicDisplay = [
-    {
-      usage: "nemoclaw <name> snapshot restore",
-      description: "Restore state from a snapshot",
-      flags: "[selector] [--to <dst>] [--force] [--yes|-y]",
-      group: "Sandbox Management",
-      scope: "sandbox",
-      order: 9,
-    },
-  ] satisfies readonly PublicCommandDisplayEntry[];
   static args = {
     sandboxName: sandboxNameArg,
     selector: Args.string({
