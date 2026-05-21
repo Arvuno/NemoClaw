@@ -623,7 +623,7 @@ function getSandboxReuseState(sandboxName: string | null) {
 function repairRecordedSandbox(sandboxName: string | null): void {
   if (!sandboxName) return;
   note(`  [resume] Cleaning up recorded sandbox '${sandboxName}' before recreating it.`);
-  runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
+  bestEffortForwardStop(DASHBOARD_PORT);
   runOpenshell(["sandbox", "delete", sandboxName], { ignoreError: true });
   registry.removeSandbox(sandboxName);
 }
@@ -2588,7 +2588,7 @@ function stopLegacyGatewayClusterContainer(): boolean {
 }
 
 function retireLegacyGatewayForDockerDriverUpgrade(): void {
-  runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
+  bestEffortForwardStop(DASHBOARD_PORT);
   stopDockerDriverGatewayProcess();
   const stoppedLegacyContainer = stopLegacyGatewayClusterContainer();
   removeDockerDriverGatewayRegistration();
@@ -3555,7 +3555,7 @@ async function preflight(
     const containerState = verifyGatewayContainerRunning(GATEWAY_NAME);
     if (containerState === "missing") {
       console.log("  Gateway metadata is stale (container not running). Cleaning up...");
-      runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
+      bestEffortForwardStop(DASHBOARD_PORT);
       gatewayReuseState = destroyGatewayForReuse(
         destroyGateway,
         "  ✓ Stale gateway metadata cleaned up",
@@ -3589,7 +3589,7 @@ async function preflight(
       console.log(
         `  Gateway container is running but ${getGatewayLocalEndpoint()}/ is not responding. Recreating...`,
       );
-      runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
+      bestEffortForwardStop(DASHBOARD_PORT);
       gatewayReuseState = destroyGatewayForReuse(
         destroyGateway,
         "  ✓ Stale gateway cleaned up",
@@ -3618,7 +3618,7 @@ async function preflight(
       gatewayReuseState = "missing";
       console.log("  ✓ Previous session cleaned up");
     } else {
-      runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
+      bestEffortForwardStop(DASHBOARD_PORT);
       gatewayReuseState = destroyGatewayForReuse(
         destroyGateway,
         "  ✓ Previous session cleaned up",
@@ -8558,10 +8558,17 @@ function getRunningForwardPorts(forwardListOutput: string | null | undefined): s
   return [...ports];
 }
 
+function bestEffortForwardStop(port: string | number): void {
+  runOpenshell(["forward", "stop", String(port)], {
+    ignoreError: true,
+    suppressOutput: true,
+  });
+}
+
 function stopAllDashboardForwards(): void {
   const forwardList = runCaptureOpenshell(["forward", "list"], { ignoreError: true });
   for (const port of getRunningForwardPorts(forwardList)) {
-    runOpenshell(["forward", "stop", port], { ignoreError: true });
+    bestEffortForwardStop(port);
   }
 }
 
@@ -8616,7 +8623,7 @@ function ensureDashboardForward(
     preferredEntry &&
     (preferredEntry.sandboxName === sandboxName || !isLiveForwardStatus(preferredEntry.status))
   ) {
-    runOpenshell(["forward", "stop", String(preferredPort)], { ignoreError: true });
+    bestEffortForwardStop(preferredPort);
     existingForwards = runCaptureOpenshell(["forward", "list"], { ignoreError: true });
   }
   let actualPort: number;
@@ -8672,7 +8679,7 @@ function ensureDashboardForward(
   const occupied = getOccupiedPorts(existingForwards);
   for (const [port, owner] of occupied.entries()) {
     if (owner === sandboxName && Number(port) !== actualPort) {
-      runOpenshell(["forward", "stop", port], { ignoreError: true });
+      bestEffortForwardStop(port);
     }
   }
 
@@ -8680,14 +8687,14 @@ function ensureDashboardForward(
   const parsedUrl = new URL(chatUiUrl.includes("://") ? chatUiUrl : `http://${chatUiUrl}`);
   parsedUrl.port = String(actualPort);
   const actualTarget = getDashboardForwardTarget(parsedUrl.toString());
-  runOpenshell(["forward", "stop", String(actualPort)], { ignoreError: true });
+  bestEffortForwardStop(actualPort);
   const { result: fwdResult, diagnostic: fwdDiagnostic } = runBackgroundForwardStartWithPortReleaseRetries(
     (stdio, timeout) =>
       runOpenshell(
         ["forward", "start", "--background", actualTarget, sandboxName],
         { ignoreError: true, suppressOutput: true, stdio, timeout },
       ),
-    () => { sleep(1); runOpenshell(["forward", "stop", String(actualPort)], { ignoreError: true }); },
+    () => { sleep(1); bestEffortForwardStop(actualPort); },
   );
   if (fwdResult && fwdResult.status !== 0) {
     const looksLikePortConflict = looksLikeForwardPortConflict(fwdDiagnostic);
@@ -9438,7 +9445,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
       const containerState = verifyGatewayContainerRunning(GATEWAY_NAME);
       if (containerState === "missing") {
         console.log("  Gateway metadata is stale (container not running). Cleaning up...");
-        runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
+        bestEffortForwardStop(DASHBOARD_PORT);
         gatewayReuseState = destroyGatewayForReuse(
           destroyGateway,
           "  ✓ Stale gateway metadata cleaned up",
@@ -9477,7 +9484,7 @@ async function onboard(opts: OnboardOptions = {}): Promise<void> {
         console.log(
           `  Gateway container is running but ${getGatewayLocalEndpoint()}/ is not responding. Recreating...`,
         );
-        runOpenshell(["forward", "stop", String(DASHBOARD_PORT)], { ignoreError: true });
+        bestEffortForwardStop(DASHBOARD_PORT);
         gatewayReuseState = destroyGatewayForReuse(
           destroyGateway,
           "  ✓ Stale gateway cleaned up",
@@ -10253,6 +10260,7 @@ module.exports = {
   startGatewayForRecovery,
   openshellArgv,
   runCaptureOpenshell,
+  bestEffortForwardStop,
   agentSupportsWebSearch,
   setupInference,
   setupMessagingChannels,
