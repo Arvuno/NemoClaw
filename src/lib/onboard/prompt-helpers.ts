@@ -1,6 +1,12 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+export function step(n: number, total: number, msg: string): void {
+  console.log("");
+  console.log(`  [${n}/${total}] ${msg}`);
+  console.log(`  ${"─".repeat(50)}`);
+}
+
 export function getNavigationChoice(value = ""): "back" | "exit" | null {
   const normalized = String(value || "")
     .trim()

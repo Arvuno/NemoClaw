@@ -302,6 +302,7 @@ const {
   exitOnboardFromPrompt,
   getNavigationChoice,
   isAffirmativeAnswer,
+  step,
   ...onboardPromptHelpers
 }: typeof import("./onboard/prompt-helpers") = require("./onboard/prompt-helpers");
 const providerRecovery: typeof import("./onboard/provider-recovery") = require("./onboard/provider-recovery");
@@ -615,12 +616,6 @@ const { getSandboxReuseState, repairRecordedSandbox } = sandboxReuse.createSandb
 });
 
 const { streamSandboxCreate } = sandboxCreateStream;
-
-function step(n: number, total: number, msg: string): void {
-  console.log("");
-  console.log(`  [${n}/${total}] ${msg}`);
-  console.log(`  ${"─".repeat(50)}`);
-}
 
 const { executeSandboxCommandForVerification }: typeof import("./onboard/sandbox-verification-exec") =
   require("./onboard/sandbox-verification-exec");
