@@ -52,6 +52,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execSync, execFileSync, spawnSync, type StdioOptions } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 
 // Instance configuration
@@ -1064,6 +1065,18 @@ describe("Brev GPU runtime setup", () => {
     );
     expect(setup).toContain(
       `if command -v ufw >/dev/null 2>&1; then sudo ufw allow from ${DOCKER_DEFAULT_BRIDGE_POOL_CIDR} to any port ${OLLAMA_AUTH_PROXY_PORT} proto tcp >/dev/null || echo "warning: could not add UFW Ollama auth proxy allow rule" >&2; fi`,
+    );
+  });
+
+  it("runs Docker GPU sandbox inference proof with the OpenShell proxy env", () => {
+    const script = fs.readFileSync(path.join(REPO_DIR, "test/e2e/test-gpu-e2e.sh"), "utf-8");
+
+    expect(script).toContain('[[ "$SANDBOX_INFERENCE_URL" == https://inference.local/* ]]');
+    expect(script).toContain('SANDBOX_INFERENCE_DOCKER_EXEC_ENV=(');
+    expect(script).toContain('--env "HTTPS_PROXY=${INFERENCE_PROXY_URL}"');
+    expect(script).toContain('INFERENCE_NO_PROXY="localhost,127.0.0.1,::1,${INFERENCE_PROXY_HOST}"');
+    expect(script).toContain(
+      'docker exec "${SANDBOX_INFERENCE_DOCKER_EXEC_ENV[@]}" "$sandbox_container_id"',
     );
   });
 });

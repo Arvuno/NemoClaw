@@ -515,12 +515,28 @@ fi
 # mode where OpenClaw is configured with a direct loopback Ollama URL.
 SANDBOX_INFERENCE_URL="https://inference.local/v1/chat/completions"
 SANDBOX_INFERENCE_EXEC="openshell"
+SANDBOX_INFERENCE_DOCKER_EXEC_ENV=()
 if grep -Fq "OpenClaw local inference will use direct sandbox URL" "$INSTALL_LOG"; then
   OLLAMA_HOST_PORT="${NEMOCLAW_OLLAMA_PORT:-11434}"
   SANDBOX_INFERENCE_URL="http://127.0.0.1:${OLLAMA_HOST_PORT}/v1/chat/completions"
   SANDBOX_INFERENCE_EXEC="docker"
 elif grep -Fq "Docker-driver GPU patch active" "$INSTALL_LOG"; then
   SANDBOX_INFERENCE_EXEC="docker"
+fi
+if [ "$SANDBOX_INFERENCE_EXEC" = "docker" ] && [[ "$SANDBOX_INFERENCE_URL" == https://inference.local/* ]]; then
+  INFERENCE_PROXY_HOST="${NEMOCLAW_PROXY_HOST:-10.200.0.1}"
+  INFERENCE_PROXY_PORT="${NEMOCLAW_PROXY_PORT:-3128}"
+  INFERENCE_PROXY_URL="http://${INFERENCE_PROXY_HOST}:${INFERENCE_PROXY_PORT}"
+  INFERENCE_NO_PROXY="localhost,127.0.0.1,::1,${INFERENCE_PROXY_HOST}"
+  SANDBOX_INFERENCE_DOCKER_EXEC_ENV=(
+    --env "HTTP_PROXY=${INFERENCE_PROXY_URL}"
+    --env "HTTPS_PROXY=${INFERENCE_PROXY_URL}"
+    --env "NO_PROXY=${INFERENCE_NO_PROXY}"
+    --env "http_proxy=${INFERENCE_PROXY_URL}"
+    --env "https_proxy=${INFERENCE_PROXY_URL}"
+    --env "no_proxy=${INFERENCE_NO_PROXY}"
+  )
+  info "[LOCAL] Docker GPU inference proof will use OpenShell proxy ${INFERENCE_PROXY_URL}"
 fi
 info "[LOCAL] Sandbox inference test → ${SANDBOX_INFERENCE_URL} → Ollama on GPU..."
 sandbox_probe_failure=""
@@ -543,7 +559,7 @@ run_sandbox_inference_probe() {
       | head -n 1)
     if [ -n "$sandbox_container_id" ]; then
       info "[LOCAL] Using docker exec for Docker GPU sandbox inference proof (${sandbox_container_id:0:12})..."
-      sandbox_response=$($TIMEOUT_CMD docker exec "$sandbox_container_id" sh -lc "$sandbox_curl_cmd" 2>&1) || true
+      sandbox_response=$($TIMEOUT_CMD docker exec "${SANDBOX_INFERENCE_DOCKER_EXEC_ENV[@]}" "$sandbox_container_id" sh -lc "$sandbox_curl_cmd" 2>&1) || true
     else
       sandbox_probe_failure="OpenShell-managed Docker container not found for ${SANDBOX_NAME}"
     fi
