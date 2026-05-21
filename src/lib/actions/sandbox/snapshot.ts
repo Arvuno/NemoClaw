@@ -5,7 +5,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { dockerCapture, dockerInspect } from "../../adapters/docker";
-import { stripAnsi } from "../../adapters/openshell/client";
 import { captureOpenshell, getOpenshellBinary, runOpenshell } from "../../adapters/openshell/runtime";
 import { CLI_NAME } from "../../cli/branding";
 import { prompt as askPrompt } from "../../credentials/store";
