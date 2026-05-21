@@ -646,103 +646,27 @@ const {
   runCurlProbe,
 } = httpProbe;
 
-async function promptHermesAuthMethod(): Promise<HermesAuthMethod | typeof BACK_TO_SELECTION> {
-  const methods: Array<{ key: HermesAuthMethod; label: string }> = [
-    { key: HERMES_AUTH_METHOD_OAUTH, label: "Nous Portal OAuth (authenticate via browser)" },
-    {
-      key: HERMES_AUTH_METHOD_API_KEY,
-      label: "Nous API Key (paste a key from the provider dashboard)",
-    },
-  ];
-  const requested = getRequestedHermesAuthMethod();
-  if (isNonInteractive()) {
-    const method =
-      requested ||
-      (resolveHermesNousApiKey()
-        ? HERMES_AUTH_METHOD_API_KEY
-        : HERMES_AUTH_METHOD_OAUTH);
-    note(`  [non-interactive] Hermes auth: ${hermesAuthMethodLabel(method)}`);
-    return method;
-  }
+const {
+  promptHermesAuthMethod,
+  resolveHermesNousApiKey,
+  stageNousApiKeyProviderEnv,
+  ensureHermesNousApiKeyEnv,
+  openshellResultMessage,
+  checkHermesProviderStoreReachable,
+} = hermesAuth.createHermesAuthHelpers({
+  isNonInteractive,
+  note,
+  prompt,
+  getNavigationChoice,
+  exitOnboardFromPrompt,
+  validateNvidiaApiKeyValue: (value: string, envName: string) =>
+    validateNvidiaApiKeyValue(value, envName),
+  compactText,
+  redact,
+  runOpenshell,
+  backToSelection: BACK_TO_SELECTION,
+});
 
-  console.log("");
-  console.log("  Hermes Provider authentication:");
-  methods.forEach((method, index) => {
-    console.log(`    ${index + 1}) ${method.label}`);
-  });
-  console.log("");
-
-  const defaultIdx = (requested ? methods.findIndex((method) => method.key === requested) : 0) + 1;
-  const choice = await prompt(`  Choose [${defaultIdx}]: `);
-  const navigation = getNavigationChoice(choice);
-  if (navigation === "back") return BACK_TO_SELECTION;
-  if (navigation === "exit") exitOnboardFromPrompt();
-  const idx = parseInt(choice || String(defaultIdx), 10) - 1;
-  return methods[idx]?.key || methods[defaultIdx - 1]?.key || HERMES_AUTH_METHOD_OAUTH;
-}
-
-function resolveHermesNousApiKey(): string | null {
-  return (
-    // check-direct-credential-env-ignore -- Hermes Provider API keys are read only from the invoking shell for OpenShell provider registration; do not resolve host credentials.json.
-    normalizeCredentialValue(process.env[HERMES_NOUS_API_KEY_CREDENTIAL_ENV]) ||
-    normalizeCredentialValue(process.env.NEMOCLAW_PROVIDER_KEY) ||
-    null
-  );
-}
-
-function stageNousApiKeyProviderEnv(): void {
-  const key = resolveHermesNousApiKey();
-  if (key) {
-    process.env[HERMES_NOUS_API_KEY_CREDENTIAL_ENV] = key;
-  }
-}
-
-async function ensureHermesNousApiKeyEnv(): Promise<string> {
-  const existing = resolveHermesNousApiKey();
-  if (existing) {
-    process.env[HERMES_NOUS_API_KEY_CREDENTIAL_ENV] = existing;
-    return existing;
-  }
-  console.log("");
-  console.log("  Hermes Provider Nous API Key");
-  console.log(`  Create or copy a key from ${HERMES_NOUS_API_KEY_HELP_URL}`);
-  const key = normalizeCredentialValue(
-    await prompt("  Nous API Key: ", {
-      secret: true,
-    }),
-  );
-  const validationError = validateNvidiaApiKeyValue(key, HERMES_NOUS_API_KEY_CREDENTIAL_ENV);
-  if (validationError) {
-    console.error(validationError);
-    process.exit(1);
-  }
-  process.env[HERMES_NOUS_API_KEY_CREDENTIAL_ENV] = key;
-  return key;
-}
-
-function openshellResultMessage(result: {
-  stdout?: string | Buffer | null;
-  stderr?: string | Buffer | null;
-}): string {
-  return compactText(redact(`${result.stderr || ""} ${result.stdout || ""}`));
-}
-
-function checkHermesProviderStoreReachable(
-  runOpenshellImpl: typeof runOpenshell = runOpenshell,
-): { ok: true } | { ok: false; message: string } {
-  const result = runOpenshellImpl(["provider", "list"], {
-    ignoreError: true,
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: 10_000,
-  });
-  if (result.status === 0) return { ok: true };
-  return {
-    ok: false,
-    message:
-      openshellResultMessage(result) ||
-      "OpenShell provider storage is unreachable; the gateway may be stopped or refusing connections.",
-  };
-}
 
 async function selectOnboardAgent({
   agentFlag = null,
@@ -5158,7 +5082,7 @@ async function setupNim(
             console.log("");
             continue selectionLoop;
           }
-          hermesAuthMethod = selectedHermesAuthMethod;
+          hermesAuthMethod = normalizeHermesAuthMethod(selectedHermesAuthMethod);
           if (hermesAuthMethod === HERMES_AUTH_METHOD_API_KEY) {
             credentialEnv = HERMES_NOUS_API_KEY_CREDENTIAL_ENV;
             stageNousApiKeyProviderEnv();
