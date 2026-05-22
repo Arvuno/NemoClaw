@@ -108,8 +108,8 @@ sandbox_exec() {
 # 2026.5.x builds can show only `openclaw` in pgrep/ps even after the gateway
 # is ready. Prefer explicit gateway argv/title matches, then fall back to the
 # oldest live `openclaw` argv process when gateway.log proves it reached ready.
-# The fallback matches argv as well as comm because hosted Linux ps can show the
-# process comm as `node` even when pgrep reports argv as plain `openclaw`.
+# The fallback uses pgrep because hosted Linux diagnostics show pgrep can see
+# `311 openclaw` even when the ps columns used above still miss the process.
 gateway_pid() {
   local script
   script=$(
@@ -119,9 +119,7 @@ pid="$(ps -eo pid=,comm=,args= 2>/dev/null | awk '
   $2 == "openclaw-gateway" || $0 ~ /openclaw[[:space:]]+gateway([[:space:]]|$)/ || $0 ~ /openclaw-gateway/ { print $1 }
 ' | sort -n | head -n 1)"
 if [ -z "$pid" ] && grep -Eq "\[gateway\] (ready|http server listening)" /tmp/gateway.log 2>/dev/null; then
-  pid="$(ps -eo pid=,comm=,args= 2>/dev/null | awk '
-    $2 == "openclaw" || $0 ~ /(^|[[:space:]])openclaw([[:space:]]|$)/ { print $1 }
-  ' | sort -n | head -n 1)"
+  pid="$(pgrep -fo '[o]penclaw' 2>/dev/null || true)"
 fi
 printf "%s\n" "$pid"
 SH
