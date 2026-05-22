@@ -85,14 +85,15 @@ function renderSnapshotTable(
 }
 
 // Resolve the running src pod's image. Docker- and VM-driver sandboxes don't
-// have the legacy cluster container, so trust the registered imageTag;
-// fall back to the kubectl probe only for the "kubernetes" driver.
+// have the legacy cluster container — trust the registered imageTag and fail
+// fast if it's missing. Only the "kubernetes" driver falls back to the
+// kubectl probe inside the gateway container.
 function resolveSrcPodImage(srcName: string, srcEntry?: SandboxEntry | { name: string }): string | null {
   const registeredImage = (srcEntry as { imageTag?: string | null } | undefined)?.imageTag;
   const registeredDriver = (srcEntry as { openshellDriver?: string | null } | undefined)
     ?.openshellDriver;
-  if (usesGatewayMetadataProbe(registeredDriver) && registeredImage) {
-    return registeredImage;
+  if (usesGatewayMetadataProbe(registeredDriver)) {
+    return registeredImage ?? null;
   }
 
   const gatewayContainer = `openshell-cluster-${NEMOCLAW_GATEWAY_NAME}`;
