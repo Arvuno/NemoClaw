@@ -102,11 +102,16 @@ export class ManifestCompiler {
       configured,
       disabled,
       inputs: await resolveChannelInputs(manifest, context, this.hooks, {
-        runEnrollment: active && context.workflow === "create" && context.isInteractive,
+        runEnrollment:
+          selected && active && isEnrollmentWorkflow(context.workflow) && context.isInteractive,
       }),
       hooks: manifest.hooks.map((hook) => cloneHookReference(manifest.id, hook)),
     };
   }
+}
+
+function isEnrollmentWorkflow(workflow: ManifestCompilerContext["workflow"]): boolean {
+  return workflow === "onboard" || workflow === "add-channel";
 }
 
 function isChannelActive(

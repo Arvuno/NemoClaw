@@ -189,7 +189,7 @@ const telegramPlan = {
   schemaVersion: 1,
   sandboxName: "demo",
   agent: "openclaw",
-  workflow: "create",
+  workflow: "onboard",
   channels: [
     {
       channelId: "telegram",

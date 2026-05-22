@@ -75,7 +75,7 @@ describe("ManifestCompiler", () => {
     const plan = await compiler().compile({
       sandboxName: "demo",
       agent: "openclaw",
-      workflow: "create",
+      workflow: "onboard",
       isInteractive: true,
       selectedChannels: ["slack", "telegram", "wechat", "discord", "whatsapp"],
       credentialAvailability: {
@@ -222,7 +222,7 @@ describe("ManifestCompiler", () => {
     const plan = await compiler().compile({
       sandboxName: "demo",
       agent: "openclaw",
-      workflow: "create",
+      workflow: "onboard",
       isInteractive: true,
       selectedChannels: ["wechat", "telegram"],
     });
@@ -263,7 +263,7 @@ describe("ManifestCompiler", () => {
     ).compile({
       sandboxName: "demo",
       agent: "openclaw",
-      workflow: "create",
+      workflow: "onboard",
       isInteractive: false,
       selectedChannels: ["telegram"],
       credentialAvailability: {
@@ -287,7 +287,7 @@ describe("ManifestCompiler", () => {
         const plan = await compiler().compile({
           sandboxName: "demo",
           agent: "openclaw",
-          workflow: "create",
+          workflow: "onboard",
           isInteractive: false,
           selectedChannels: ["telegram"],
         });
@@ -309,7 +309,7 @@ describe("ManifestCompiler", () => {
     const context = {
       sandboxName: "demo",
       agent: "openclaw",
-      workflow: "create",
+      workflow: "onboard",
       isInteractive: false,
       selectedChannels: ["telegram"],
       credentialAvailability: {
@@ -344,7 +344,7 @@ describe("ManifestCompiler", () => {
     const plan = await compiler().compile({
       sandboxName: "demo",
       agent: "openclaw",
-      workflow: "stop",
+      workflow: "stop-channel",
       isInteractive: false,
       selectedChannels: [],
       configuredChannels: ["telegram"],
@@ -444,7 +444,7 @@ describe("ManifestCompiler", () => {
     ).compile({
       sandboxName: "demo",
       agent: "openclaw",
-      workflow: "create",
+      workflow: "onboard",
       isInteractive: true,
       selectedChannels: ["matrix"],
     });

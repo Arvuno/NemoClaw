@@ -175,7 +175,13 @@ export interface SandboxMessagingPlan {
 }
 
 /** Workflow that requested a compiled messaging plan. */
-export type MessagingCompilerWorkflow = "create" | "rebuild" | "start" | "stop";
+export type MessagingCompilerWorkflow =
+  | "onboard"
+  | "add-channel"
+  | "remove-channel"
+  | "start-channel"
+  | "stop-channel"
+  | "rebuild";
 
 /** Compiled metadata for one requested channel. */
 export interface SandboxMessagingChannelPlan {
