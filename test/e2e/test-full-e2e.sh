@@ -399,7 +399,7 @@ agent_reply=$(printf '%s' "$agent_response" | python3 "$REPO/test/e2e/lib/opencl
 if grep -qE "(^|[^0-9])42([^0-9]|$)" <<<"$agent_reply"; then
   pass "[LIVE] openclaw agent: model answered 6×7=42 through openclaw → inference.local"
 else
-  fail "[LIVE] openclaw agent: expected '42' in agent reply, got: ${agent_reply:0:200}"
+  fail "[LIVE] openclaw agent: expected '42' in parsed agent reply, got: ${agent_reply:0:200}; raw JSON: ${agent_response:0:500}"
 fi
 
 # ══════════════════════════════════════════════════════════════════

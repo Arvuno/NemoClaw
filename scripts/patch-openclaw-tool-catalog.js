@@ -220,6 +220,14 @@ function listSelectionFiles(distDir) {
     .sort();
 }
 
+function hasBuiltInToolCatalog(source) {
+  return source.includes("applyToolSearchCatalog({") && source.includes("buildToolSearchRunPlan({");
+}
+
+function hasNativeToolSearch(source) {
+  return NATIVE_TOOL_SEARCH_PATTERNS.every((pattern) => source.includes(pattern));
+}
+
 function patchSelectionText(source, filePath) {
   if (source.includes(MARKER)) {
     if (ALREADY_PATCHED_FORBIDDEN_PATTERNS.some((pattern) => source.includes(pattern))) {
@@ -233,8 +241,12 @@ function patchSelectionText(source, filePath) {
     return { patched: false, text: source };
   }
 
-  if (NATIVE_TOOL_SEARCH_PATTERNS.every((pattern) => source.includes(pattern))) {
+  if (hasNativeToolSearch(source)) {
     return { patched: false, text: source, status: "native-tool-search" };
+  }
+
+  if (hasBuiltInToolCatalog(source)) {
+    return { patched: false, text: source, skippedBuiltIn: true };
   }
 
   const requiredPatterns = [
@@ -275,10 +287,19 @@ function patchOpenClawToolCatalog(distDir) {
     return (
       text.includes(ALL_CUSTOM_TOOLS_PATTERN) ||
       text.includes(MARKER) ||
-      NATIVE_TOOL_SEARCH_PATTERNS.every((pattern) => text.includes(pattern))
+      hasNativeToolSearch(text)
     );
   });
   if (targetFiles.length !== 1) {
+    if (targetFiles.length === 0) {
+      const builtInCatalogFile = selectionFiles.find((file) => {
+        const text = fs.readFileSync(file, "utf-8");
+        return hasBuiltInToolCatalog(text);
+      });
+      if (builtInCatalogFile) {
+        return { status: "skipped-built-in", file: builtInCatalogFile, version };
+      }
+    }
     throw new Error(`Expected exactly one selection-*.js target, found ${targetFiles.length}`);
   }
 
@@ -289,6 +310,9 @@ function patchOpenClawToolCatalog(distDir) {
   if (patched) {
     fs.writeFileSync(target, text);
     return { status: "patched", file: target, version };
+  }
+  if (result.skippedBuiltIn) {
+    return { status: "skipped-built-in", file: target, version };
   }
   return { status: result.status ?? "already-patched", file: target, version };
 }

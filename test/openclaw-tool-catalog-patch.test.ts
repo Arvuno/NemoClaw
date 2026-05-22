@@ -226,6 +226,25 @@ describe("OpenClaw compact tool catalog patch", () => {
       fs.rmSync(native.root, { recursive: true, force: true });
     }
 
+    const builtInCatalog = makeFixture({
+      allCustomToolsLine: [
+        "\t\tconst toolSearch = applyToolSearchCatalog({",
+        "\t\t\ttools: effectiveTools,",
+        "\t\t});",
+        "\t\tconst toolSearchRunPlan = buildToolSearchRunPlan({",
+        "\t\t\tvisibleTools: effectiveTools,",
+        "\t\t});",
+      ].join("\n"),
+    });
+    try {
+      const result = runPatch(builtInCatalog.dist);
+      expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
+      expect(result.stdout).toContain("skipped-built-in");
+      expect(fs.readFileSync(builtInCatalog.selectionPath, "utf-8")).not.toContain(MARKER);
+    } finally {
+      fs.rmSync(builtInCatalog.root, { recursive: true, force: true });
+    }
+
     const partial = makeFixture({
       allCustomToolsLine: [
         MARKER,
