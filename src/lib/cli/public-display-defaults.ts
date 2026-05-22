@@ -365,7 +365,7 @@ const PUBLIC_DISPLAY_LAYOUT: Record<string, readonly PublicDisplayLayout[]> = {
     {
       "group": "Sandbox Management",
       "order": 9,
-      "flags": "[selector] [--to <dst>]"
+      "flags": "[selector] [--to <dst>] [--force] [--yes|-y]"
     }
   ],
   "sandbox:status": [

@@ -25,6 +25,8 @@ import {
 } from "../../domain/policy-channel";
 import * as registry from "../../state/registry";
 import { runOpenshell } from "../../adapters/openshell/runtime";
+import { shellQuote } from "../../runner";
+import { executeSandboxCommand, executeSandboxExecCommand } from "./process-recovery";
 import { rebuildSandbox } from "./rebuild";
 import {
   type ChannelDef,
@@ -741,6 +743,57 @@ function applyChannelPresetIfAvailable(sandboxName: string, channelName: string)
   }
 }
 
+function getSandboxChannelStatePaths(agent: AgentDefinition, channelName: string): string[] {
+  const configDir = agent.configPaths.dir;
+  const stateDirs = new Set(agent.stateDirs);
+  if (stateDirs.has("platforms")) {
+    return [`${configDir}/platforms/${channelName}`];
+  }
+  if (stateDirs.has(channelName)) {
+    return [`${configDir}/${channelName}`];
+  }
+  return [];
+}
+
+function isSafeChannelStatePath(p: string): boolean {
+  if (!p.startsWith("/sandbox/.")) return false;
+  if (p.includes("..")) return false;
+  return /^\/sandbox\/\.[A-Za-z0-9_./-]+$/.test(p);
+}
+
+const CHANNEL_CLEAR_SENTINEL = "NEMOCLAW_CHANNEL_CLEAR_OK";
+
+// Wipe the durable per-channel state inside the sandbox before rebuild so
+// the state_dirs backup does not restore an auth blob the operator just
+// asked NemoClaw to forget. Returns true when no cleanup was needed OR
+// when the in-sandbox rm produced our success sentinel; false otherwise.
+// Tries `openshell sandbox exec` first and falls back to SSH for transient
+// wrapper hiccups (mirrors the pattern in process-recovery.ts:286-296).
+// Fixes #3998.
+function clearSandboxChannelDurableState(sandboxName: string, channelName: string): boolean {
+  const agent = resolveAgentForSandbox(sandboxName);
+  const paths = getSandboxChannelStatePaths(agent, channelName).filter(isSafeChannelStatePath);
+  if (paths.length === 0) return true;
+
+  const quoted = paths.map((p) => shellQuote(p)).join(" ");
+  const cmd = `rm -rf -- ${quoted} && printf '%s\\n' ${shellQuote(CHANNEL_CLEAR_SENTINEL)}`;
+  const sentinelSeen = (result: { stdout?: string | null } | null): boolean =>
+    !!result && typeof result.stdout === "string" && result.stdout.includes(CHANNEL_CLEAR_SENTINEL);
+
+  let result = executeSandboxExecCommand(sandboxName, cmd);
+  if (!sentinelSeen(result)) {
+    result = executeSandboxCommand(sandboxName, cmd);
+  }
+  if (!sentinelSeen(result)) {
+    console.error(
+      `  ${YW}⚠${R} Could not clear in-sandbox '${channelName}' channel state at ${paths.join(", ")}.`,
+    );
+    return false;
+  }
+  console.log(`  ${G}✓${R} Cleared in-sandbox '${channelName}' channel state.`);
+  return true;
+}
+
 // Mirror a registry-side preset add/remove into `session.policyPresets`.
 // Without this, a later `rebuild` re-enters onboard resume, reads the
 // stale session, and narrows the preset back away — see #3437 follow-up.
@@ -800,9 +853,11 @@ function syncSessionPolicyPresetsWithRegistry(
 function removeChannelPresetIfPresent(sandboxName: string, channelName: string): void {
   const builtinPresets = new Set(policies.listPresets().map((p) => p.name));
   if (!builtinPresets.has(channelName)) {
+    syncSessionPolicyPresetsWithRegistry(sandboxName, channelName, "remove");
     return;
   }
   if (!policies.getAppliedPresets(sandboxName).includes(channelName)) {
+    syncSessionPolicyPresetsWithRegistry(sandboxName, channelName, "remove");
     return;
   }
   try {
@@ -853,10 +908,44 @@ export async function removeSandboxChannel(
 
   clearChannelTokens(channel);
   const tokenKeys = getChannelTokenKeys(channel);
-  // Same rationale as channels-add: tear down the gateway providers and
-  // drop the channel from the registry NOW so a deferred rebuild does
-  // not leave a stale bridge running against a token NemoClaw has
-  // already "removed" from the user's perspective.
+  const isQrChannel = channelUsesInSandboxQrPairing(channel);
+
+  const registryEntry = registry.getSandbox(sandboxName);
+  let sessionForSandbox: ReturnType<typeof onboardSession.loadSession> = null;
+  try {
+    sessionForSandbox = onboardSession.loadSession();
+  } catch {
+    sessionForSandbox = null;
+  }
+  const sessionPolicyPresets =
+    sessionForSandbox?.sandboxName === sandboxName &&
+    Array.isArray(sessionForSandbox.policyPresets)
+      ? sessionForSandbox.policyPresets
+      : [];
+  const hasChannelResidue =
+    (registryEntry?.messagingChannels || []).includes(canonical) ||
+    (registryEntry?.policies || []).includes(canonical) ||
+    sessionPolicyPresets.includes(canonical) ||
+    policies.getAppliedPresets(sandboxName).includes(canonical);
+
+  // QR-paired channels store auth blobs inside the sandbox that survive a
+  // rebuild via the state_dirs backup. Tear those down FIRST so a cleanup
+  // failure leaves the registry/policy untouched — the operator can re-run
+  // after starting the sandbox. Bailing here is the only way to keep
+  // #3998 from recurring on cleanup error. Skip the cleanup attempt entirely
+  // when the registry/policy show no residue — `channels remove` on a
+  // never-configured/already-clean sandbox must remain a quiet no-op even
+  // when the sandbox is stopped (#4001 review).
+  if (isQrChannel && hasChannelResidue && !clearSandboxChannelDurableState(sandboxName, canonical)) {
+    console.error(
+      `  Refusing to proceed: '${canonical}' session state is still inside the sandbox.`,
+    );
+    console.error(
+      `    Start the sandbox, then re-run: ${CLI_NAME} ${sandboxName} channels remove ${canonical}`,
+    );
+    process.exit(1);
+  }
+
   await applyChannelRemoveToGatewayAndRegistry(sandboxName, canonical, tokenKeys);
   if (tokenKeys.length > 0) {
     console.log(`  ${G}✓${R} Removed ${canonical} bridge from the OpenShell gateway.`);
@@ -866,6 +955,12 @@ export async function removeSandboxChannel(
 
   removeChannelPresetIfPresent(sandboxName, canonical);
 
+  // Token-based channels: best-effort tidy of any leftover dir. Token
+  // revocation already prevents the bot from authenticating, so a
+  // failure here is a warning, not a bail.
+  if (!isQrChannel) {
+    clearSandboxChannelDurableState(sandboxName, canonical);
+  }
 
   await promptAndRebuild(sandboxName, `remove '${canonical}'`);
 }

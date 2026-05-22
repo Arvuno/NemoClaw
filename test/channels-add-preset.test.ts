@@ -74,6 +74,10 @@ resolver.resolveOpenshell = () => "/fake/openshell";
 const openshellRuntime = require(${j("adapters/openshell/runtime.js")});
 openshellRuntime.runOpenshell = () => ({ status: 0, stdout: "", stderr: "" });
 
+const processRecovery = require(${j("actions/sandbox/process-recovery.js")});
+processRecovery.executeSandboxExecCommand = () => ({ status: 0, stdout: "NEMOCLAW_CHANNEL_CLEAR_OK", stderr: "" });
+processRecovery.executeSandboxCommand = () => null;
+
 const runner = require(${j("runner.js")});
 runner.run = () => ({ status: 0, stdout: "", stderr: "" });
 runner.runCapture = () => "";
