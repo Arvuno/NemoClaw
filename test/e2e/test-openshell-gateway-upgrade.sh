@@ -173,7 +173,8 @@ if [ "$rewrote_openclaw" = "0" ]; then
   printf 'add build-arg OPENCLAW_VERSION=%s\n' "$old_openclaw" >>"$log_file"
 fi
 if [ "$rewrote_base" = "0" ]; then
-  printf 'no BASE_IMAGE override seen; old Dockerfile default remains unchanged\n' >>"$log_file"
+  args+=("--build-arg" "BASE_IMAGE=${base_ref}")
+  printf 'add build-arg BASE_IMAGE=%s\n' "$base_ref" >>"$log_file"
 fi
 exec "$real_docker" "${args[@]}"
 EOF
