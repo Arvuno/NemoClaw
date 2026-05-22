@@ -1,0 +1,266 @@
+---
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+title: "Plugin API Reference"
+sidebar-title: "Plugin API"
+description: "OpenClaw plugin API reference for NemoClaw extensions."
+description-agent: "Reference for the NemoClaw plugin API types and interfaces."
+keywords: ["nemoclaw plugin api", "openclaw plugin sdk"]
+content:
+  type: "reference"
+---
+
+NemoClaw exposes its plugin API for developers building extensions inside the OpenClaw sandbox environment.
+
+## Plugin Entry Point
+
+```typescript
+export default function register(api: OpenClawPluginApi): void
+```
+
+Called by the OpenClaw host when the plugin loads. Register commands, providers, and hooks using the provided `api` object.
+
+## OpenClawPluginApi
+
+The main API object injected by the OpenClaw host.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | `string` | Unique plugin identifier |
+| `name` | `string` | Human-readable plugin name |
+| `version` | `string \| undefined` | Plugin version |
+| `config` | `OpenClawConfig` | Active OpenClaw configuration |
+| `pluginConfig` | `OpenClawConfig \| undefined` | Plugin-specific config from `openclaw.plugin.json` |
+| `logger` | `PluginLogger` | Structured logger |
+
+### registerCommand(command)
+
+Register a slash command handler.
+
+```typescript
+api.registerCommand(command: PluginCommandDefinition): void
+```
+
+### registerProvider(provider)
+
+Register a model inference provider.
+
+```typescript
+api.registerProvider(provider: ProviderPlugin): void
+```
+
+### registerService(service)
+
+Register a background service.
+
+```typescript
+api.registerService(service: PluginService): void
+```
+
+### resolvePath(input)
+
+Resolve a relative path against the sandbox root.
+
+```typescript
+api.resolvePath(input: string): string
+```
+
+### on(hookName, handler)
+
+Register a lifecycle hook.
+
+```typescript
+api.on(
+  hookName: string,
+  handler: (...args: readonly PluginValue[]) => HookResult | Promise<HookResult>
+): void
+```
+
+## PluginCommandDefinition
+
+```typescript
+export interface PluginCommandDefinition {
+  name: string;
+  description: string;
+  acceptsArgs?: boolean;
+  requireAuth?: boolean;
+  handler: (ctx: PluginCommandContext) => PluginCommandResult | Promise<PluginCommandResult>;
+}
+```
+
+## PluginCommandContext
+
+Context passed to slash command handlers.
+
+```typescript
+export interface PluginCommandContext {
+  senderId?: string;
+  channel: string;
+  isAuthorizedSender: boolean;
+  args?: string;
+  commandBody: string;
+  config: OpenClawConfig;
+  from?: string;
+  to?: string;
+  accountId?: string;
+}
+```
+
+## PluginCommandResult
+
+Return value from a slash command handler.
+
+```typescript
+export interface PluginCommandResult {
+  text?: string;
+  mediaUrl?: string;
+  mediaUrls?: string[];
+}
+```
+
+## ProviderPlugin
+
+Registration shape for a custom model provider.
+
+```typescript
+export interface ProviderPlugin {
+  id: string;
+  label: string;
+  docsPath?: string;
+  aliases?: string[];
+  envVars?: string[];
+  models?: ModelProviderConfig;
+  auth: ProviderAuthMethod[];
+}
+```
+
+## ModelProviderConfig
+
+Model catalog shape.
+
+```typescript
+export interface ModelProviderConfig {
+  chat?: ModelProviderEntry[];
+  completion?: ModelProviderEntry[];
+}
+```
+
+## ModelProviderEntry
+
+Model entry in a provider's catalog.
+
+```typescript
+export interface ModelProviderEntry {
+  id: string;
+  label: string;
+  contextWindow?: number;
+  maxOutput?: number;
+}
+```
+
+## ProviderAuthMethod
+
+Auth method for a provider plugin.
+
+```typescript
+export interface ProviderAuthMethod {
+  id?: string;
+  type: string;
+  envVar?: string;
+  headerName?: string;
+  label?: string;
+}
+```
+
+## PluginService
+
+Background service registration.
+
+```typescript
+export interface PluginService {
+  id: string;
+  start: (ctx: { config: OpenClawConfig; logger: PluginLogger }) => void | Promise<void>;
+  stop?: (ctx: { config: OpenClawConfig; logger: PluginLogger }) => void | Promise<void>;
+}
+```
+
+## PluginLogger
+
+Logger provided by the plugin host.
+
+```typescript
+export interface PluginLogger {
+  info(message: string): void;
+  warn(message: string): void;
+  error(message: string): void;
+  debug(message: string): void;
+}
+```
+
+## Hooks
+
+### before_tool_call
+
+Fires before a tool is executed. Return `BeforeToolCallResult` to modify params or block the call.
+
+```typescript
+interface BeforeToolCallEvent {
+  toolName: string;
+  params: ToolParams;
+  runId?: string;
+  toolCallId?: string;
+}
+
+interface BeforeToolCallResult {
+  params?: ToolParams;
+  block?: boolean;
+  blockReason?: string;
+}
+```
+
+### before_prompt_build
+
+Fires before the prompt is built. Return `BeforePromptBuildResult` to modify system prompt or context.
+
+```typescript
+interface BeforePromptBuildResult {
+  systemPrompt?: string;
+  prependContext?: string;
+  appendContext?: string;
+  prependSystemContext?: string;
+  appendSystemContext?: string;
+}
+```
+
+## NemoClaw-Specific Types
+
+### NemoClawConfig
+
+Plugin-specific configuration read from `pluginConfig`.
+
+```typescript
+export interface NemoClawConfig {
+  blueprintVersion: string;
+  blueprintRegistry: string;
+  sandboxName: string;
+  inferenceProvider: string;
+}
+```
+
+### getPluginConfig(api)
+
+Extract `NemoClawConfig` from the plugin API.
+
+```typescript
+export function getPluginConfig(api: OpenClawPluginApi): NemoClawConfig
+```
+
+## Type Aliases
+
+```typescript
+type PluginScalar = string | number | boolean | null | undefined;
+type PluginValue = PluginScalar | PluginRecord | PluginValue[];
+type PluginRecord = { [key: string]: PluginValue };
+type ToolParams = { [key: string]: PluginValue };
+type HookResult = BeforeToolCallResult | BeforePromptBuildResult | undefined;
+```
