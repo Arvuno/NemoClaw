@@ -667,7 +667,7 @@ fi`,
       const fakeBin = path.join(tmp, "bin");
       const prefix = path.join(tmp, "prefix");
       const npmLog = path.join(tmp, "npm.log");
-      const opensellLog = path.join(tmp, "install-openshell.log");
+      const openshellLog = path.join(tmp, "install-openshell.log");
       fs.mkdirSync(fakeBin);
       fs.mkdirSync(path.join(tmp, ".git"));
       fs.mkdirSync(path.join(prefix, "bin"), { recursive: true });
@@ -730,13 +730,13 @@ exit 0
           NEMOCLAW_REPO_ROOT: tmp,
           NPM_PREFIX: prefix,
           NPM_LOG_PATH: npmLog,
-          INSTALL_OPENSHELL_LOG: opensellLog,
+          INSTALL_OPENSHELL_LOG: openshellLog,
         },
       });
 
       expect(result.status).toBe(0);
-      expect(fs.existsSync(opensellLog)).toBe(true);
-      expect(fs.readFileSync(opensellLog, "utf-8")).toMatch(/install-openshell\.sh invoked/);
+      expect(fs.existsSync(openshellLog)).toBe(true);
+      expect(fs.readFileSync(openshellLog, "utf-8")).toMatch(/install-openshell\.sh invoked/);
     },
   );
 
@@ -748,7 +748,7 @@ exit 0
       const fakeBin = path.join(tmp, "bin");
       const prefix = path.join(tmp, "prefix");
       const npmLog = path.join(tmp, "npm.log");
-      const opensellLog = path.join(tmp, "install-openshell.log");
+      const openshellLog = path.join(tmp, "install-openshell.log");
       fs.mkdirSync(fakeBin);
       fs.mkdirSync(path.join(tmp, ".git"));
       fs.mkdirSync(path.join(prefix, "bin"), { recursive: true });
@@ -818,12 +818,12 @@ exit 0
           NEMOCLAW_REPO_ROOT: tmp,
           NPM_PREFIX: prefix,
           NPM_LOG_PATH: npmLog,
-          INSTALL_OPENSHELL_LOG: opensellLog,
+          INSTALL_OPENSHELL_LOG: openshellLog,
         },
       });
 
       expect(result.status).toBe(0);
-      expect(fs.existsSync(opensellLog)).toBe(false);
+      expect(fs.existsSync(openshellLog)).toBe(false);
     },
   );
 
