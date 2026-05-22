@@ -862,12 +862,21 @@ export async function removeSandboxChannel(
   const tokenKeys = getChannelTokenKeys(channel);
   const isQrChannel = channelUsesInSandboxQrPairing(channel);
 
+  const registryEntry = registry.getSandbox(sandboxName);
+  const hasChannelResidue =
+    (registryEntry?.messagingChannels || []).includes(canonical) ||
+    (registryEntry?.policies || []).includes(canonical) ||
+    policies.getAppliedPresets(sandboxName).includes(canonical);
+
   // QR-paired channels store auth blobs inside the sandbox that survive a
   // rebuild via the state_dirs backup. Tear those down FIRST so a cleanup
   // failure leaves the registry/policy untouched — the operator can re-run
   // after starting the sandbox. Bailing here is the only way to keep
-  // #3998 from recurring on cleanup error.
-  if (isQrChannel && !clearSandboxChannelDurableState(sandboxName, canonical)) {
+  // #3998 from recurring on cleanup error. Skip the cleanup attempt entirely
+  // when the registry/policy show no residue — `channels remove` on a
+  // never-configured/already-clean sandbox must remain a quiet no-op even
+  // when the sandbox is stopped (#4001 review).
+  if (isQrChannel && hasChannelResidue && !clearSandboxChannelDurableState(sandboxName, canonical)) {
     console.error(
       `  Refusing to proceed: '${canonical}' session state is still inside the sandbox.`,
     );

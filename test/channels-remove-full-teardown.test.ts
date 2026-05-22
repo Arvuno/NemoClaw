@@ -305,26 +305,21 @@ const ctx = module.exports;
     })}
 const ctx = module.exports;
 (async () => {
+  const dumpState = () => ({
+    sandboxExecCalls: ctx.sandboxExecCalls,
+    sandboxSshCalls: ctx.sandboxSshCalls,
+    sessionPolicyPresets: ctx.sessionStore.policyPresets,
+    removedPresets: ctx.removedPresets,
+    registryUpdates: ctx.registryUpdates,
+    callOrder: ctx.callOrder,
+    exitCode: ctx.getExitCode(),
+  });
   try {
     await ctx.channelModule.removeSandboxChannel("test-sb", { channel: "whatsapp" });
-    process.stdout.write("\\n__RESULT__" + JSON.stringify({
-      sandboxExecCalls: ctx.sandboxExecCalls,
-      sessionPolicyPresets: ctx.sessionStore.policyPresets,
-      removedPresets: ctx.removedPresets,
-      registryUpdates: ctx.registryUpdates,
-      callOrder: ctx.callOrder,
-      exitCode: ctx.getExitCode(),
-    }) + "\\n");
+    process.stdout.write("\\n__RESULT__" + JSON.stringify(dumpState()) + "\\n");
   } catch (err) {
     if (typeof err.message === "string" && err.message.startsWith("__PROCESS_EXIT__")) {
-      process.stdout.write("\\n__RESULT__" + JSON.stringify({
-        sandboxExecCalls: ctx.sandboxExecCalls,
-        sessionPolicyPresets: ctx.sessionStore.policyPresets,
-        removedPresets: ctx.removedPresets,
-        registryUpdates: ctx.registryUpdates,
-        callOrder: ctx.callOrder,
-        exitCode: ctx.getExitCode(),
-      }) + "\\n");
+      process.stdout.write("\\n__RESULT__" + JSON.stringify(dumpState()) + "\\n");
       return;
     }
     process.stdout.write("\\n__RESULT__" + JSON.stringify({ error: err.message, stack: err.stack }) + "\\n");
@@ -363,6 +358,62 @@ const ctx = module.exports;
       c.command.startsWith("rm -rf"),
     );
     assert.equal(cleanupCalls.length, 1, "expected the rm -rf attempt that failed");
+    assert.equal(
+      payload.sandboxSshCalls.length,
+      1,
+      `SSH fallback must be attempted before aborting; sandboxSshCalls=${JSON.stringify(payload.sandboxSshCalls)}`,
+    );
+    assert.ok(
+      payload.sandboxSshCalls[0].command.startsWith("rm -rf"),
+      `SSH fallback must invoke the rm -rf cleanup; got ${payload.sandboxSshCalls[0].command}`,
+    );
+  });
+
+  it("does not abort when removing a never-configured QR channel even if sandbox is unreachable", () => {
+    const script = `${buildPreamble({
+      presetNamesApplied: ["npm", "pypi"],
+      sandboxAgent: "openclaw",
+      channelInRegistry: "telegram",
+      sandboxExecResult: { status: 1, stdout: "", stderr: "sandbox is not running" },
+      sshFallbackResult: { status: 255, stdout: "", stderr: "ssh: connect to host ... failed" },
+    })}
+const ctx = module.exports;
+(async () => {
+  try {
+    await ctx.channelModule.removeSandboxChannel("test-sb", { channel: "whatsapp" });
+    process.stdout.write("\\n__RESULT__" + JSON.stringify({
+      sandboxExecCalls: ctx.sandboxExecCalls,
+      sandboxSshCalls: ctx.sandboxSshCalls,
+      callOrder: ctx.callOrder,
+      exitCode: ctx.getExitCode(),
+    }) + "\\n");
+  } catch (err) {
+    process.stdout.write("\\n__RESULT__" + JSON.stringify({ error: err.message, stack: err.stack }) + "\\n");
+  }
+})();
+`;
+    const result = runScript(script);
+    assert.equal(result.status, 0, `script failed: ${result.stderr}\n${result.stdout}`);
+    const marker = result.stdout.lastIndexOf("__RESULT__");
+    assert.ok(marker >= 0, `no __RESULT__ marker:\n${result.stdout}`);
+    const payload = JSON.parse(result.stdout.slice(marker + "__RESULT__".length).trim());
+    assert.ok(!payload.error, `unexpected error: ${payload.error}\n${payload.stack || ""}`);
+
+    assert.equal(payload.exitCode, null, "must remain a no-op when registry shows no channel residue");
+    assert.equal(
+      payload.sandboxExecCalls.length,
+      0,
+      `sandbox-exec cleanup must NOT run when channel was never configured; got ${JSON.stringify(payload.sandboxExecCalls)}`,
+    );
+    assert.equal(
+      payload.sandboxSshCalls.length,
+      0,
+      "SSH fallback must NOT run when channel was never configured",
+    );
+    assert.ok(
+      payload.callOrder.includes("promptAndRebuild"),
+      `rebuild prompt must still fire on the no-op remove path; callOrder=${JSON.stringify(payload.callOrder)}`,
+    );
   });
 
   it("leaves non-whatsapp presets in session.policyPresets untouched when removing a token-based channel", () => {
